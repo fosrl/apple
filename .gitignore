@@ -1,0 +1,63 @@
+# macOS / Xcode / Swift / SwiftUI gitignore
+
+## General
+.DS_Store
+*.swp
+*.lock
+*.tmp
+*.log
+
+## Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+*.xccheckout
+*.xcodeproj/project.xcworkspace/
+!default.xcworkspace/
+
+# Xcode workspace settings (often user-specific)
+*.xcworkspace/xcuserdata/
+
+## Swift Package Manager (SPM)
+/.build/
+Packages/
+Package.pins
+Package.resolved
+
+## CocoaPods (if used)
+Pods/
+Podfile.lock
+
+## Carthage (if used)
+Carthage/Build/
+Carthage/Checkouts/
+
+## Fastlane (if used)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+## Temporary or Auto-generated Files
+*.moved-aside
+*.orig
+*.rej
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pbxuser
+
+## SwiftPM, Tuist, or other Tools
+.xcodeproj/project.xcworkspace/xcuserdata/
+tuist/Derived/
+.swiftpm/
+
+## App-specific
+*.dSYM
+*.ipa
+*.app
+
+# If you’re using Firebase or similar SDKs, sometimes config files are private:
+GoogleService-Info.plist

@@ -1,0 +1,5 @@
+module PangolinGo {
+    header "PangolinGo/libpangolin.h"
+    export *
+}
+
