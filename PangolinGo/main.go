@@ -1,21 +1,26 @@
 package main
 
+/*
+#include <stdint.h>
+*/
 import (
 	"C"
 	"sync"
 	"time"
 )
+import "fmt"
 
 var (
-	tunnelRunning bool
-	tunnelMutex   sync.Mutex
-	stopChan      chan struct{}
-	wg            sync.WaitGroup
+	tunnelRunning  bool
+	tunnelMutex    sync.Mutex
+	tunnelFileDesc int32
+	stopChan       chan struct{}
+	wg             sync.WaitGroup
 )
 
 //export startTunnel
-func startTunnel() *C.char {
-	appLogger.Info("startTunnel() called - starting tunnel")
+func startTunnel(fd C.int) *C.char {
+	appLogger.Info("startTunnel() called - starting tunnel with FD: %d", int(fd))
 
 	tunnelMutex.Lock()
 	defer tunnelMutex.Unlock()
@@ -26,30 +31,35 @@ func startTunnel() *C.char {
 		return C.CString("Error: Tunnel already running")
 	}
 
+	tunnelFileDesc = int32(fd)
+	appLogger.Info("Starting tunnel from go side with FD: %d", tunnelFileDesc)
+
 	// Create stop channel
 	stopChan = make(chan struct{})
 	tunnelRunning = true
 
 	// Start background process that runs forever
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 
-		appLogger.Info("Olm process started")
+		appLogger.Info("Background process started")
 
 		for {
 			select {
 			case <-ticker.C:
-				appLogger.Info("Olm running...")
+				appLogger.Info("Background process running...")
 			case <-stopChan:
-				appLogger.Info("Olm process stopped")
+				appLogger.Info("Background process stopped")
 				return
 			}
 		}
-	})
+	}()
 
 	appLogger.Info("startTunnel() completed successfully")
-	return C.CString("Tunnel started")
+	return C.CString(fmt.Sprintf("Tunnel started with FD: %d", tunnelFileDesc))
 }
 
 //export stopTunnel
@@ -71,6 +81,9 @@ func stopTunnel() *C.char {
 		stopChan = nil
 	}
 
+	tunnelRunning = false
+	tunnelMutex.Unlock()
+
 	// Wait for goroutine to finish (with timeout)
 	done := make(chan struct{})
 	go func() {
@@ -85,12 +98,10 @@ func stopTunnel() *C.char {
 		appLogger.Warn("Timeout waiting for background process to stop")
 	}
 
-	tunnelRunning = false
+	tunnelMutex.Lock()
 	appLogger.Info("stopTunnel() completed successfully")
 	return C.CString("Tunnel stopped")
 }
 
 // We need an entry point; it's ok for this to be empty
-func main() {
-	appLogger.Info("main() entry point called")
-}
+func main() {}

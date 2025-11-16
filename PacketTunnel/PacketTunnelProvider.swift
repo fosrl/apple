@@ -6,11 +6,24 @@
 //
 
 import NetworkExtension
-import PangolinGo
+import os.log
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
+    private var tunnelAdapter: TunnelAdapter?
+    private let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
+        let log = OSLog(subsystem: subsystem, category: "PacketTunnelProvider")
+        // Log the subsystem being used for debugging
+        os_log("PacketTunnelProvider initialized with subsystem: %{public}@", log: log, type: .info, subsystem)
+        return log
+    }()
     
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
+        os_log("startTunnel called with options: %{public}@", log: logger, type: .info, options?.description ?? "nil")
+        
+        // Initialize the tunnel adapter
+        tunnelAdapter = TunnelAdapter(with: self)
+        
         // Set up a basic network configuration
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
 
@@ -26,62 +39,31 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         // Set MTU
         settings.mtu = 1500
 
-        // Apply the settings
-        setTunnelNetworkSettings(settings) { error in
+        os_log("Network settings configured - IPv4: %{public}@, DNS: %{public}@, MTU: %d", 
+               log: logger, type: .info,
+               settings.ipv4Settings?.addresses.joined(separator: ", ") ?? "none",
+               settings.dnsSettings?.servers.joined(separator: ", ") ?? "none",
+               settings.mtu ?? 0)
+
+        // Use the tunnel adapter to start the tunnel and discover the file descriptor
+        tunnelAdapter?.start(with: settings) { [weak self] (error: Error?) in
             if let error = error {
-                // If network settings failed, try to stop the Go tunnel
-                if let stopResult = PangolinGo.stopTunnel() {
-                    let stopMessage = String(cString: stopResult)
-                    stopResult.deallocate()
-                    print("Go stopTunnel (cleanup): \(stopMessage)")
-                }
-                completionHandler(error)
+                os_log("Tunnel start failed: %{public}@", log: self?.logger ?? .default, type: .error, error.localizedDescription)
             } else {
-                completionHandler(nil)
+                os_log("Tunnel start completed successfully", log: self?.logger ?? .default, type: .info)
             }
-        }
-        
-        // Call Go function to start tunnel (use module prefix to avoid conflict with instance method)
-        var goError: Error? = nil
-        if let result = PangolinGo.startTunnel() {
-            let message = String(cString: result)
-            result.deallocate()
-            print("Go startTunnel: \(message)")
-            
-            // Check if the Go function returned an error
-            if message.lowercased().contains("error") || message.lowercased().contains("fail") {
-                goError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
-            }
-        } else {
-            goError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to call Go startTunnel function"])
-        }
-        
-        // If Go function failed, return error immediately
-        if let error = goError {
             completionHandler(error)
-            return
         }
     }
     
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        // Call Go function to stop tunnel (use module prefix to avoid conflict with instance method)
-        var stopError: Error? = nil
-        if let result = PangolinGo.stopTunnel() {
-            let message = String(cString: result)
-            result.deallocate()
-            print("Go stopTunnel: \(message)")
-            
-            // Check if the Go function returned an error
-            if message.lowercased().contains("error") || message.lowercased().contains("fail") {
-                stopError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
-            }
-        } else {
-            stopError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to call Go stopTunnel function"])
-        }
+        os_log("stopTunnel called with reason: %d", log: logger, type: .info, reason.rawValue)
         
-        // Log any errors but still complete (tunnel should stop regardless)
-        if let error = stopError {
-            print("Error stopping Go tunnel: \(error.localizedDescription)")
+        // Use the tunnel adapter to stop the Go tunnel
+        if let error = tunnelAdapter?.stop() {
+            os_log("Error stopping tunnel adapter: %{public}@", log: logger, type: .error, error.localizedDescription)
+        } else {
+            os_log("Tunnel stopped successfully", log: logger, type: .info)
         }
         
         completionHandler()

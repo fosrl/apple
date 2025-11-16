@@ -9,7 +9,6 @@ import Foundation
 import NetworkExtension
 import SystemExtensions
 import Combine
-import PangolinGo
 
 class TunnelManager: NSObject, ObservableObject {
     @Published var isConnected = false
@@ -204,12 +203,8 @@ class TunnelManager: NSObject, ObservableObject {
             }
         }
         
-        // Call Go function to start tunnel (if needed)
-        if let result = startTunnel() {
-            let message = String(cString: result)
-            result.deallocate()
-            print("Go startTunnel: \(message)")
-        }
+        // Note: Go startTunnel is called from within the PacketTunnelProvider system extension
+        // when the tunnel starts, not from the app side
         
         do {
             // Start with options if needed
@@ -229,12 +224,8 @@ class TunnelManager: NSObject, ObservableObject {
             return
         }
         
-        // Call Go function to stop tunnel (if needed)
-        if let result = stopTunnel() {
-            let message = String(cString: result)
-            result.deallocate()
-            print("Go stopTunnel: \(message)")
-        }
+        // Note: Go stopTunnel is called from within the PacketTunnelProvider system extension
+        // when the tunnel stops, not from the app side
         
         manager.connection.stopVPNTunnel()
         await updateConnectionStatus()

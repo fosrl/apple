@@ -1,11 +1,16 @@
 package main
 
+/*
+#cgo CFLAGS: -I../PacketTunnel
+#include "../PacketTunnel/GoLoggerBridge.h"
+#include <stdlib.h>
+*/
+import "C"
 import (
 	"fmt"
-	"log"
-	"os"
 	"runtime"
 	"time"
+	"unsafe"
 )
 
 // LogLevel represents the severity of a log message
@@ -20,17 +25,19 @@ const (
 
 // Logger provides formatted logging functionality
 type Logger struct {
-	prefix   string
-	logLevel LogLevel
-	logger   *log.Logger
+	prefix    string
+	logLevel  LogLevel
+	subsystem *C.char
+	category  *C.char
 }
 
 // NewLogger creates a new logger instance
 func NewLogger(prefix string) *Logger {
 	return &Logger{
-		prefix:   prefix,
-		logLevel: LogLevelInfo,
-		logger:   log.New(os.Stderr, "", 0), // We'll format everything ourselves
+		prefix:    prefix,
+		logLevel:  LogLevelInfo,
+		subsystem: C.CString("net.pangolin.Pangolin.PacketTunnel"),
+		category:  C.CString("PangolinGo"),
 	}
 }
 
@@ -66,32 +73,53 @@ func (l *Logger) formatMessage(level string, format string, args ...interface{})
 		timestamp, level, l.prefix, file, line, message)
 }
 
+// logToOSLog sends a log message to os.log via the C bridge
+func (l *Logger) logToOSLog(level LogLevel, levelName string, format string, args ...interface{}) {
+	if l.logLevel > level {
+		return
+	}
+
+	message := l.formatMessage(levelName, format, args...)
+	cMessage := C.CString(message)
+	defer C.free(unsafe.Pointer(cMessage))
+
+	// Map Go log levels to os.log levels:
+	// 0=DEBUG, 1=INFO, 2=DEFAULT, 3=ERROR, 4=FAULT
+	var osLogLevel C.int
+	switch level {
+	case LogLevelDebug:
+		osLogLevel = 0 // DEBUG
+	case LogLevelInfo:
+		osLogLevel = 1 // INFO
+	case LogLevelWarn:
+		osLogLevel = 2 // DEFAULT
+	case LogLevelError:
+		osLogLevel = 3 // ERROR
+	default:
+		osLogLevel = 2 // DEFAULT
+	}
+
+	C.goLogToOSLog(l.subsystem, l.category, osLogLevel, cMessage)
+}
+
 // Debug logs a debug message
 func (l *Logger) Debug(format string, args ...interface{}) {
-	if l.logLevel <= LogLevelDebug {
-		l.logger.Println(l.formatMessage("DEBUG", format, args...))
-	}
+	l.logToOSLog(LogLevelDebug, "DEBUG", format, args...)
 }
 
 // Info logs an info message
 func (l *Logger) Info(format string, args ...interface{}) {
-	if l.logLevel <= LogLevelInfo {
-		l.logger.Println(l.formatMessage("INFO", format, args...))
-	}
+	l.logToOSLog(LogLevelInfo, "INFO", format, args...)
 }
 
 // Warn logs a warning message
 func (l *Logger) Warn(format string, args ...interface{}) {
-	if l.logLevel <= LogLevelWarn {
-		l.logger.Println(l.formatMessage("WARN", format, args...))
-	}
+	l.logToOSLog(LogLevelWarn, "WARN", format, args...)
 }
 
 // Error logs an error message
 func (l *Logger) Error(format string, args ...interface{}) {
-	if l.logLevel <= LogLevelError {
-		l.logger.Println(l.formatMessage("ERROR", format, args...))
-	}
+	l.logToOSLog(LogLevelError, "ERROR", format, args...)
 }
 
 // global logger instance

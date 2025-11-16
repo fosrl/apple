@@ -82,7 +82,7 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
-extern char* startTunnel(void);
+extern char* startTunnel(int fd);
 extern char* stopTunnel(void);
 
 #ifdef __cplusplus
