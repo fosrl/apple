@@ -20,7 +20,7 @@ var (
 
 //export startTunnel
 func startTunnel(fd C.int) *C.char {
-	appLogger.Info("Starting tunnel with FD: %d", int(fd))
+	appLogger.Debug("Starting tunnel with FD: %d", int(fd))
 
 	tunnelMutex.Lock()
 	defer tunnelMutex.Unlock()
@@ -32,7 +32,6 @@ func startTunnel(fd C.int) *C.char {
 	}
 
 	tunnelFileDesc = int32(fd)
-	appLogger.Info("Starting tunnel from go side with FD: %d", tunnelFileDesc)
 
 	// Create stop channel
 	stopChan = make(chan struct{})
@@ -40,7 +39,7 @@ func startTunnel(fd C.int) *C.char {
 
 	// Schedule network settings update after 5 seconds
 	wg.Go(func() {
-		appLogger.Info("Scheduling network settings update in 5 seconds")
+		appLogger.Debug("Scheduling network settings update in 5 seconds")
 
 		select {
 		case <-time.After(5 * time.Second):
@@ -60,13 +59,13 @@ func startTunnel(fd C.int) *C.char {
 		}
 	})
 
-	appLogger.Info("Start tunnel completed successfully")
+	appLogger.Debug("Start tunnel completed successfully")
 	return C.CString(fmt.Sprintf("Tunnel started with FD: %d", tunnelFileDesc))
 }
 
 //export stopTunnel
 func stopTunnel() *C.char {
-	appLogger.Info("Stopping tunnel")
+	appLogger.Debug("Stopping tunnel")
 
 	tunnelMutex.Lock()
 	defer tunnelMutex.Unlock()
@@ -95,13 +94,13 @@ func stopTunnel() *C.char {
 
 	select {
 	case <-done:
-		appLogger.Info("Background process stopped successfully")
+		appLogger.Debug("Background process stopped successfully")
 	case <-time.After(5 * time.Second):
 		appLogger.Warn("Timeout waiting for background process to stop")
 	}
 
 	tunnelMutex.Lock()
-	appLogger.Info("Tunnel stopped successfully")
+	appLogger.Debug("Tunnel stopped successfully")
 	return C.CString("Tunnel stopped")
 }
 

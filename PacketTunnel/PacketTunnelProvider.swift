@@ -14,12 +14,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
         let log = OSLog(subsystem: subsystem, category: "PacketTunnelProvider")
         // Log the subsystem being used for debugging
-        os_log("PacketTunnelProvider initialized with subsystem: %{public}@", log: log, type: .info, subsystem)
+        os_log("PacketTunnelProvider initialized with subsystem: %{public}@", log: log, type: .debug, subsystem)
         return log
     }()
     
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        os_log("startTunnel called with options: %{public}@", log: logger, type: .info, options?.description ?? "nil")
+        os_log("startTunnel called with options: %{public}@", log: logger, type: .debug, options?.description ?? "nil")
         
         // Initialize the tunnel adapter
         tunnelAdapter = TunnelAdapter(with: self)
@@ -40,7 +40,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         settings.mtu = 1500
 
         os_log("Network settings configured - IPv4: %{public}@, DNS: %{public}@, MTU: %d", 
-               log: logger, type: .info,
+               log: logger, type: .debug,
                settings.ipv4Settings?.addresses.joined(separator: ", ") ?? "none",
                settings.dnsSettings?.servers.joined(separator: ", ") ?? "none",
                settings.mtu ?? 0)
@@ -57,7 +57,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        os_log("stopTunnel called with reason: %d", log: logger, type: .info, reason.rawValue)
+        os_log("stopTunnel called with reason: %d", log: logger, type: .debug, reason.rawValue)
         
         // Use the tunnel adapter to stop the Go tunnel
         if let error = tunnelAdapter?.stop() {

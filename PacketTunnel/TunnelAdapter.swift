@@ -76,6 +76,7 @@ public class TunnelAdapter {
     }()
     
     private var lastAppliedSettings: NEPacketTunnelNetworkSettings?
+    private var lastSeenVersion: Int = -1
     private var settingsPollTimer: DispatchSourceTimer?
     private let pollInterval: TimeInterval = 0.5 // 500ms
     
@@ -88,7 +89,7 @@ public class TunnelAdapter {
     //
     // - Returns: The file descriptor for the tunnel interface, or nil if not found
     private func discoverTunnelFileDescriptor() -> Int32? {
-        os_log("Starting tunnel file descriptor discovery", log: logger, type: .info)
+        os_log("Starting tunnel file descriptor discovery", log: logger, type: .debug)
         
         var ctlInfo = ctl_info()
         
@@ -128,7 +129,7 @@ public class TunnelAdapter {
             
             // Match the control ID to find our tunnel interface
             if addr.sc_id == ctlInfo.ctl_id {
-                os_log("Discovered tunnel file descriptor: %d", log: logger, type: .info, fd)
+                os_log("Discovered tunnel file descriptor: %d", log: logger, type: .debug, fd)
                 return fd
             }
         }
@@ -144,7 +145,7 @@ public class TunnelAdapter {
     //   - completionHandler: Called when the tunnel startup is complete or fails
     public func start(with networkSettings: NEPacketTunnelNetworkSettings,
                      completionHandler: @escaping (Error?) -> Void) {
-        os_log("Starting tunnel with network settings", log: logger, type: .info)
+        os_log("Starting tunnel with network settings", log: logger, type: .debug)
         
         // Set network settings first - this creates the tunnel interface
         packetTunnelProvider?.setTunnelNetworkSettings(networkSettings) { [weak self] error in
@@ -162,13 +163,13 @@ public class TunnelAdapter {
                 return
             }
             
-            os_log("Tunnel network settings applied successfully", log: self.logger, type: .info)
+            os_log("Tunnel network settings applied successfully", log: self.logger, type: .debug)
             
             // Now that network settings are set, discover the file descriptor
             let tunnelFD: Int32
             if let discoveredFD = self.discoverTunnelFileDescriptor() {
                 tunnelFD = discoveredFD
-                os_log("Tunnel file descriptor discovered: %d", log: self.logger, type: .info, tunnelFD)
+                os_log("Tunnel file descriptor discovered: %d", log: self.logger, type: .debug, tunnelFD)
             } else {
                 // Log warning but use 0 as sentinel value - the tunnel might still work
                 tunnelFD = 0
@@ -176,12 +177,12 @@ public class TunnelAdapter {
             }
             
             // Call Go function to start tunnel with file descriptor
-            os_log("Calling Go startTunnel function with FD: %d", log: self.logger, type: .info, tunnelFD)
+            os_log("Calling Go startTunnel function with FD: %d", log: self.logger, type: .debug, tunnelFD)
             var goError: Error? = nil
             if let result = PangolinGo.startTunnel(tunnelFD) {
                 let message = String(cString: result)
                 result.deallocate()
-                os_log("Go startTunnel returned: %{public}@", log: self.logger, type: .info, message)
+                os_log("Go startTunnel returned: %{public}@", log: self.logger, type: .debug, message)
                 
                 // Check if the Go function returned an error
                 if message.lowercased().contains("error") || message.lowercased().contains("fail") {
@@ -196,16 +197,19 @@ public class TunnelAdapter {
             // If Go function failed, return error
             if let error = goError {
                 // Try to stop the Go tunnel on error
-                os_log("Stopping Go tunnel due to start error", log: self.logger, type: .info)
+                os_log("Stopping Go tunnel due to start error", log: self.logger, type: .debug)
                 _ = self.stopGoTunnel()
                 completionHandler(error)
                 return
             }
             
-            os_log("Tunnel started successfully", log: self.logger, type: .info)
+            os_log("Tunnel started successfully", log: self.logger, type: .debug)
             
             // Store the initial settings
             self.lastAppliedSettings = networkSettings
+            
+            // Initialize version tracking
+            self.lastSeenVersion = PangolinGo.getNetworkSettingsVersion()
             
             // Start polling for network settings updates
             self.startSettingsPolling()
@@ -224,12 +228,12 @@ public class TunnelAdapter {
     
     // Internal method to stop the Go tunnel
     private func stopGoTunnel() -> Error? {
-        os_log("Stopping Go tunnel", log: logger, type: .info)
+        os_log("Stopping Go tunnel", log: logger, type: .debug)
         var stopError: Error? = nil
         if let result = PangolinGo.stopTunnel() {
             let message = String(cString: result)
             result.deallocate()
-            os_log("Go stopTunnel returned: %{public}@", log: logger, type: .info, message)
+            os_log("Go stopTunnel returned: %{public}@", log: logger, type: .debug, message)
             
             // Check if the Go function returned an error
             if message.lowercased().contains("error") || message.lowercased().contains("fail") {
@@ -244,8 +248,10 @@ public class TunnelAdapter {
         if let error = stopError {
             os_log("Error stopping Go tunnel: %{public}@", log: logger, type: .error, error.localizedDescription)
         } else {
-            os_log("Go tunnel stopped successfully", log: logger, type: .info)
+            os_log("Go tunnel stopped successfully", log: logger, type: .debug)
         }
+        
+        os_log("Tunnel stopped successfully", log: self.logger, type: .debug)
         
         return stopError
     }
@@ -255,7 +261,7 @@ public class TunnelAdapter {
     private func startSettingsPolling() {
         stopSettingsPolling() // Stop any existing timer
         
-        os_log("Starting network settings polling (interval: %.1f seconds)", log: logger, type: .info, pollInterval)
+        os_log("Starting network settings polling (interval: %.1f seconds)", log: logger, type: .debug, pollInterval)
         
         let queue = DispatchQueue(label: "com.pangolin.tunnel.settings-poll", qos: .utility)
         let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -271,43 +277,51 @@ public class TunnelAdapter {
         if let timer = settingsPollTimer {
             timer.cancel()
             settingsPollTimer = nil
-            os_log("Stopped network settings polling", log: logger, type: .info)
+            os_log("Stopped network settings polling", log: logger, type: .debug)
         }
     }
     
     private func pollNetworkSettings() {
-        guard let result = PangolinGo.getNetworkSettings() else {
-            os_log("getNetworkSettings returned nil", log: logger, type: .error)
-            return
-        }
+        // Poll the version number first (lightweight)
+        let currentVersion = PangolinGo.getNetworkSettingsVersion()
         
-        let jsonString = String(cString: result)
-        result.deallocate()
-        
-        // Parse JSON
-        guard let jsonData = jsonString.data(using: .utf8) else {
-            os_log("Failed to convert JSON string to data", log: logger, type: .error)
-            return
-        }
-        
-        let decoder = JSONDecoder()
-        guard let settingsJSON = try? decoder.decode(NetworkSettingsJSON.self, from: jsonData) else {
-            // Empty JSON is valid (no settings)
-            if jsonString.trimmingCharacters(in: .whitespacesAndNewlines) == "{}" {
+        // Only fetch full settings if version has changed
+        if currentVersion > lastSeenVersion {
+            os_log("Network settings version changed from %d to %d, fetching settings", log: logger, type: .debug, lastSeenVersion, currentVersion)
+            lastSeenVersion = currentVersion
+            
+            // Fetch the full network settings
+            guard let result = PangolinGo.getNetworkSettings() else {
+                os_log("getNetworkSettings returned nil", log: logger, type: .error)
                 return
             }
-            os_log("Failed to decode network settings JSON: %{public}@", log: logger, type: .error, jsonString)
-            return
-        }
-        
-        // Convert to NEPacketTunnelNetworkSettings, merging with existing settings
-        guard let newSettings = convertJSONToNetworkSettings(settingsJSON, mergingWith: lastAppliedSettings) else {
-            return
-        }
-        
-        // Compare with last applied settings
-        if !settingsAreEqual(newSettings, lastAppliedSettings) {
-            os_log("Network settings changed, updating...", log: logger, type: .info)
+            
+            let jsonString = String(cString: result)
+            result.deallocate()
+            
+            // Parse JSON
+            guard let jsonData = jsonString.data(using: .utf8) else {
+                os_log("Failed to convert JSON string to data", log: logger, type: .error)
+                return
+            }
+            
+            let decoder = JSONDecoder()
+            guard let settingsJSON = try? decoder.decode(NetworkSettingsJSON.self, from: jsonData) else {
+                // Empty JSON is valid (no settings)
+                if jsonString.trimmingCharacters(in: .whitespacesAndNewlines) == "{}" {
+                    return
+                }
+                os_log("Failed to decode network settings JSON: %{public}@", log: logger, type: .error, jsonString)
+                return
+            }
+            
+            // Convert to NEPacketTunnelNetworkSettings, merging with existing settings
+            guard let newSettings = convertJSONToNetworkSettings(settingsJSON, mergingWith: lastAppliedSettings) else {
+                return
+            }
+            
+            // Version changed, so settings are different - update them
+            os_log("Network settings version changed, updating...", log: logger, type: .debug)
             updateNetworkSettings(newSettings)
         }
     }
@@ -445,115 +459,6 @@ public class TunnelAdapter {
         return settings
     }
     
-    private func settingsAreEqual(_ settings1: NEPacketTunnelNetworkSettings?, _ settings2: NEPacketTunnelNetworkSettings?) -> Bool {
-        guard let s1 = settings1, let s2 = settings2 else {
-            return settings1 == nil && settings2 == nil
-        }
-        
-        // Compare tunnel remote address
-        if s1.tunnelRemoteAddress != s2.tunnelRemoteAddress {
-            return false
-        }
-        
-        // Compare MTU
-        if s1.mtu != s2.mtu {
-            return false
-        }
-        
-        // Compare DNS servers
-        if s1.dnsSettings?.servers != s2.dnsSettings?.servers {
-            return false
-        }
-        
-        // Compare IPv4 settings
-        if s1.ipv4Settings?.addresses != s2.ipv4Settings?.addresses ||
-           s1.ipv4Settings?.subnetMasks != s2.ipv4Settings?.subnetMasks {
-            return false
-        }
-        
-        // Compare IPv4 routes
-        if !ipv4RoutesAreEqual(s1.ipv4Settings?.includedRoutes, s2.ipv4Settings?.includedRoutes) ||
-           !ipv4RoutesAreEqual(s1.ipv4Settings?.excludedRoutes, s2.ipv4Settings?.excludedRoutes) {
-            return false
-        }
-        
-        // Compare IPv6 settings
-        if s1.ipv6Settings?.addresses != s2.ipv6Settings?.addresses ||
-           s1.ipv6Settings?.networkPrefixLengths != s2.ipv6Settings?.networkPrefixLengths {
-            return false
-        }
-        
-        // Compare IPv6 routes
-        if !ipv6RoutesAreEqual(s1.ipv6Settings?.includedRoutes, s2.ipv6Settings?.includedRoutes) ||
-           !ipv6RoutesAreEqual(s1.ipv6Settings?.excludedRoutes, s2.ipv6Settings?.excludedRoutes) {
-            return false
-        }
-        
-        return true
-    }
-    
-    private func ipv4RoutesAreEqual(_ routes1: [NEIPv4Route]?, _ routes2: [NEIPv4Route]?) -> Bool {
-        guard let r1 = routes1, let r2 = routes2 else {
-            return routes1 == nil && routes2 == nil
-        }
-        
-        if r1.count != r2.count {
-            return false
-        }
-        
-        for (route1, route2) in zip(r1, r2) {
-            // Compare destination address
-            if route1.destinationAddress != route2.destinationAddress {
-                return false
-            }
-            
-            // Compare subnet mask
-            if route1.destinationSubnetMask != route2.destinationSubnetMask {
-                return false
-            }
-            
-            // Compare gateway address (handle nil cases)
-            let gateway1 = route1.gatewayAddress ?? ""
-            let gateway2 = route2.gatewayAddress ?? ""
-            if gateway1 != gateway2 {
-                return false
-            }
-        }
-        
-        return true
-    }
-    
-    private func ipv6RoutesAreEqual(_ routes1: [NEIPv6Route]?, _ routes2: [NEIPv6Route]?) -> Bool {
-        guard let r1 = routes1, let r2 = routes2 else {
-            return routes1 == nil && routes2 == nil
-        }
-        
-        if r1.count != r2.count {
-            return false
-        }
-        
-        for (route1, route2) in zip(r1, r2) {
-            // Compare destination address
-            if route1.destinationAddress != route2.destinationAddress {
-                return false
-            }
-            
-            // Compare network prefix length
-            if route1.destinationNetworkPrefixLength != route2.destinationNetworkPrefixLength {
-                return false
-            }
-            
-            // Compare gateway address (handle nil cases)
-            let gateway1 = route1.gatewayAddress ?? ""
-            let gateway2 = route2.gatewayAddress ?? ""
-            if gateway1 != gateway2 {
-                return false
-            }
-        }
-        
-        return true
-    }
-    
     private func updateNetworkSettings(_ settings: NEPacketTunnelNetworkSettings) {
         packetTunnelProvider?.setTunnelNetworkSettings(settings) { [weak self] error in
             guard let self = self else { return }
@@ -561,7 +466,7 @@ public class TunnelAdapter {
             if let error = error {
                 os_log("Failed to update network settings: %{public}@", log: self.logger, type: .error, error.localizedDescription)
             } else {
-                os_log("Network settings updated successfully", log: self.logger, type: .info)
+                os_log("Network settings updated successfully", log: self.logger, type: .debug)
                 self.lastAppliedSettings = settings
             }
         }

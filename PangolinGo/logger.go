@@ -8,8 +8,6 @@ package main
 import "C"
 import (
 	"fmt"
-	"runtime"
-	"time"
 	"unsafe"
 )
 
@@ -48,29 +46,12 @@ func (l *Logger) SetLevel(level LogLevel) {
 
 // formatMessage formats a log message with timestamp, level, prefix, and caller info
 func (l *Logger) formatMessage(level string, format string, args ...interface{}) string {
-	// Get caller information (skip 2 frames: formatMessage and the log method)
-	_, file, line, ok := runtime.Caller(2)
-	if !ok {
-		file = "unknown"
-		line = 0
-	} else {
-		// Get just the filename, not the full path
-		for i := len(file) - 1; i > 0; i-- {
-			if file[i] == '/' {
-				file = file[i+1:]
-				break
-			}
-		}
-	}
-
-	timestamp := time.Now().Format("2006-01-02 15:04:05.000")
 	message := format
 	if len(args) > 0 {
 		message = fmt.Sprintf(format, args...)
 	}
 
-	return fmt.Sprintf("[%s] [%s] [%s] %s:%d - %s",
-		timestamp, level, l.prefix, file, line, message)
+	return fmt.Sprintf("%s", message)
 }
 
 // logToOSLog sends a log message to os.log via the C bridge

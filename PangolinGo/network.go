@@ -43,13 +43,20 @@ type IPv6Route struct {
 var (
 	networkSettings      NetworkSettings
 	networkSettingsMutex sync.RWMutex
+	settingsVersion      int64
 )
+
+// incrementVersion increments the settings version (must be called with lock held)
+func incrementVersion() {
+	settingsVersion++
+}
 
 // SetTunnelRemoteAddress sets the tunnel remote address
 func SetTunnelRemoteAddress(address string) {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings.TunnelRemoteAddress = address
+	incrementVersion()
 	appLogger.Info("Set tunnel remote address: %s", address)
 }
 
@@ -58,6 +65,7 @@ func SetMTU(mtu int) {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings.MTU = &mtu
+	incrementVersion()
 	appLogger.Info("Set MTU: %d", mtu)
 }
 
@@ -66,6 +74,7 @@ func SetDNSServers(servers []string) {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings.DNSServers = servers
+	incrementVersion()
 	appLogger.Info("Set DNS servers: %v", servers)
 }
 
@@ -75,6 +84,7 @@ func SetIPv4Settings(addresses []string, subnetMasks []string) {
 	defer networkSettingsMutex.Unlock()
 	networkSettings.IPv4Addresses = addresses
 	networkSettings.IPv4SubnetMasks = subnetMasks
+	incrementVersion()
 	appLogger.Info("Set IPv4 addresses: %v, subnet masks: %v", addresses, subnetMasks)
 }
 
@@ -83,6 +93,7 @@ func SetIPv4IncludedRoutes(routes []IPv4Route) {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings.IPv4IncludedRoutes = routes
+	incrementVersion()
 	appLogger.Info("Set IPv4 included routes: %d routes", len(routes))
 }
 
@@ -91,6 +102,7 @@ func SetIPv4ExcludedRoutes(routes []IPv4Route) {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings.IPv4ExcludedRoutes = routes
+	incrementVersion()
 	appLogger.Info("Set IPv4 excluded routes: %d routes", len(routes))
 }
 
@@ -100,6 +112,7 @@ func SetIPv6Settings(addresses []string, networkPrefixes []string) {
 	defer networkSettingsMutex.Unlock()
 	networkSettings.IPv6Addresses = addresses
 	networkSettings.IPv6NetworkPrefixes = networkPrefixes
+	incrementVersion()
 	appLogger.Info("Set IPv6 addresses: %v, network prefixes: %v", addresses, networkPrefixes)
 }
 
@@ -108,6 +121,7 @@ func SetIPv6IncludedRoutes(routes []IPv6Route) {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings.IPv6IncludedRoutes = routes
+	incrementVersion()
 	appLogger.Info("Set IPv6 included routes: %d routes", len(routes))
 }
 
@@ -116,6 +130,7 @@ func SetIPv6ExcludedRoutes(routes []IPv6Route) {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings.IPv6ExcludedRoutes = routes
+	incrementVersion()
 	appLogger.Info("Set IPv6 excluded routes: %d routes", len(routes))
 }
 
@@ -124,7 +139,17 @@ func ClearNetworkSettings() {
 	networkSettingsMutex.Lock()
 	defer networkSettingsMutex.Unlock()
 	networkSettings = NetworkSettings{}
+	incrementVersion()
 	appLogger.Info("Cleared all network settings")
+}
+
+// getNetworkSettingsVersion returns the current network settings version number
+//
+//export getNetworkSettingsVersion
+func getNetworkSettingsVersion() C.long {
+	networkSettingsMutex.RLock()
+	defer networkSettingsMutex.RUnlock()
+	return C.long(settingsVersion)
 }
 
 // getNetworkSettings returns the current network settings as a JSON string

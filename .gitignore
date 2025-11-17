@@ -59,5 +59,9 @@ tuist/Derived/
 *.ipa
 *.app
 
-# If you’re using Firebase or similar SDKs, sometimes config files are private:
+# If you're using Firebase or similar SDKs, sometimes config files are private:
 GoogleService-Info.plist
+
+## Go build artifacts (generated libraries and headers)
+PangolinGo/libpangolin*.a
+PangolinGo/libpangolin*.h
