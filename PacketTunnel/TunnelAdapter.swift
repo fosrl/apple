@@ -10,6 +10,63 @@ import NetworkExtension
 import PangolinGo
 import os.log
 
+// NetworkSettingsJSON represents the JSON structure from Go
+private struct NetworkSettingsJSON: Codable {
+    let tunnelRemoteAddress: String?
+    let mtu: Int?
+    let dnsServers: [String]?
+    let ipv4Addresses: [String]?
+    let ipv4SubnetMasks: [String]?
+    let ipv4IncludedRoutes: [IPv4RouteJSON]?
+    let ipv4ExcludedRoutes: [IPv4RouteJSON]?
+    let ipv6Addresses: [String]?
+    let ipv6NetworkPrefixes: [String]?
+    let ipv6IncludedRoutes: [IPv6RouteJSON]?
+    let ipv6ExcludedRoutes: [IPv6RouteJSON]?
+    
+    enum CodingKeys: String, CodingKey {
+        case tunnelRemoteAddress = "tunnel_remote_address"
+        case mtu
+        case dnsServers = "dns_servers"
+        case ipv4Addresses = "ipv4_addresses"
+        case ipv4SubnetMasks = "ipv4_subnet_masks"
+        case ipv4IncludedRoutes = "ipv4_included_routes"
+        case ipv4ExcludedRoutes = "ipv4_excluded_routes"
+        case ipv6Addresses = "ipv6_addresses"
+        case ipv6NetworkPrefixes = "ipv6_network_prefixes"
+        case ipv6IncludedRoutes = "ipv6_included_routes"
+        case ipv6ExcludedRoutes = "ipv6_excluded_routes"
+    }
+}
+
+private struct IPv4RouteJSON: Codable {
+    let destinationAddress: String
+    let subnetMask: String?
+    let gatewayAddress: String?
+    let isDefault: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case destinationAddress = "destination_address"
+        case subnetMask = "subnet_mask"
+        case gatewayAddress = "gateway_address"
+        case isDefault = "is_default"
+    }
+}
+
+private struct IPv6RouteJSON: Codable {
+    let destinationAddress: String
+    let networkPrefixLength: Int?
+    let gatewayAddress: String?
+    let isDefault: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case destinationAddress = "destination_address"
+        case networkPrefixLength = "network_prefix_length"
+        case gatewayAddress = "gateway_address"
+        case isDefault = "is_default"
+    }
+}
+
 // Adapter class that handles tunnel file descriptor discovery and management
 public class TunnelAdapter {
     private weak var packetTunnelProvider: NEPacketTunnelProvider?
@@ -17,6 +74,10 @@ public class TunnelAdapter {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
         return OSLog(subsystem: subsystem, category: "TunnelAdapter")
     }()
+    
+    private var lastAppliedSettings: NEPacketTunnelNetworkSettings?
+    private var settingsPollTimer: DispatchSourceTimer?
+    private let pollInterval: TimeInterval = 0.5 // 500ms
     
     public init(with packetTunnelProvider: NEPacketTunnelProvider) {
         self.packetTunnelProvider = packetTunnelProvider
@@ -142,6 +203,13 @@ public class TunnelAdapter {
             }
             
             os_log("Tunnel started successfully", log: self.logger, type: .info)
+            
+            // Store the initial settings
+            self.lastAppliedSettings = networkSettings
+            
+            // Start polling for network settings updates
+            self.startSettingsPolling()
+            
             completionHandler(nil)
         }
     }
@@ -150,6 +218,7 @@ public class TunnelAdapter {
     //
     // - Returns: An error if stopping failed, nil otherwise
     public func stop() -> Error? {
+        stopSettingsPolling()
         return stopGoTunnel()
     }
     
@@ -179,6 +248,323 @@ public class TunnelAdapter {
         }
         
         return stopError
+    }
+    
+    // MARK: - Network Settings Polling
+    
+    private func startSettingsPolling() {
+        stopSettingsPolling() // Stop any existing timer
+        
+        os_log("Starting network settings polling (interval: %.1f seconds)", log: logger, type: .info, pollInterval)
+        
+        let queue = DispatchQueue(label: "com.pangolin.tunnel.settings-poll", qos: .utility)
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
+        timer.setEventHandler { [weak self] in
+            self?.pollNetworkSettings()
+        }
+        timer.resume()
+        settingsPollTimer = timer
+    }
+    
+    private func stopSettingsPolling() {
+        if let timer = settingsPollTimer {
+            timer.cancel()
+            settingsPollTimer = nil
+            os_log("Stopped network settings polling", log: logger, type: .info)
+        }
+    }
+    
+    private func pollNetworkSettings() {
+        guard let result = PangolinGo.getNetworkSettings() else {
+            os_log("getNetworkSettings returned nil", log: logger, type: .error)
+            return
+        }
+        
+        let jsonString = String(cString: result)
+        result.deallocate()
+        
+        // Parse JSON
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            os_log("Failed to convert JSON string to data", log: logger, type: .error)
+            return
+        }
+        
+        let decoder = JSONDecoder()
+        guard let settingsJSON = try? decoder.decode(NetworkSettingsJSON.self, from: jsonData) else {
+            // Empty JSON is valid (no settings)
+            if jsonString.trimmingCharacters(in: .whitespacesAndNewlines) == "{}" {
+                return
+            }
+            os_log("Failed to decode network settings JSON: %{public}@", log: logger, type: .error, jsonString)
+            return
+        }
+        
+        // Convert to NEPacketTunnelNetworkSettings, merging with existing settings
+        guard let newSettings = convertJSONToNetworkSettings(settingsJSON, mergingWith: lastAppliedSettings) else {
+            return
+        }
+        
+        // Compare with last applied settings
+        if !settingsAreEqual(newSettings, lastAppliedSettings) {
+            os_log("Network settings changed, updating...", log: logger, type: .info)
+            updateNetworkSettings(newSettings)
+        }
+    }
+    
+    private func convertJSONToNetworkSettings(_ json: NetworkSettingsJSON, mergingWith existing: NEPacketTunnelNetworkSettings?) -> NEPacketTunnelNetworkSettings? {
+        // If all fields are nil/empty, return nil (no settings to apply)
+        let hasSettings = json.tunnelRemoteAddress != nil ||
+                         json.mtu != nil ||
+                         (json.dnsServers != nil && !json.dnsServers!.isEmpty) ||
+                         (json.ipv4Addresses != nil && !json.ipv4Addresses!.isEmpty) ||
+                         (json.ipv6Addresses != nil && !json.ipv6Addresses!.isEmpty)
+        
+        if !hasSettings {
+            return nil
+        }
+        
+        // Use existing remote address if not specified in JSON, otherwise use JSON value or default
+        let remoteAddress = json.tunnelRemoteAddress ?? existing?.tunnelRemoteAddress ?? "127.0.0.1"
+        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: remoteAddress)
+        
+        // Set MTU (use JSON value if provided, otherwise preserve existing)
+        if let mtu = json.mtu {
+            settings.mtu = NSNumber(value: mtu)
+        } else if let existingMTU = existing?.mtu {
+            settings.mtu = existingMTU
+        }
+        
+        // Set DNS settings (use JSON value if provided, otherwise preserve existing)
+        if let dnsServers = json.dnsServers, !dnsServers.isEmpty {
+            let dnsSettings = NEDNSSettings(servers: dnsServers)
+            settings.dnsSettings = dnsSettings
+        } else if let existingDNS = existing?.dnsSettings {
+            settings.dnsSettings = existingDNS
+        }
+        
+        // Set IPv4 settings
+        if let ipv4Addresses = json.ipv4Addresses, !ipv4Addresses.isEmpty {
+            let subnetMasks = json.ipv4SubnetMasks ?? Array(repeating: "255.255.255.0", count: ipv4Addresses.count)
+            let ipv4Settings = NEIPv4Settings(addresses: ipv4Addresses, subnetMasks: subnetMasks)
+            
+            // Convert routes
+            var includedRoutes: [NEIPv4Route] = []
+            if let routesJSON = json.ipv4IncludedRoutes {
+                for routeJSON in routesJSON {
+                    if routeJSON.isDefault == true {
+                        includedRoutes.append(NEIPv4Route.default())
+                    } else {
+                        let destination = routeJSON.destinationAddress
+                        let subnetMask = routeJSON.subnetMask ?? "255.255.255.255"
+                        let route = NEIPv4Route(destinationAddress: destination, subnetMask: subnetMask)
+                        if let gateway = routeJSON.gatewayAddress {
+                            route.gatewayAddress = gateway
+                        }
+                        includedRoutes.append(route)
+                    }
+                }
+            }
+            ipv4Settings.includedRoutes = includedRoutes
+            
+            var excludedRoutes: [NEIPv4Route] = []
+            if let routesJSON = json.ipv4ExcludedRoutes {
+                for routeJSON in routesJSON {
+                    if routeJSON.isDefault == true {
+                        excludedRoutes.append(NEIPv4Route.default())
+                    } else {
+                        let destination = routeJSON.destinationAddress
+                        let subnetMask = routeJSON.subnetMask ?? "255.255.255.255"
+                        let route = NEIPv4Route(destinationAddress: destination, subnetMask: subnetMask)
+                        if let gateway = routeJSON.gatewayAddress {
+                            route.gatewayAddress = gateway
+                        }
+                        excludedRoutes.append(route)
+                    }
+                }
+            }
+            ipv4Settings.excludedRoutes = excludedRoutes
+            
+            settings.ipv4Settings = ipv4Settings
+        }
+        
+        // Set IPv6 settings
+        if let ipv6Addresses = json.ipv6Addresses, !ipv6Addresses.isEmpty {
+            let networkPrefixes = json.ipv6NetworkPrefixes ?? Array(repeating: "64", count: ipv6Addresses.count)
+            let networkPrefixLengths = networkPrefixes.compactMap { Int($0) }.map { NSNumber(value: $0) }
+            let ipv6Settings = NEIPv6Settings(addresses: ipv6Addresses, networkPrefixLengths: networkPrefixLengths)
+            
+            // Convert routes
+            var includedRoutes: [NEIPv6Route] = []
+            if let routesJSON = json.ipv6IncludedRoutes {
+                for routeJSON in routesJSON {
+                    if routeJSON.isDefault == true {
+                        includedRoutes.append(NEIPv6Route.default())
+                    } else {
+                        let destination = routeJSON.destinationAddress
+                        let prefixLength = routeJSON.networkPrefixLength ?? 128
+                        let route = NEIPv6Route(destinationAddress: destination, networkPrefixLength: NSNumber(value: prefixLength))
+                        if let gateway = routeJSON.gatewayAddress {
+                            route.gatewayAddress = gateway
+                        }
+                        includedRoutes.append(route)
+                    }
+                }
+            }
+            ipv6Settings.includedRoutes = includedRoutes
+            
+            var excludedRoutes: [NEIPv6Route] = []
+            if let routesJSON = json.ipv6ExcludedRoutes {
+                for routeJSON in routesJSON {
+                    if routeJSON.isDefault == true {
+                        excludedRoutes.append(NEIPv6Route.default())
+                    } else {
+                        let destination = routeJSON.destinationAddress
+                        let prefixLength = routeJSON.networkPrefixLength ?? 128
+                        let route = NEIPv6Route(destinationAddress: destination, networkPrefixLength: NSNumber(value: prefixLength))
+                        if let gateway = routeJSON.gatewayAddress {
+                            route.gatewayAddress = gateway
+                        }
+                        excludedRoutes.append(route)
+                    }
+                }
+            }
+            ipv6Settings.excludedRoutes = excludedRoutes
+            
+            settings.ipv6Settings = ipv6Settings
+        } else if let existingIPv6 = existing?.ipv6Settings {
+            // Preserve existing IPv6 settings if not being updated
+            settings.ipv6Settings = existingIPv6
+        }
+        
+        // If no IPv4 settings were set from JSON, preserve existing ones
+        if settings.ipv4Settings == nil, let existingIPv4 = existing?.ipv4Settings {
+            settings.ipv4Settings = existingIPv4
+        }
+        
+        return settings
+    }
+    
+    private func settingsAreEqual(_ settings1: NEPacketTunnelNetworkSettings?, _ settings2: NEPacketTunnelNetworkSettings?) -> Bool {
+        guard let s1 = settings1, let s2 = settings2 else {
+            return settings1 == nil && settings2 == nil
+        }
+        
+        // Compare tunnel remote address
+        if s1.tunnelRemoteAddress != s2.tunnelRemoteAddress {
+            return false
+        }
+        
+        // Compare MTU
+        if s1.mtu != s2.mtu {
+            return false
+        }
+        
+        // Compare DNS servers
+        if s1.dnsSettings?.servers != s2.dnsSettings?.servers {
+            return false
+        }
+        
+        // Compare IPv4 settings
+        if s1.ipv4Settings?.addresses != s2.ipv4Settings?.addresses ||
+           s1.ipv4Settings?.subnetMasks != s2.ipv4Settings?.subnetMasks {
+            return false
+        }
+        
+        // Compare IPv4 routes
+        if !ipv4RoutesAreEqual(s1.ipv4Settings?.includedRoutes, s2.ipv4Settings?.includedRoutes) ||
+           !ipv4RoutesAreEqual(s1.ipv4Settings?.excludedRoutes, s2.ipv4Settings?.excludedRoutes) {
+            return false
+        }
+        
+        // Compare IPv6 settings
+        if s1.ipv6Settings?.addresses != s2.ipv6Settings?.addresses ||
+           s1.ipv6Settings?.networkPrefixLengths != s2.ipv6Settings?.networkPrefixLengths {
+            return false
+        }
+        
+        // Compare IPv6 routes
+        if !ipv6RoutesAreEqual(s1.ipv6Settings?.includedRoutes, s2.ipv6Settings?.includedRoutes) ||
+           !ipv6RoutesAreEqual(s1.ipv6Settings?.excludedRoutes, s2.ipv6Settings?.excludedRoutes) {
+            return false
+        }
+        
+        return true
+    }
+    
+    private func ipv4RoutesAreEqual(_ routes1: [NEIPv4Route]?, _ routes2: [NEIPv4Route]?) -> Bool {
+        guard let r1 = routes1, let r2 = routes2 else {
+            return routes1 == nil && routes2 == nil
+        }
+        
+        if r1.count != r2.count {
+            return false
+        }
+        
+        for (route1, route2) in zip(r1, r2) {
+            // Compare destination address
+            if route1.destinationAddress != route2.destinationAddress {
+                return false
+            }
+            
+            // Compare subnet mask
+            if route1.destinationSubnetMask != route2.destinationSubnetMask {
+                return false
+            }
+            
+            // Compare gateway address (handle nil cases)
+            let gateway1 = route1.gatewayAddress ?? ""
+            let gateway2 = route2.gatewayAddress ?? ""
+            if gateway1 != gateway2 {
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    private func ipv6RoutesAreEqual(_ routes1: [NEIPv6Route]?, _ routes2: [NEIPv6Route]?) -> Bool {
+        guard let r1 = routes1, let r2 = routes2 else {
+            return routes1 == nil && routes2 == nil
+        }
+        
+        if r1.count != r2.count {
+            return false
+        }
+        
+        for (route1, route2) in zip(r1, r2) {
+            // Compare destination address
+            if route1.destinationAddress != route2.destinationAddress {
+                return false
+            }
+            
+            // Compare network prefix length
+            if route1.destinationNetworkPrefixLength != route2.destinationNetworkPrefixLength {
+                return false
+            }
+            
+            // Compare gateway address (handle nil cases)
+            let gateway1 = route1.gatewayAddress ?? ""
+            let gateway2 = route2.gatewayAddress ?? ""
+            if gateway1 != gateway2 {
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    private func updateNetworkSettings(_ settings: NEPacketTunnelNetworkSettings) {
+        packetTunnelProvider?.setTunnelNetworkSettings(settings) { [weak self] error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                os_log("Failed to update network settings: %{public}@", log: self.logger, type: .error, error.localizedDescription)
+            } else {
+                os_log("Network settings updated successfully", log: self.logger, type: .info)
+                self.lastAppliedSettings = settings
+            }
+        }
     }
 }
 

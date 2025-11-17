@@ -23,6 +23,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 
 
 
+
 /* End of preamble from import "C" comments.  */
 
 
@@ -84,6 +85,10 @@ extern "C" {
 
 extern char* startTunnel(int fd);
 extern char* stopTunnel(void);
+
+// getNetworkSettings returns the current network settings as a JSON string
+//
+extern char* getNetworkSettings(void);
 
 #ifdef __cplusplus
 }
