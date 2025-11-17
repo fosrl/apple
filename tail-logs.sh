@@ -39,5 +39,5 @@ echo "Tailing logs for subsystem: net.pangolin.Pangolin.PacketTunnel (level: $LE
 echo "Press Ctrl+C to stop"
 echo ""
 
-log stream --predicate 'subsystem == "net.pangolin.Pangolin.PacketTunnel"' --level="$LEVEL"
+log stream --predicate 'subsystem == "net.pangolin.Pangolin.PacketTunnel"' --level="$LEVEL" --style compact
 

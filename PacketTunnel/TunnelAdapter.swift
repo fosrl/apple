@@ -10,7 +10,7 @@ import NetworkExtension
 import PangolinGo
 import os.log
 
-/// Adapter class that handles tunnel file descriptor discovery and management
+// Adapter class that handles tunnel file descriptor discovery and management
 public class TunnelAdapter {
     private weak var packetTunnelProvider: NEPacketTunnelProvider?
     private let logger: OSLog = {
@@ -22,10 +22,10 @@ public class TunnelAdapter {
         self.packetTunnelProvider = packetTunnelProvider
     }
     
-    /// Discovers the tunnel file descriptor by scanning open file descriptors
-    /// and matching them against the utun control interface.
-    ///
-    /// - Returns: The file descriptor for the tunnel interface, or nil if not found
+    // Discovers the tunnel file descriptor by scanning open file descriptors
+    // and matching them against the utun control interface.
+    //
+    // - Returns: The file descriptor for the tunnel interface, or nil if not found
     private func discoverTunnelFileDescriptor() -> Int32? {
         os_log("Starting tunnel file descriptor discovery", log: logger, type: .info)
         
@@ -76,11 +76,11 @@ public class TunnelAdapter {
         return nil
     }
     
-    /// Starts the tunnel with the provided network settings and discovers the file descriptor
-    ///
-    /// - Parameters:
-    ///   - networkSettings: The network settings to apply to the tunnel
-    ///   - completionHandler: Called when the tunnel startup is complete or fails
+    // Starts the tunnel with the provided network settings and discovers the file descriptor
+    //
+    // - Parameters:
+    //   - networkSettings: The network settings to apply to the tunnel
+    //   - completionHandler: Called when the tunnel startup is complete or fails
     public func start(with networkSettings: NEPacketTunnelNetworkSettings,
                      completionHandler: @escaping (Error?) -> Void) {
         os_log("Starting tunnel with network settings", log: logger, type: .info)
@@ -146,14 +146,14 @@ public class TunnelAdapter {
         }
     }
     
-    /// Stops the Go tunnel
-    ///
-    /// - Returns: An error if stopping failed, nil otherwise
+    // Stops the Go tunnel
+    //
+    // - Returns: An error if stopping failed, nil otherwise
     public func stop() -> Error? {
         return stopGoTunnel()
     }
     
-    /// Internal method to stop the Go tunnel
+    // Internal method to stop the Go tunnel
     private func stopGoTunnel() -> Error? {
         os_log("Stopping Go tunnel", log: logger, type: .info)
         var stopError: Error? = nil
