@@ -40,4 +40,3 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 log stream --predicate 'subsystem == "net.pangolin.Pangolin.PacketTunnel"' --level="$LEVEL" --style compact
-

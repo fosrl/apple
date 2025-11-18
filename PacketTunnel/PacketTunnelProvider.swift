@@ -6,7 +6,18 @@
 //
 
 import NetworkExtension
+import PangolinGo
 import os.log
+
+// Centralized log level configuration
+enum LogLevel: Int {
+    case debug = 0
+    case info = 1
+    case warn = 2
+    case error = 3
+    
+    static var current: LogLevel = .debug // Default to debug
+}
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     private var tunnelAdapter: TunnelAdapter?
@@ -18,35 +29,20 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         return log
     }()
     
+    override init() {
+        super.init()
+        // Set log level for Go logger to match Swift configuration
+        PangolinGo.setLogLevel(Int32(LogLevel.current.rawValue))
+    }
+    
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         os_log("startTunnel called with options: %{public}@", log: logger, type: .debug, options?.description ?? "nil")
         
         // Initialize the tunnel adapter
         tunnelAdapter = TunnelAdapter(with: self)
-        
-        // Set up a basic network configuration
-        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-
-        // Configure IPv4 settings
-        let ipv4Settings = NEIPv4Settings(addresses: ["10.0.0.1"], subnetMasks: ["255.255.255.0"])
-        ipv4Settings.includedRoutes = [NEIPv4Route.default()]
-        settings.ipv4Settings = ipv4Settings
-
-        // Set DNS settings
-        let dnsSettings = NEDNSSettings(servers: ["8.8.8.8", "8.8.4.4"])
-        settings.dnsSettings = dnsSettings
-
-        // Set MTU
-        settings.mtu = 1500
-
-        os_log("Network settings configured - IPv4: %{public}@, DNS: %{public}@, MTU: %d", 
-               log: logger, type: .debug,
-               settings.ipv4Settings?.addresses.joined(separator: ", ") ?? "none",
-               settings.dnsSettings?.servers.joined(separator: ", ") ?? "none",
-               settings.mtu ?? 0)
 
         // Use the tunnel adapter to start the tunnel and discover the file descriptor
-        tunnelAdapter?.start(with: settings) { [weak self] (error: Error?) in
+        tunnelAdapter?.start { [weak self] (error: Error?) in
             if let error = error {
                 os_log("Tunnel start failed: %{public}@", log: self?.logger ?? .default, type: .error, error.localizedDescription)
             } else {

@@ -138,84 +138,60 @@ public class TunnelAdapter {
         return nil
     }
     
-    // Starts the tunnel with the provided network settings and discovers the file descriptor
+    // Starts the tunnel and discovers the file descriptor
     //
     // - Parameters:
-    //   - networkSettings: The network settings to apply to the tunnel
     //   - completionHandler: Called when the tunnel startup is complete or fails
-    public func start(with networkSettings: NEPacketTunnelNetworkSettings,
-                     completionHandler: @escaping (Error?) -> Void) {
-        os_log("Starting tunnel with network settings", log: logger, type: .debug)
+    public func start(completionHandler: @escaping (Error?) -> Void) {
+        os_log("Starting tunnel", log: logger, type: .debug)
         
-        // Set network settings first - this creates the tunnel interface
-        packetTunnelProvider?.setTunnelNetworkSettings(networkSettings) { [weak self] error in
-            guard let self = self else {
-                let adapterError = NSError(domain: "TunnelAdapter", code: -1,
-                                        userInfo: [NSLocalizedDescriptionKey: "Adapter deallocated"])
-                os_log("Adapter deallocated during tunnel start", log: self?.logger ?? .default, type: .fault)
-                completionHandler(adapterError)
-                return
-            }
-            
-            if let error = error {
-                os_log("Failed to set tunnel network settings: %{public}@", log: self.logger, type: .error, error.localizedDescription)
-                completionHandler(error)
-                return
-            }
-            
-            os_log("Tunnel network settings applied successfully", log: self.logger, type: .debug)
-            
-            // Now that network settings are set, discover the file descriptor
-            let tunnelFD: Int32
-            if let discoveredFD = self.discoverTunnelFileDescriptor() {
-                tunnelFD = discoveredFD
-                os_log("Tunnel file descriptor discovered: %d", log: self.logger, type: .debug, tunnelFD)
-            } else {
-                // Log warning but use 0 as sentinel value - the tunnel might still work
-                tunnelFD = 0
-                os_log("Warning: Could not discover tunnel file descriptor, using 0", log: self.logger, type: .default)
-            }
-            
-            // Call Go function to start tunnel with file descriptor
-            os_log("Calling Go startTunnel function with FD: %d", log: self.logger, type: .debug, tunnelFD)
-            var goError: Error? = nil
-            if let result = PangolinGo.startTunnel(tunnelFD) {
-                let message = String(cString: result)
-                result.deallocate()
-                os_log("Go startTunnel returned: %{public}@", log: self.logger, type: .debug, message)
-                
-                // Check if the Go function returned an error
-                if message.lowercased().contains("error") || message.lowercased().contains("fail") {
-                    goError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
-                    os_log("Go tunnel start failed: %{public}@", log: self.logger, type: .error, message)
-                }
-            } else {
-                goError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to call Go startTunnel function"])
-                os_log("Failed to call Go startTunnel function (returned nil)", log: self.logger, type: .error)
-            }
-            
-            // If Go function failed, return error
-            if let error = goError {
-                // Try to stop the Go tunnel on error
-                os_log("Stopping Go tunnel due to start error", log: self.logger, type: .debug)
-                _ = self.stopGoTunnel()
-                completionHandler(error)
-                return
-            }
-            
-            os_log("Tunnel started successfully", log: self.logger, type: .debug)
-            
-            // Store the initial settings
-            self.lastAppliedSettings = networkSettings
-            
-            // Initialize version tracking
-            self.lastSeenVersion = PangolinGo.getNetworkSettingsVersion()
-            
-            // Start polling for network settings updates
-            self.startSettingsPolling()
-            
-            completionHandler(nil)
+        // Discover the file descriptor
+        let tunnelFD: Int32
+        if let discoveredFD = discoverTunnelFileDescriptor() {
+            tunnelFD = discoveredFD
+            os_log("Tunnel file descriptor discovered: %d", log: logger, type: .debug, tunnelFD)
+        } else {
+            // Log warning but use 0 as sentinel value - the tunnel might still work
+            tunnelFD = 0
+            os_log("Warning: Could not discover tunnel file descriptor, using 0", log: logger, type: .default)
         }
+        
+        // Call Go function to start tunnel with file descriptor
+        os_log("Calling Go startTunnel function with FD: %d", log: logger, type: .debug, tunnelFD)
+        var goError: Error? = nil
+        if let result = PangolinGo.startTunnel(tunnelFD) {
+            let message = String(cString: result)
+            result.deallocate()
+            os_log("Go startTunnel returned: %{public}@", log: logger, type: .debug, message)
+            
+            // Check if the Go function returned an error
+            if message.lowercased().contains("error") || message.lowercased().contains("fail") {
+                goError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
+                os_log("Go tunnel start failed: %{public}@", log: logger, type: .error, message)
+            }
+        } else {
+            goError = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to call Go startTunnel function"])
+            os_log("Failed to call Go startTunnel function (returned nil)", log: logger, type: .error)
+        }
+        
+        // If Go function failed, return error
+        if let error = goError {
+            // Try to stop the Go tunnel on error
+            os_log("Stopping Go tunnel due to start error", log: logger, type: .debug)
+            _ = stopGoTunnel()
+            completionHandler(error)
+            return
+        }
+        
+        os_log("Tunnel started successfully", log: logger, type: .debug)
+        
+        // Initialize version tracking
+        lastSeenVersion = PangolinGo.getNetworkSettingsVersion()
+        
+        // Start polling for network settings updates
+        startSettingsPolling()
+        
+        completionHandler(nil)
     }
     
     // Stops the Go tunnel

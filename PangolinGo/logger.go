@@ -8,7 +8,10 @@ package main
 import "C"
 import (
 	"fmt"
+	"time"
 	"unsafe"
+
+	"github.com/fosrl/newt/logger"
 )
 
 // LogLevel represents the severity of a log message
@@ -46,12 +49,10 @@ func (l *Logger) SetLevel(level LogLevel) {
 
 // formatMessage formats a log message with timestamp, level, prefix, and caller info
 func (l *Logger) formatMessage(level string, format string, args ...interface{}) string {
-	message := format
 	if len(args) > 0 {
-		message = fmt.Sprintf(format, args...)
+		return fmt.Sprintf(format, args...)
 	}
-
-	return fmt.Sprintf("%s", message)
+	return format
 }
 
 // logToOSLog sends a log message to os.log via the C bridge
@@ -103,10 +104,51 @@ func (l *Logger) Error(format string, args ...interface{}) {
 	l.logToOSLog(LogLevelError, "ERROR", format, args...)
 }
 
+// OSLogWriter adapts our Logger to the newt/logger LogWriter interface
+type OSLogWriter struct {
+	logger *Logger
+}
+
+// Write implements the logger.LogWriter interface
+func (w *OSLogWriter) Write(level logger.LogLevel, timestamp time.Time, message string) {
+	// Map newt/logger.LogLevel to our LogLevel
+	var ourLevel LogLevel
+	switch level {
+	case logger.DEBUG:
+		ourLevel = LogLevelDebug
+	case logger.INFO:
+		ourLevel = LogLevelInfo
+	case logger.WARN:
+		ourLevel = LogLevelWarn
+	case logger.ERROR:
+		ourLevel = LogLevelError
+	default:
+		ourLevel = LogLevelInfo
+	}
+
+	// Call the appropriate method on our logger
+	switch ourLevel {
+	case LogLevelDebug:
+		w.logger.Debug("%s", message)
+	case LogLevelInfo:
+		w.logger.Info("%s", message)
+	case LogLevelWarn:
+		w.logger.Warn("%s", message)
+	case LogLevelError:
+		w.logger.Error("%s", message)
+	}
+}
+
+// NewOSLogWriter creates a new OSLogWriter that wraps our Logger
+func NewOSLogWriter(logger *Logger) *OSLogWriter {
+	return &OSLogWriter{logger: logger}
+}
+
 // global logger instance
 var appLogger *Logger
 
 func init() {
 	appLogger = NewLogger("PangolinGo")
+	// Log level will be set from Swift via setLogLevel
 	appLogger.Info("Logger initialized")
 }
