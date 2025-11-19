@@ -8,6 +8,19 @@
 import SwiftUI
 import AppKit
 
+class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var tunnelManager: TunnelManager?
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        // Disconnect the tunnel when the app is about to terminate
+        // This ensures the packet tunnel network extension also exits when the app exits
+        if let tunnelManager = tunnelManager {
+            tunnelManager.stopTunnelSync()
+            print("Tunnel stopped due to app termination")
+        }
+    }
+}
+
 @main
 struct PangolinApp: App {
     @StateObject private var configManager = ConfigManager()
@@ -15,6 +28,7 @@ struct PangolinApp: App {
     @StateObject private var apiClient: APIClient
     @StateObject private var authManager: AuthManager
     @StateObject private var tunnelManager: TunnelManager
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     
     
     init() {
@@ -47,6 +61,9 @@ struct PangolinApp: App {
                     guard NSApp.activationPolicy() != .accessory else { return }
                     NSApp.setActivationPolicy(.accessory)
                 }
+                
+                // Set tunnel manager reference in app delegate for termination handling
+                appDelegate.tunnelManager = tunnelManager
                 
                 Task {
                     await authManager.initialize()
