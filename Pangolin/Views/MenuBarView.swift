@@ -40,6 +40,15 @@ struct MenuBarView: View {
                 Text(email)
             }
             
+            // Organization selector (when authenticated and has orgs)
+            if authManager.isAuthenticated && !authManager.organizations.isEmpty {
+                Menu("Organizations") {
+                    ForEach(authManager.organizations, id: \.orgId) { org in
+                        Text(org.name)
+                    }
+                }
+            }
+            
             // Login
             if authManager.isAuthenticated {
                 Button("Login to different account") {

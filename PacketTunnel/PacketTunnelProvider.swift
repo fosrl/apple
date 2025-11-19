@@ -6,18 +6,7 @@
 //
 
 import NetworkExtension
-import PangolinGo
 import os.log
-
-// Centralized log level configuration
-enum LogLevel: Int {
-    case debug = 0
-    case info = 1
-    case warn = 2
-    case error = 3
-    
-    static var current: LogLevel = .debug // Default to debug
-}
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     private var tunnelAdapter: TunnelAdapter?
@@ -31,8 +20,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     
     override init() {
         super.init()
-        // Set log level for Go logger to match Swift configuration
-        PangolinGo.setLogLevel(Int32(LogLevel.current.rawValue))
     }
     
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {

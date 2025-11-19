@@ -47,6 +47,11 @@ func (l *Logger) SetLevel(level LogLevel) {
 	l.logLevel = level
 }
 
+// GetLevel returns the current log level
+func (l *Logger) GetLevel() LogLevel {
+	return l.logLevel
+}
+
 // formatMessage formats a log message with timestamp, level, prefix, and caller info
 func (l *Logger) formatMessage(level string, format string, args ...interface{}) string {
 	if len(args) > 0 {
@@ -151,4 +156,66 @@ func init() {
 	appLogger = NewLogger("PangolinGo")
 	// Log level will be set from Swift via setLogLevel
 	appLogger.Info("Logger initialized")
+}
+
+// setLogLevel sets the log level for the Go logger
+// level: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+//
+//export setLogLevel
+func setLogLevel(level C.int) {
+	appLogger.SetLevel(LogLevel(level))
+}
+
+// getCurrentLogLevel returns the current log level from appLogger
+func getCurrentLogLevel() LogLevel {
+	return appLogger.GetLevel()
+}
+
+// logLevelToNewtLoggerLevel converts LogLevel to logger.LogLevel from newt/logger package
+func logLevelToNewtLoggerLevel(level LogLevel) logger.LogLevel {
+	switch level {
+	case LogLevelDebug:
+		return logger.DEBUG
+	case LogLevelInfo:
+		return logger.INFO
+	case LogLevelWarn:
+		return logger.WARN
+	case LogLevelError:
+		return logger.ERROR
+	default:
+		return logger.INFO
+	}
+}
+
+// logLevelToString converts LogLevel to a string representation
+func logLevelToString(level LogLevel) string {
+	switch level {
+	case LogLevelDebug:
+		return "debug"
+	case LogLevelInfo:
+		return "info"
+	case LogLevelWarn:
+		return "warn"
+	case LogLevelError:
+		return "error"
+	default:
+		return "info"
+	}
+}
+
+// InitOLMLogger initializes the OLM logger with the current log level from appLogger
+func InitOLMLogger() {
+	// Create a LogWriter adapter that wraps our appLogger
+	osLogWriter := NewOSLogWriter(appLogger)
+
+	// Create a logger instance using the newt/logger package with our custom writer
+	olmLogger := logger.NewLoggerWithWriter(osLogWriter)
+	olmLogger.SetLevel(logLevelToNewtLoggerLevel(getCurrentLogLevel()))
+
+	logger.Init(olmLogger)
+}
+
+// GetLogLevelString returns the current log level as a string for OLM config
+func GetLogLevelString() string {
+	return logLevelToString(getCurrentLogLevel())
 }

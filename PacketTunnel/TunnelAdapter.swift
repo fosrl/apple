@@ -10,6 +10,14 @@ import NetworkExtension
 import PangolinGo
 import os.log
 
+// Centralized log level configuration
+enum LogLevel: Int {
+    case debug = 0
+    case info = 1
+    case warn = 2
+    case error = 3
+}
+
 // NetworkSettingsJSON represents the JSON structure from Go
 private struct NetworkSettingsJSON: Codable {
     let tunnelRemoteAddress: String?
@@ -82,6 +90,46 @@ public class TunnelAdapter {
     
     public init(with packetTunnelProvider: NEPacketTunnelProvider) {
         self.packetTunnelProvider = packetTunnelProvider
+        // Set log level for Go logger to debug
+        PangolinGo.setLogLevel(Int32(LogLevel.debug.rawValue))
+        
+        // Hardcoded default values for OLM initialization configuration
+        let config: [String: Any] = [
+            "enableAPI": true,
+            "socketPath": "/var/run/olm.sock",
+            "logLevel": "debug"
+        ]
+        
+        // Convert config to JSON string
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: config),
+              let configJSON = String(data: jsonData, encoding: .utf8) else {
+            os_log("Failed to serialize init config to JSON", log: logger, type: .error)
+            return
+        }
+        
+        // Create a mutable C string copy for the Go function
+        let configJSONCString = configJSON.utf8CString
+        let configJSONPtr = UnsafeMutablePointer<CChar>.allocate(capacity: configJSONCString.count)
+        configJSONCString.withUnsafeBufferPointer { buffer in
+            configJSONPtr.initialize(from: buffer.baseAddress!, count: buffer.count)
+        }
+        defer {
+            configJSONPtr.deallocate()
+        }
+        
+        // Call Go initOlm function with JSON configuration
+        if let result = PangolinGo.initOlm(configJSONPtr) {
+            let message = String(cString: result)
+            result.deallocate()
+            os_log("Go init returned: %{public}@", log: logger, type: .debug, message)
+            
+            // Check if the Go function returned an error
+            if message.lowercased().contains("error") || message.lowercased().contains("fail") {
+                os_log("Go init failed: %{public}@", log: logger, type: .error, message)
+            }
+        } else {
+            os_log("Failed to call Go init function (returned nil)", log: logger, type: .error)
+        }
     }
     
     // Discovers the tunnel file descriptor by scanning open file descriptors
@@ -156,10 +204,42 @@ public class TunnelAdapter {
             os_log("Warning: Could not discover tunnel file descriptor, using 0", log: logger, type: .default)
         }
         
-        // Call Go function to start tunnel with file descriptor
+        // Hardcoded default values for tunnel configuration
+        let config: [String: Any] = [
+            "endpoint": "https://p.fosrl.io",
+            "id": "aud0iemczu1cyin",
+            "secret": "8i84dcx5nuvt8jchphaawzzqxq4qnus5sw99sm8rh4jc0fsu",
+            "mtu": 1280,
+            "dns": "8.8.8.8",
+            "holepunch": false,
+            "pingIntervalSeconds": 5,
+            "pingTimeoutSeconds": 5
+        ]
+        
+        // Convert config to JSON string
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: config),
+              let configJSON = String(data: jsonData, encoding: .utf8) else {
+            let error = NSError(domain: "PangolinGo", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to serialize tunnel config to JSON"])
+            os_log("Failed to serialize tunnel config to JSON", log: logger, type: .error)
+            completionHandler(error)
+            return
+        }
+        
+        // Call Go function to start tunnel with file descriptor and JSON configuration
         os_log("Calling Go startTunnel function with FD: %d", log: logger, type: .debug, tunnelFD)
         var goError: Error? = nil
-        if let result = PangolinGo.startTunnel(tunnelFD) {
+        
+        // Create a mutable C string copy for the Go function
+        let configJSONCString = configJSON.utf8CString
+        let configJSONPtr = UnsafeMutablePointer<CChar>.allocate(capacity: configJSONCString.count)
+        configJSONCString.withUnsafeBufferPointer { buffer in
+            configJSONPtr.initialize(from: buffer.baseAddress!, count: buffer.count)
+        }
+        defer {
+            configJSONPtr.deallocate()
+        }
+        
+        if let result = PangolinGo.startTunnel(tunnelFD, configJSONPtr) {
             let message = String(cString: result)
             result.deallocate()
             os_log("Go startTunnel returned: %{public}@", log: logger, type: .debug, message)

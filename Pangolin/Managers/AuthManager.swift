@@ -15,6 +15,7 @@ class AuthManager: ObservableObject {
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var currentOrg: Organization?
+    @Published var organizations: [Organization] = []
     @Published var isLoading = false
     @Published var isInitializing = true
     @Published var errorMessage: String?
@@ -39,15 +40,18 @@ class AuthManager: ObservableObject {
         if let token = secretManager.getSecret(key: "session-token") {
             apiClient.updateSessionToken(token)
             
-            // Verify token is still valid
+            // Always fetch the latest user info to verify the user exists and update stored info
             do {
                 let user = try await apiClient.getUser()
+                // Update stored config with latest user info
                 await handleSuccessfulAuth(user: user, token: token)
             } catch {
-                // Token is invalid, clear it
+                // Token is invalid or user doesn't exist, clear it
                 _ = secretManager.deleteSecret(key: "session-token")
                 _ = configManager.clear()
                 isAuthenticated = false
+                currentUser = nil
+                currentOrg = nil
             }
         } else {
             isAuthenticated = false
@@ -197,14 +201,20 @@ class AuthManager: ObservableObject {
         // Get organizations
         do {
             let orgsResponse = try await apiClient.listUserOrgs(userId: user.userId)
+            organizations = orgsResponse.orgs
             
-            if orgsResponse.orgs.count == 1 {
+            // Restore last selected org from config, or auto-select if only one org
+            if let savedOrgId = config.orgId,
+               let savedOrg = organizations.first(where: { $0.orgId == savedOrgId }) {
+                // Restore last selected org
+                currentOrg = savedOrg
+            } else if orgsResponse.orgs.count == 1 {
                 // Auto-select single org
                 currentOrg = orgsResponse.orgs.first
                 config.orgId = currentOrg?.orgId
                 _ = configManager.save(config)
             } else if orgsResponse.orgs.count > 1 {
-                // For now, select first org (can be enhanced later)
+                // Select first org if no saved org
                 currentOrg = orgsResponse.orgs.first
                 config.orgId = currentOrg?.orgId
                 _ = configManager.save(config)
@@ -212,10 +222,56 @@ class AuthManager: ObservableObject {
         } catch {
             // Non-fatal error, continue without org
             print("Failed to load organizations: \(error)")
+            organizations = []
         }
+        
+        // Ensure OLM credentials exist for this device-account combo
+        await ensureOlmCredentials(userId: user.userId)
         
         isAuthenticated = true
         errorMessage = nil
+    }
+    
+    func selectOrganization(_ org: Organization) async {
+        currentOrg = org
+        
+        // Save selected org to config
+        var config = configManager.config ?? Config()
+        config.orgId = org.orgId
+        _ = configManager.save(config)
+    }
+    
+    private func ensureOlmCredentials(userId: String) async {
+        // Check if OLM credentials already exist
+        if secretManager.hasOlmCredentials(userId: userId) {
+            return
+        }
+        
+        // Create OLM credentials
+        do {
+            let deviceName = DeviceInfo.getDeviceModelName()
+            let olmResponse = try await apiClient.createOlm(userId: userId, name: deviceName)
+            
+            // Save OLM credentials
+            let saved = secretManager.saveOlmCredentials(
+                userId: userId,
+                olmId: olmResponse.olmId,
+                secret: olmResponse.secret
+            )
+            
+            if !saved {
+                await MainActor.run {
+                    AlertManager.shared.showErrorDialog(
+                        NSError(domain: "Pangolin", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save OLM credentials"])
+                    )
+                }
+            }
+        } catch {
+            // Show error alert to user
+            await MainActor.run {
+                AlertManager.shared.showErrorDialog(error)
+            }
+        }
     }
     
     func logout() async {
@@ -237,6 +293,7 @@ class AuthManager: ObservableObject {
         isAuthenticated = false
         currentUser = nil
         currentOrg = nil
+        organizations = []
         errorMessage = nil
         deviceAuthCode = nil
         deviceAuthLoginURL = nil

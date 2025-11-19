@@ -2,29 +2,80 @@ package main
 
 /*
 #include <stdint.h>
+#include <stdlib.h>
 */
 import (
 	"C"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
-	"github.com/fosrl/newt/logger"
 	olmpkg "github.com/fosrl/olm/olm"
 )
+import "time"
+
+// InitOlmConfig represents the JSON configuration for initOlm
+type InitOlmConfig struct {
+	EnableAPI  bool   `json:"enableAPI"`
+	SocketPath string `json:"socketPath"`
+	LogLevel   string `json:"logLevel"`
+}
+
+// StartTunnelConfig represents the JSON configuration for startTunnel
+type StartTunnelConfig struct {
+	Endpoint            string `json:"endpoint"`
+	ID                  string `json:"id"`
+	Secret              string `json:"secret"`
+	MTU                 int    `json:"mtu"`
+	DNS                 string `json:"dns"`
+	Holepunch           bool   `json:"holepunch"`
+	PingIntervalSeconds int    `json:"pingIntervalSeconds"`
+	PingTimeoutSeconds  int    `json:"pingTimeoutSeconds"`
+}
 
 var (
-	tunnelRunning  bool
-	tunnelMutex    sync.Mutex
-	tunnelFileDesc int32
-	olmContext     context.Context
-	olmCancel      context.CancelFunc
+	tunnelRunning bool
+	tunnelMutex   sync.Mutex
+	olmContext    context.Context
 )
 
+//export initOlm
+func initOlm(configJSON *C.char) *C.char {
+	appLogger.Debug("Initializing with config")
+
+	// Parse JSON configuration
+	configStr := C.GoString(configJSON)
+	var config InitOlmConfig
+	if err := json.Unmarshal([]byte(configStr), &config); err != nil {
+		appLogger.Error("Failed to parse init config JSON: %v", err)
+		return C.CString(fmt.Sprintf("Error: Failed to parse config JSON: %v", err))
+	}
+
+	// Initialize OLM logger with current log level
+	InitOLMLogger()
+
+	// Create context for OLM
+	olmContext = context.Background()
+
+	// Create OLM GlobalConfig with hardcoded values from Swift
+	olmConfig := olmpkg.GlobalConfig{
+		LogLevel:   GetLogLevelString(),
+		EnableAPI:  config.EnableAPI,
+		SocketPath: config.SocketPath,
+		Version:    "1",
+	}
+
+	// Initialize OLM with context and GlobalConfig
+	olmpkg.Init(olmContext, olmConfig)
+
+	appLogger.Debug("Init completed successfully")
+	return C.CString("Init completed successfully")
+}
+
 //export startTunnel
-func startTunnel(fd C.int) *C.char {
-	appLogger.Debug("Starting tunnel with FD: %d", int(fd))
+func startTunnel(fd C.int, configJSON *C.char) *C.char {
+	appLogger.Debug("Starting tunnel")
 
 	tunnelMutex.Lock()
 	defer tunnelMutex.Unlock()
@@ -35,42 +86,37 @@ func startTunnel(fd C.int) *C.char {
 		return C.CString("Error: Tunnel already running")
 	}
 
-	tunnelFileDesc = int32(fd)
 	tunnelRunning = true
 
-	// Create a LogWriter adapter that wraps our appLogger
-	osLogWriter := NewOSLogWriter(appLogger)
-
-	// Create a logger instance using the newt/logger package with our custom writer
-	olmLogger := logger.NewLoggerWithWriter(osLogWriter)
-	olmLogger.SetLevel(logger.DEBUG)
-
-	logger.Init(olmLogger)
-
-	// Create OLM config with hard-coded values
-	olmConfig := olmpkg.Config{
-		Endpoint:             "https://p.fosrl.io",
-		ID:                   "aud0iemczu1cyin",
-		Secret:               "8i84dcx5nuvt8jchphaawzzqxq4qnus5sw99sm8rh4jc0fsu",
-		MTU:                  1280,
-		DNS:                  "8.8.8.8",
-		LogLevel:             "debug",
-		EnableAPI:            true,
-		SocketPath:           "/var/run/olm.sock",
-		Holepunch:            false,
-		FileDescriptorTun:    uint32(tunnelFileDesc),
-		PingIntervalDuration: 5 * time.Second,
-		PingTimeoutDuration:  5 * time.Second,
-		Version:              "1",
+	// Parse JSON configuration
+	configStr := C.GoString(configJSON)
+	var config StartTunnelConfig
+	if err := json.Unmarshal([]byte(configStr), &config); err != nil {
+		appLogger.Error("Failed to parse tunnel config JSON: %v", err)
+		tunnelRunning = false
+		return C.CString(fmt.Sprintf("Error: Failed to parse config JSON: %v", err))
 	}
 
-	// Create context for OLM
-	olmContext, olmCancel = context.WithCancel(context.Background())
+	// Create OLM Config with tunnel parameters
+	olmConfig := olmpkg.TunnelConfig{
+		Endpoint:             config.Endpoint,
+		ID:                   config.ID,
+		Secret:               config.Secret,
+		MTU:                  config.MTU,
+		DNS:                  config.DNS,
+		Holepunch:            config.Holepunch,
+		PingIntervalDuration: time.Duration(config.PingIntervalSeconds) * time.Second,
+		PingTimeoutDuration:  time.Duration(config.PingTimeoutSeconds) * time.Second,
+		FileDescriptorTun:    uint32(fd),
+	}
 
-	// Start OLM in a goroutine
+	// print the config for debugging
+	appLogger.Debug("Tunnel config: %+v", olmConfig)
+
+	// Start OLM tunnel with config
+	appLogger.Info("Starting OLM tunnel...")
 	go func() {
-		appLogger.Info("Starting OLM tunnel...")
-		olmpkg.Run(olmContext, olmConfig)
+		olmpkg.StartTunnel(olmConfig)
 		appLogger.Info("OLM tunnel stopped")
 
 		// Update tunnel state when OLM stops
@@ -80,7 +126,7 @@ func startTunnel(fd C.int) *C.char {
 	}()
 
 	appLogger.Debug("Start tunnel completed successfully")
-	return C.CString(fmt.Sprintf("Tunnel started with FD: %d", tunnelFileDesc))
+	return C.CString("Tunnel started")
 }
 
 //export stopTunnel
@@ -96,11 +142,8 @@ func stopTunnel() *C.char {
 		return C.CString("Error: Tunnel not running")
 	}
 
-	// Cancel OLM context to stop the tunnel
-	if olmCancel != nil {
-		olmCancel()
-		olmCancel = nil
-	}
+	// Stop OLM tunnel
+	olmpkg.StopTunnel()
 
 	tunnelRunning = false
 	appLogger.Debug("Tunnel stopped successfully")
@@ -142,14 +185,6 @@ func getNetworkSettings() *C.char {
 	}
 
 	return C.CString(settingsJSON)
-}
-
-// setLogLevel sets the log level for the Go logger
-// level: 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
-//
-//export setLogLevel
-func setLogLevel(level C.int) {
-	appLogger.SetLevel(LogLevel(level))
 }
 
 // We need an entry point; it's ok for this to be empty

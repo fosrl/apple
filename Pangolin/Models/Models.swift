@@ -94,3 +94,14 @@ struct Pagination: Codable {
     let offset: Int?
 }
 
+// MARK: - OLM
+
+struct CreateOlmRequest: Codable {
+    let name: String
+}
+
+struct CreateOlmResponse: Codable {
+    let olmId: String
+    let secret: String
+}
+

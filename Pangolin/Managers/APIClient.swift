@@ -345,6 +345,14 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    func createOlm(userId: String, name: String) async throws -> CreateOlmResponse {
+        let requestBody = CreateOlmRequest(name: name)
+        let bodyData = try JSONEncoder().encode(requestBody)
+        
+        let (data, response) = try await makeRequest(method: "PUT", path: "/user/\(userId)/olm", body: bodyData)
+        return try parseResponse(data, response)
+    }
+    
     // MARK: - Connection Test
     
     func testConnection() async throws -> Bool {

@@ -62,5 +62,31 @@ class SecretManager: ObservableObject {
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
+    
+    // MARK: - OLM Credentials
+    
+    func getOlmId(userId: String) -> String? {
+        return getSecret(key: "olm-id-\(userId)")
+    }
+    
+    func getOlmSecret(userId: String) -> String? {
+        return getSecret(key: "olm-secret-\(userId)")
+    }
+    
+    func saveOlmCredentials(userId: String, olmId: String, secret: String) -> Bool {
+        let idSaved = saveSecret(key: "olm-id-\(userId)", value: olmId)
+        let secretSaved = saveSecret(key: "olm-secret-\(userId)", value: secret)
+        return idSaved && secretSaved
+    }
+    
+    func hasOlmCredentials(userId: String) -> Bool {
+        return getOlmId(userId: userId) != nil && getOlmSecret(userId: userId) != nil
+    }
+    
+    func deleteOlmCredentials(userId: String) -> Bool {
+        let idDeleted = deleteSecret(key: "olm-id-\(userId)")
+        let secretDeleted = deleteSecret(key: "olm-secret-\(userId)")
+        return idDeleted && secretDeleted
+    }
 }
 
