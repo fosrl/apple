@@ -21,7 +21,14 @@ class TunnelManager: NSObject, ObservableObject {
     private var systemExtensionRequest: OSSystemExtensionRequest?
     private var systemExtensionInstallContinuation: CheckedContinuation<Bool, Error>?
     
-    override init() {
+    private let configManager: ConfigManager
+    private let secretManager: SecretManager
+    private let authManager: AuthManager
+    
+    init(configManager: ConfigManager, secretManager: SecretManager, authManager: AuthManager) {
+        self.configManager = configManager
+        self.secretManager = secretManager
+        self.authManager = authManager
         super.init()
         
         // Observe VPN status changes
@@ -206,9 +213,33 @@ class TunnelManager: NSObject, ObservableObject {
         // Note: Go startTunnel is called from within the PacketTunnelProvider system extension
         // when the tunnel starts, not from the app side
         
+        // Build options dictionary from config and secrets
+        var tunnelOptions: [String: NSObject] = [:]
+        
+        // Get endpoint from config
+        let endpoint = configManager.getHostname()
+        tunnelOptions["endpoint"] = endpoint as NSString
+        
+        // Get OLM credentials from secret manager for the current user
+        if let userId = authManager.currentUser?.userId ?? configManager.config?.userId {
+            if let olmId = secretManager.getOlmId(userId: userId) {
+                tunnelOptions["id"] = olmId as NSString
+            }
+            if let olmSecret = secretManager.getOlmSecret(userId: userId) {
+                tunnelOptions["secret"] = olmSecret as NSString
+            }
+        }
+        
+        // Tunnel configuration options
+        tunnelOptions["mtu"] = NSNumber(value: 1280)
+        tunnelOptions["dns"] = "8.8.8.8" as NSString
+        tunnelOptions["holepunch"] = NSNumber(value: false)
+        tunnelOptions["pingIntervalSeconds"] = NSNumber(value: 5)
+        tunnelOptions["pingTimeoutSeconds"] = NSNumber(value: 5)
+        
         do {
-            // Start with options if needed
-            try manager.connection.startVPNTunnel(options: nil)
+            // Start with options
+            try manager.connection.startVPNTunnel(options: tunnelOptions.isEmpty ? nil : tunnelOptions)
             // Don't set isConnected here - let updateConnectionStatus() handle it
             await updateConnectionStatus()
         } catch {

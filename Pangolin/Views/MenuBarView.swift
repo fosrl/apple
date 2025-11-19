@@ -27,7 +27,7 @@ struct MenuBarView: View {
         } else {
             // Connect toggle (when authenticated)
             if authManager.isAuthenticated {
-                Text("Status: \(tunnelManager.statusText)")
+                Text("\(tunnelManager.statusText)")
                     .foregroundColor(.secondary)
                 
                 UserEmailMenuItem(tunnelManager: tunnelManager)
@@ -42,11 +42,7 @@ struct MenuBarView: View {
             
             // Organization selector (when authenticated and has orgs)
             if authManager.isAuthenticated && !authManager.organizations.isEmpty {
-                Menu("Organizations") {
-                    ForEach(authManager.organizations, id: \.orgId) { org in
-                        Text(org.name)
-                    }
-                }
+                OrganizationsMenu(authManager: authManager)
             }
             
             // Login
@@ -67,6 +63,17 @@ struct MenuBarView: View {
         
         // More submenu
         Menu("More") {
+            if !authManager.isInitializing && authManager.isAuthenticated {
+                Button("Logout") {
+                    Task {
+                        await authManager.logout()
+                    }
+                }
+                .disabled(authManager.isLoading)
+            }
+            
+            Divider()
+            
             // Support section
             Text("Support")
                 .foregroundColor(.secondary)
@@ -77,17 +84,6 @@ struct MenuBarView: View {
             
             Button("Documentation") {
                 openURL("https://docs.pangolin.net/")
-            }
-            
-            Divider()
-            
-            if !authManager.isInitializing && authManager.isAuthenticated {
-                Button("Logout") {
-                    Task {
-                        await authManager.logout()
-                    }
-                }
-                .disabled(authManager.isLoading)
             }
             
             Divider()
@@ -182,6 +178,53 @@ struct MenuBarView: View {
                     NSApp.activate(ignoringOtherApps: true)
                 }
             }
+        }
+    }
+}
+
+struct OrganizationsMenu: View {
+    @ObservedObject var authManager: AuthManager
+    
+    private var organizations: [Organization] {
+        authManager.organizations
+    }
+    
+    private var currentOrgId: String? {
+        authManager.currentOrg?.orgId
+    }
+    
+    private var menuTitle: String {
+        if let currentOrg = authManager.currentOrg {
+            return currentOrg.name
+        }
+        return "Organizations"
+    }
+    
+    var body: some View {
+        Menu {
+            // Show organization count
+            Text(organizations.count == 1 ? "1 Organization" : "\(organizations.count) Organizations")
+                .foregroundColor(.secondary)
+            
+            Divider()
+            
+            ForEach(organizations, id: \.orgId) { org in
+                Button {
+                    Task {
+                        await authManager.selectOrganization(org)
+                    }
+                } label: {
+                    HStack {
+                        Text(org.name)
+                        if currentOrgId == org.orgId {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text(menuTitle)
         }
     }
 }

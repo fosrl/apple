@@ -189,8 +189,9 @@ public class TunnelAdapter {
     // Starts the tunnel and discovers the file descriptor
     //
     // - Parameters:
+    //   - options: Required dictionary containing tunnel configuration (endpoint, id, secret, mtu, dns, holepunch, pingIntervalSeconds, pingTimeoutSeconds)
     //   - completionHandler: Called when the tunnel startup is complete or fails
-    public func start(completionHandler: @escaping (Error?) -> Void) {
+    public func start(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         os_log("Starting tunnel", log: logger, type: .debug)
         
         // Discover the file descriptor
@@ -204,16 +205,38 @@ public class TunnelAdapter {
             os_log("Warning: Could not discover tunnel file descriptor, using 0", log: logger, type: .default)
         }
         
-        // Hardcoded default values for tunnel configuration
+        // Get values from options (passed through from TunnelManager)
+        guard let options = options else {
+            let error = NSError(domain: "TunnelAdapter", code: -1, userInfo: [NSLocalizedDescriptionKey: "Options are required"])
+            os_log("Options are required but were nil", log: logger, type: .error)
+            completionHandler(error)
+            return
+        }
+        
+        guard let endpoint = options["endpoint"] as? String,
+              let id = options["id"] as? String,
+              let secret = options["secret"] as? String,
+              let mtu = (options["mtu"] as? NSNumber)?.intValue,
+              let dns = options["dns"] as? String,
+              let holepunch = (options["holepunch"] as? NSNumber)?.boolValue,
+              let pingIntervalSeconds = (options["pingIntervalSeconds"] as? NSNumber)?.intValue,
+              let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue else {
+            let error = NSError(domain: "TunnelAdapter", code: -1, userInfo: [NSLocalizedDescriptionKey: "Required tunnel configuration options are missing"])
+            os_log("Required tunnel configuration options are missing", log: logger, type: .error)
+            completionHandler(error)
+            return
+        }
+        
+        // Tunnel configuration
         let config: [String: Any] = [
-            "endpoint": "https://p.fosrl.io",
-            "id": "aud0iemczu1cyin",
-            "secret": "8i84dcx5nuvt8jchphaawzzqxq4qnus5sw99sm8rh4jc0fsu",
-            "mtu": 1280,
-            "dns": "8.8.8.8",
-            "holepunch": false,
-            "pingIntervalSeconds": 5,
-            "pingTimeoutSeconds": 5
+            "endpoint": endpoint,
+            "id": id,
+            "secret": secret,
+            "mtu": mtu,
+            "dns": dns,
+            "holepunch": holepunch,
+            "pingIntervalSeconds": pingIntervalSeconds,
+            "pingTimeoutSeconds": pingTimeoutSeconds
         ]
         
         // Convert config to JSON string

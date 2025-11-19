@@ -14,7 +14,7 @@ struct PangolinApp: App {
     @StateObject private var secretManager = SecretManager()
     @StateObject private var apiClient: APIClient
     @StateObject private var authManager: AuthManager
-    @StateObject private var tunnelManager = TunnelManager()
+    @StateObject private var tunnelManager: TunnelManager
     
     
     init() {
@@ -24,11 +24,13 @@ struct PangolinApp: App {
         let token = secretMgr.getSecret(key: "session-token")
         let client = APIClient(baseURL: hostname, sessionToken: token)
         let authMgr = AuthManager(apiClient: client, configManager: configMgr, secretManager: secretMgr)
+        let tunnelMgr = TunnelManager(configManager: configMgr, secretManager: secretMgr, authManager: authMgr)
         
         _configManager = StateObject(wrappedValue: configMgr)
         _secretManager = StateObject(wrappedValue: secretMgr)
         _apiClient = StateObject(wrappedValue: client)
         _authManager = StateObject(wrappedValue: authMgr)
+        _tunnelManager = StateObject(wrappedValue: tunnelMgr)
     }
     
     var body: some Scene {

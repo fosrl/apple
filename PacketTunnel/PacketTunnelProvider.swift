@@ -25,11 +25,21 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         os_log("startTunnel called with options: %{public}@", log: logger, type: .debug, options?.description ?? "nil")
         
+        // Validate that options are provided
+        guard let options = options, !options.isEmpty else {
+            let error = NSError(domain: "PacketTunnelProvider", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Tunnel options are required but were not provided"
+            ])
+            os_log("Tunnel start failed: options not provided", log: logger, type: .error)
+            completionHandler(error)
+            return
+        }
+        
         // Initialize the tunnel adapter
         tunnelAdapter = TunnelAdapter(with: self)
 
         // Use the tunnel adapter to start the tunnel and discover the file descriptor
-        tunnelAdapter?.start { [weak self] (error: Error?) in
+        tunnelAdapter?.start(options: options) { [weak self] (error: Error?) in
             if let error = error {
                 os_log("Tunnel start failed: %{public}@", log: self?.logger ?? .default, type: .error, error.localizedDescription)
             } else {
