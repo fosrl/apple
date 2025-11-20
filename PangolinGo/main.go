@@ -32,6 +32,7 @@ type StartTunnelConfig struct {
 	Holepunch           bool   `json:"holepunch"`
 	PingIntervalSeconds int    `json:"pingIntervalSeconds"`
 	PingTimeoutSeconds  int    `json:"pingTimeoutSeconds"`
+	UserToken           string `json:"userToken"`
 }
 
 var (
@@ -108,6 +109,7 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		PingIntervalDuration: time.Duration(config.PingIntervalSeconds) * time.Second,
 		PingTimeoutDuration:  time.Duration(config.PingTimeoutSeconds) * time.Second,
 		FileDescriptorTun:    uint32(fd),
+		UserToken:            config.UserToken,
 	}
 
 	// print the config for debugging

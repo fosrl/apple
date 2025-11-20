@@ -305,6 +305,11 @@ class TunnelManager: NSObject, ObservableObject {
             }
         }
         
+        // Get session token from secret manager
+        if let userToken = secretManager.getSecret(key: "session-token") {
+            tunnelOptions["userToken"] = userToken as NSString
+        }
+        
         // Tunnel configuration options
         tunnelOptions["mtu"] = NSNumber(value: 1280)
         tunnelOptions["dns"] = "8.8.8.8" as NSString

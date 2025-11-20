@@ -227,6 +227,9 @@ public class TunnelAdapter {
             return
         }
         
+        // Get user token (optional)
+        let userToken = options["userToken"] as? String ?? ""
+        
         // Tunnel configuration
         let config: [String: Any] = [
             "endpoint": endpoint,
@@ -236,7 +239,8 @@ public class TunnelAdapter {
             "dns": dns,
             "holepunch": holepunch,
             "pingIntervalSeconds": pingIntervalSeconds,
-            "pingTimeoutSeconds": pingTimeoutSeconds
+            "pingTimeoutSeconds": pingTimeoutSeconds,
+            "userToken": userToken
         ]
         
         // Convert config to JSON string
