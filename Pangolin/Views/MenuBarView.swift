@@ -131,7 +131,7 @@ struct MenuBarView: View {
             Divider()
             
             // Copyright
-            Text("© 2025 Fossorial, Inc.")
+            Text("© \(Calendar.current.component(.year, from: Date())) Fossorial, Inc.")
                 .foregroundColor(.secondary)
             
             Button("Terms of Service") {
