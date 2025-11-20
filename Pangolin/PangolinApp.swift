@@ -7,16 +7,22 @@
 
 import SwiftUI
 import AppKit
+import os.log
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     weak var tunnelManager: TunnelManager?
+    
+    private let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "AppDelegate")
+    }()
     
     func applicationWillTerminate(_ notification: Notification) {
         // Disconnect the tunnel when the app is about to terminate
         // This ensures the packet tunnel network extension also exits when the app exits
         if let tunnelManager = tunnelManager {
             tunnelManager.stopTunnelSync()
-            print("Tunnel stopped due to app termination")
+            os_log("Tunnel stopped due to app termination", log: logger, type: .info)
         }
     }
 }
@@ -39,6 +45,9 @@ struct PangolinApp: App {
         let client = APIClient(baseURL: hostname, sessionToken: token)
         let authMgr = AuthManager(apiClient: client, configManager: configMgr, secretManager: secretMgr)
         let tunnelMgr = TunnelManager(configManager: configMgr, secretManager: secretMgr, authManager: authMgr)
+        
+        // Set tunnel manager reference in auth manager for org switching
+        authMgr.tunnelManager = tunnelMgr
         
         _configManager = StateObject(wrappedValue: configMgr)
         _secretManager = StateObject(wrappedValue: secretMgr)

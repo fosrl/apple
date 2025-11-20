@@ -14,20 +14,23 @@ struct MenuBarView: View {
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
     @Environment(\.openWindow) private var openWindow
+    @State private var menuOpenCount = 0
+    @State private var isLoggedOut = false
     
     var body: some View {
-        // Show loading state during initialization
-        if authManager.isInitializing {
-            HStack {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Loading...")
-                    .foregroundColor(.secondary)
-            }
-        } else {
-            // Connect toggle (when authenticated)
-            if authManager.isAuthenticated {
-                Text("\(tunnelManager.statusText)")
+        Group {
+            // Show loading state during initialization
+            if authManager.isInitializing {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text("Loading...")
+                        .foregroundColor(.secondary)
+                }
+            } else {
+            // Connect toggle (when authenticated and not logged out)
+            if authManager.isAuthenticated && !isLoggedOut {
+                Text(tunnelManager.status.displayText)
                     .foregroundColor(.secondary)
                 
                 UserEmailMenuItem(tunnelManager: tunnelManager)
@@ -35,23 +38,51 @@ struct MenuBarView: View {
             
             Divider()
             
-            // Email text (when authenticated)
-            if authManager.isAuthenticated, let email = authManager.currentUser?.email {
-                Text(email)
+            // Check if user has previously logged in (has saved email)
+            let hasSavedUserInfo = configManager.config?.email != nil
+            
+            // Email text (when authenticated or has saved user info)
+            if authManager.isAuthenticated || hasSavedUserInfo {
+                Group {
+                    if authManager.isAuthenticated {
+                        if let email = authManager.currentUser?.email {
+                            Text(isLoggedOut ? "\(email) (Logged out)" : email)
+                        } else if let savedEmail = configManager.config?.email {
+                            Text("\(savedEmail) (Logged out)")
+                        }
+                    } else if let savedEmail = configManager.config?.email {
+                        // Not authenticated but has saved email - show logged out state
+                        Text("\(savedEmail) (Logged out)")
+                    }
+                }
+                .id(menuOpenCount) // Force view recreation to trigger task
+                .task {
+                    // Handle menu open logic when menu opens (only if authenticated)
+                    if authManager.isAuthenticated {
+                        await handleMenuOpen()
+                    }
+                }
             }
             
-            // Organization selector (when authenticated and has orgs)
-            if authManager.isAuthenticated && !authManager.organizations.isEmpty {
-                OrganizationsMenu(authManager: authManager)
+            // Organization selector (when authenticated, has orgs, and not logged out)
+            if authManager.isAuthenticated && !authManager.organizations.isEmpty && !isLoggedOut {
+                OrganizationsMenu(authManager: authManager, tunnelManager: tunnelManager)
             }
             
-            // Login
+            // Login button
             if authManager.isAuthenticated {
-                Button("Login to different account") {
+                Button(isLoggedOut ? "Log back in" : "Login to different account") {
+                    openLoginWindow()
+                }
+                .disabled(authManager.isLoading)
+            } else if hasSavedUserInfo {
+                // Has saved user info but not authenticated - show "Log back in"
+                Button("Log back in") {
                     openLoginWindow()
                 }
                 .disabled(authManager.isLoading)
             } else {
+                // Never logged in before - show "Login to account"
                 Button("Login to account") {
                     openLoginWindow()
                 }
@@ -63,7 +94,7 @@ struct MenuBarView: View {
         
         // More submenu
         Menu("More") {
-            if !authManager.isInitializing && authManager.isAuthenticated {
+            if !authManager.isInitializing && authManager.isAuthenticated && !isLoggedOut {
                 Button("Logout") {
                     Task {
                         await authManager.logout()
@@ -108,6 +139,49 @@ struct MenuBarView: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
+        }
+        .onAppear {
+            // Increment counter to force view recreation and trigger task
+            menuOpenCount += 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
+            // Also handle menu open logic when menu begins tracking (menu is opening)
+            if authManager.isAuthenticated {
+                Task {
+                    await handleMenuOpen()
+                }
+            }
+        }
+        .onChange(of: authManager.isAuthenticated) { oldValue, newValue in
+            // Reset logged out state when authentication state changes
+            if newValue {
+                isLoggedOut = false
+            }
+        }
+    }
+    
+    private func handleMenuOpen() async {
+        // First, try to get the user to verify session is still valid
+        do {
+            let user = try await apiClient.getUser()
+            // If successful, update user and clear logged out state
+            await MainActor.run {
+                authManager.currentUser = user
+                isLoggedOut = false
+            }
+
+            // await tunnelManager.disconnect()
+        } catch {
+            // If getting user fails, mark as logged out
+            await MainActor.run {
+                isLoggedOut = true
+            }
+        }
+        
+        // Refresh organizations in background
+        if authManager.isAuthenticated {
+            await authManager.refreshOrganizations()
+        }
     }
     
     private func openURL(_ urlString: String) {
@@ -184,6 +258,7 @@ struct MenuBarView: View {
 
 struct OrganizationsMenu: View {
     @ObservedObject var authManager: AuthManager
+    @ObservedObject var tunnelManager: TunnelManager
     
     private var organizations: [Organization] {
         authManager.organizations
@@ -200,13 +275,20 @@ struct OrganizationsMenu: View {
         return "Organizations"
     }
     
+    private var shouldDisableOrgButtons: Bool {
+        switch tunnelManager.status {
+        case .connecting, .registering, .reconnecting, .disconnecting:
+            return true
+        default:
+            return false
+        }
+    }
+    
     var body: some View {
         Menu {
             // Show organization count
             Text(organizations.count == 1 ? "1 Organization" : "\(organizations.count) Organizations")
                 .foregroundColor(.secondary)
-            
-            Divider()
             
             ForEach(organizations, id: \.orgId) { org in
                 Button {
@@ -222,6 +304,7 @@ struct OrganizationsMenu: View {
                         }
                     }
                 }
+                .disabled(shouldDisableOrgButtons)
             }
         } label: {
             Text(menuTitle)
@@ -233,15 +316,15 @@ struct UserEmailMenuItem: View {
     @ObservedObject var tunnelManager: TunnelManager
     
     var body: some View {
-        Button(tunnelManager.isConnected ? "Disconnect" : "Connect") {
+        Button(tunnelManager.isNEConnected ? "Disconnect" : "Connect") {
             Task {
-                if !tunnelManager.isConnected {
+                if !tunnelManager.isNEConnected {
                     await tunnelManager.connect()
                 } else {
                     await tunnelManager.disconnect()
                 }
             }
-        }
+        }   
         .disabled(tunnelManager.isRegistering)
     }
 }

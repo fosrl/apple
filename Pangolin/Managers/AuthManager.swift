@@ -9,6 +9,7 @@ import Foundation
 import AppKit
 import Combine
 import UserNotifications
+import os.log
 
 @MainActor
 class AuthManager: ObservableObject {
@@ -25,6 +26,12 @@ class AuthManager: ObservableObject {
     let apiClient: APIClient
     private let configManager: ConfigManager
     private let secretManager: SecretManager
+    weak var tunnelManager: TunnelManager?
+    
+    private let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "AuthManager")
+    }()
     
     init(apiClient: APIClient, configManager: ConfigManager, secretManager: SecretManager) {
         self.apiClient = apiClient
@@ -47,11 +54,7 @@ class AuthManager: ObservableObject {
                 await handleSuccessfulAuth(user: user, token: token)
             } catch {
                 // Token is invalid or user doesn't exist, clear it
-                _ = secretManager.deleteSecret(key: "session-token")
-                _ = configManager.clear()
                 isAuthenticated = false
-                currentUser = nil
-                currentOrg = nil
             }
         } else {
             isAuthenticated = false
@@ -221,7 +224,7 @@ class AuthManager: ObservableObject {
             }
         } catch {
             // Non-fatal error, continue without org
-            print("Failed to load organizations: \(error)")
+            os_log("Failed to load organizations: %{public}@", log: logger, type: .error, error.localizedDescription)
             organizations = []
         }
         
@@ -232,44 +235,203 @@ class AuthManager: ObservableObject {
         errorMessage = nil
     }
     
+    func refreshOrganizations() async {
+        // Only refresh if authenticated and user ID is available
+        guard isAuthenticated, let userId = currentUser?.userId else {
+            return
+        }
+        
+        do {
+            let orgsResponse = try await apiClient.listUserOrgs(userId: userId)
+            let newOrgs = orgsResponse.orgs
+            
+            // Preserve current org selection if it still exists in the new list
+            let currentOrgId = currentOrg?.orgId
+            if let currentOrgId = currentOrgId,
+               let updatedOrg = newOrgs.first(where: { $0.orgId == currentOrgId }) {
+                // Current org still exists, update it to get latest info
+                currentOrg = updatedOrg
+            } else if currentOrgId != nil {
+                // Current org no longer exists, clear selection
+                currentOrg = nil
+                var config = configManager.config ?? Config()
+                config.orgId = nil
+                _ = configManager.save(config)
+            }
+            
+            // Update organizations list
+            organizations = newOrgs
+            
+            os_log("Organizations refreshed successfully: %d orgs", log: logger, type: .debug, newOrgs.count)
+        } catch {
+            // Fail gracefully - log error but don't disrupt the UI
+            os_log("Failed to refresh organizations in background: %{public}@", log: logger, type: .error, error.localizedDescription)
+        }
+    }
+    
+    func checkOrgAccess(orgId: String) async -> Bool {
+        // First, try to fetch the org to check access
+        do {
+            _ = try await apiClient.getOrg(orgId: orgId)
+            return true
+        } catch let error as APIError {
+            // Check if it's an unauthorized error (401 or 403)
+            if case .httpError(let statusCode, _) = error,
+               statusCode == 401 || statusCode == 403 {
+                
+                // Try to get org policy to understand why access was denied
+                if let userId = currentUser?.userId {
+                    do {
+                        let policyResponse = try await apiClient.checkOrgUserAccess(orgId: orgId, userId: userId)
+                        
+                        // Log the policy details
+                        var policyDetails: [String] = []
+                        if let policies = policyResponse.policies {
+                            if let requiredTwoFactor = policies.requiredTwoFactor {
+                                policyDetails.append("requiredTwoFactor: \(requiredTwoFactor)")
+                            }
+                            if let maxSessionLength = policies.maxSessionLength {
+                                policyDetails.append("maxSessionLength: compliant=\(maxSessionLength.compliant), maxHours=\(maxSessionLength.maxSessionLengthHours), currentHours=\(maxSessionLength.sessionAgeHours)")
+                            }
+                            if let passwordAge = policies.passwordAge {
+                                policyDetails.append("passwordAge: compliant=\(passwordAge.compliant), maxDays=\(passwordAge.maxPasswordAgeDays), currentDays=\(passwordAge.passwordAgeDays)")
+                            }
+                        }
+                        
+                        let policyLogMessage = policyDetails.isEmpty ? "none" : policyDetails.joined(separator: ", ")
+                        os_log("Org policy check for org %{public}@: allowed=%{public}@, error=%{public}@, policies=[%{public}@]", 
+                               log: logger, 
+                               type: .error,
+                               orgId,
+                               String(policyResponse.allowed),
+                               policyResponse.error ?? "none",
+                               policyLogMessage)
+                        
+                        // Show alert about org policy preventing access
+                        await MainActor.run {
+                            AlertManager.shared.showAlertDialog(
+                                title: "Access Denied",
+                                message: "Org policy preventing access to this org"
+                            )
+                        }
+                        return false
+                    } catch {
+                        // Failed to get org policy - show generic unauthorized message
+                        os_log("Failed to get org policy for org %{public}@: %{public}@", 
+                               log: logger, 
+                               type: .error,
+                               orgId,
+                               error.localizedDescription)
+                        
+                        await MainActor.run {
+                            AlertManager.shared.showAlertDialog(
+                                title: "Access Denied",
+                                message: "Unauthorized access to this org. Contact your admin."
+                            )
+                        }
+                        return false
+                    }
+                } else {
+                    // No user ID available - show generic unauthorized message
+                    await MainActor.run {
+                        AlertManager.shared.showAlertDialog(
+                            title: "Access Denied",
+                            message: "Unauthorized access to this org. Contact your admin."
+                        )
+                    }
+                    return false
+                }
+            } else {
+                // Some other error occurred - show it
+                await MainActor.run {
+                    AlertManager.shared.showErrorDialog(error)
+                }
+                return false
+            }
+        } catch {
+            // Unexpected error - show it
+            await MainActor.run {
+                AlertManager.shared.showErrorDialog(error)
+            }
+            return false
+        }
+    }
+    
     func selectOrganization(_ org: Organization) async {
+        // First check org access
+        guard await checkOrgAccess(orgId: org.orgId) else {
+            return
+        }
+        
+        // If access is granted, proceed with selecting the org
         currentOrg = org
         
         // Save selected org to config
         var config = configManager.config ?? Config()
         config.orgId = org.orgId
         _ = configManager.save(config)
+        
+        // Switch org in tunnel if connected
+        if let tunnelManager = tunnelManager {
+            await tunnelManager.switchOrg(orgId: org.orgId)
+        }
     }
     
-    private func ensureOlmCredentials(userId: String) async {
-        // Check if OLM credentials already exist
+    func ensureOlmCredentials(userId: String) async {
+        // Check if OLM credentials already exist locally
         if secretManager.hasOlmCredentials(userId: userId) {
-            return
+            // Verify OLM exists on server by getting the client
+            if let olmIdString = secretManager.getOlmId(userId: userId),
+               let clientId = Int(olmIdString) {
+                do {
+                    let client = try await apiClient.getClient(clientId: clientId)
+                    
+                    // Verify the olmId matches
+                    if let clientOlmId = client.olmId, clientOlmId == olmIdString {
+                        os_log("OLM credentials verified successfully", log: logger, type: .debug)
+                    } else {
+                        os_log("OLM ID mismatch - client olmId: %{public}@, stored olmId: %{public}@", log: logger, type: .error, client.olmId ?? "nil", olmIdString)
+                        // Clear invalid credentials
+                        _ = secretManager.deleteOlmCredentials(userId: userId)
+                    }
+                } catch {
+                    // If getting client fails, the OLM might not exist
+                    os_log("Failed to verify OLM credentials: %{public}@", log: logger, type: .error, error.localizedDescription)
+                    // Clear invalid credentials so we can try to create new ones
+                    _ = secretManager.deleteOlmCredentials(userId: userId)
+                }
+            } else {
+                // Can't convert olmId to Int, clear credentials
+                os_log("Cannot verify OLM - olmId is not a valid clientId", log: logger, type: .error)
+                _ = secretManager.deleteOlmCredentials(userId: userId)
+            }
         }
         
-        // Create OLM credentials
-        do {
-            let deviceName = DeviceInfo.getDeviceModelName()
-            let olmResponse = try await apiClient.createOlm(userId: userId, name: deviceName)
-            
-            // Save OLM credentials
-            let saved = secretManager.saveOlmCredentials(
-                userId: userId,
-                olmId: olmResponse.olmId,
-                secret: olmResponse.secret
-            )
-            
-            if !saved {
-                await MainActor.run {
-                    AlertManager.shared.showErrorDialog(
-                        NSError(domain: "Pangolin", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save OLM credentials"])
-                    )
+        // If credentials don't exist or were cleared, create new ones
+        if !secretManager.hasOlmCredentials(userId: userId) {
+            do {
+                let deviceName = DeviceInfo.getDeviceModelName()
+                let olmResponse = try await apiClient.createOlm(userId: userId, name: deviceName)
+                
+                // Save OLM credentials
+                let saved = secretManager.saveOlmCredentials(
+                    userId: userId,
+                    olmId: olmResponse.olmId,
+                    secret: olmResponse.secret
+                )
+                
+                if !saved {
+                    await MainActor.run {
+                        AlertManager.shared.showErrorDialog(
+                            NSError(domain: "Pangolin", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save OLM credentials"])
+                        )
+                    }
                 }
-            }
-        } catch {
-            // Show error alert to user
-            await MainActor.run {
-                AlertManager.shared.showErrorDialog(error)
+            } catch {
+                // Show error alert to user
+                await MainActor.run {
+                    AlertManager.shared.showErrorDialog(error)
+                }
             }
         }
     }
@@ -286,12 +448,9 @@ class AuthManager: ObservableObject {
         }
         
         // Clear local data
-        _ = secretManager.deleteSecret(key: "session-token")
-        _ = configManager.clear()
         apiClient.updateSessionToken(nil)
         
         isAuthenticated = false
-        currentUser = nil
         currentOrg = nil
         organizations = []
         errorMessage = nil

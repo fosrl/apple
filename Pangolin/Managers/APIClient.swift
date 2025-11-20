@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import os.log
 
 enum APIError: Error, LocalizedError {
     case invalidURL
@@ -54,6 +55,11 @@ class APIClient: ObservableObject {
     
     private let session: URLSession
     
+    private let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "APIClient")
+    }()
+    
     var currentBaseURL: String {
         return baseURL
     }
@@ -69,7 +75,7 @@ class APIClient: ObservableObject {
         configuration.allowsCellularAccess = true
         self.session = URLSession(configuration: configuration)
         
-        print("APIClient initialized with baseURL: \(self.baseURL)")
+        os_log("APIClient initialized with baseURL: %{public}@", log: logger, type: .info, self.baseURL)
     }
     
     func updateBaseURL(_ newBaseURL: String) {
@@ -102,19 +108,8 @@ class APIClient: ObservableObject {
         
         // Validate URL construction
         guard let url = URL(string: fullURL) else {
-            print("Error: Invalid URL constructed: \(fullURL) (baseURL: \(baseURL), path: \(path))")
+            os_log("Error: Invalid URL constructed: %{public}@ (baseURL: %{public}@, path: %{public}@)", log: logger, type: .error, fullURL, baseURL, path)
             return nil
-        }
-        
-        // Verify the URL components
-        if let host = url.host {
-            print("URL host: \(host)")
-        } else {
-            print("Warning: URL has no host component: \(fullURL)")
-        }
-        
-        if let scheme = url.scheme {
-            print("URL scheme: \(scheme)")
         }
         
         return url
@@ -146,7 +141,7 @@ class APIClient: ObservableObject {
         }
         
         do {
-            print("Making request to: \(url.absoluteString)")
+            os_log("Making request to: %{public}@", log: logger, type: .debug, url.absoluteString)
             let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -156,38 +151,38 @@ class APIClient: ObservableObject {
             return (data, httpResponse)
         } catch let error as URLError {
             // Log detailed error information
-            print("URLError: \(error.localizedDescription)")
-            print("Error code: \(error.code.rawValue)")
-            print("Error domain: \(error._domain)")
+            os_log("URLError: %{public}@", log: logger, type: .error, error.localizedDescription)
+            os_log("Error code: %d", log: logger, type: .error, error.code.rawValue)
+            os_log("Error domain: %{public}@", log: logger, type: .error, error._domain)
             if let url = error.failingURL {
-                print("Failed URL: \(url.absoluteString)")
+                os_log("Failed URL: %{public}@", log: logger, type: .error, url.absoluteString)
             }
             
             // Provide more specific error messages
             switch error.code {
             case .cannotFindHost:
                 let message = "Cannot find server at \(baseURL). Error: \(error.localizedDescription). Please verify the server URL is correct and accessible."
-                print(message)
+                os_log("%{public}@", log: logger, type: .error, message)
                 throw APIError.httpError(0, message)
             case .cannotConnectToHost:
                 let message = "Cannot connect to server at \(baseURL). Error: \(error.localizedDescription). Please check if the server is running and accessible."
-                print(message)
+                os_log("%{public}@", log: logger, type: .error, message)
                 throw APIError.httpError(0, message)
             case .timedOut:
                 let message = "Connection to \(baseURL) timed out. Please check your network connection."
-                print(message)
+                os_log("%{public}@", log: logger, type: .error, message)
                 throw APIError.httpError(0, message)
             case .dnsLookupFailed:
                 let message = "DNS lookup failed for \(baseURL). Error: \(error.localizedDescription). Please check if the hostname is correct."
-                print(message)
+                os_log("%{public}@", log: logger, type: .error, message)
                 throw APIError.httpError(0, message)
             default:
                 let message = "Network error: \(error.localizedDescription) (code: \(error.code.rawValue))"
-                print(message)
+                os_log("%{public}@", log: logger, type: .error, message)
                 throw APIError.networkError(error)
             }
         } catch {
-            print("Unexpected error: \(error)")
+            os_log("Unexpected error: %{public}@", log: logger, type: .error, error.localizedDescription)
             throw APIError.networkError(error)
         }
     }
@@ -350,6 +345,25 @@ class APIClient: ObservableObject {
         let bodyData = try JSONEncoder().encode(requestBody)
         
         let (data, response) = try await makeRequest(method: "PUT", path: "/user/\(userId)/olm", body: bodyData)
+        return try parseResponse(data, response)
+    }
+    
+    // MARK: - Organization
+    
+    func getOrg(orgId: String) async throws -> GetOrgResponse {
+        let (data, response) = try await makeRequest(method: "GET", path: "/org/\(orgId)")
+        return try parseResponse(data, response)
+    }
+    
+    func checkOrgUserAccess(orgId: String, userId: String) async throws -> CheckOrgUserAccessResponse {
+        let (data, response) = try await makeRequest(method: "GET", path: "/org/\(orgId)/user/\(userId)/check")
+        return try parseResponse(data, response)
+    }
+    
+    // MARK: - Client
+    
+    func getClient(clientId: Int) async throws -> GetClientResponse {
+        let (data, response) = try await makeRequest(method: "GET", path: "/client/\(clientId)")
         return try parseResponse(data, response)
     }
     

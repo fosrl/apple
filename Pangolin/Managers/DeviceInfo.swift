@@ -20,6 +20,14 @@ enum DeviceInfo {
         return mapModelIdentifierToName(modelString)
     }
     
+    static func getUniqueDeviceIdentifier() -> String {
+        var size = 0
+        sysctlbyname("hw.uuid", nil, &size, nil, 0)
+        var uuid = [CChar](repeating: 0, count: size)
+        sysctlbyname("hw.uuid", &uuid, &size, nil, 0)
+        return String(cString: uuid)
+    }
+    
     private static func mapModelIdentifierToName(_ identifier: String) -> String {
         // Map model identifier prefix to device type
         if identifier.hasPrefix("MacBookPro") {

@@ -8,12 +8,18 @@
 import Foundation
 import Combine
 import SwiftUI
+import os.log
 
 class ConfigManager: ObservableObject {
     @Published var config: Config?
     
     private let configPath: URL
     private let defaultHostname = "https://app.pangolin.net"
+    
+    private let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "ConfigManager")
+    }()
     
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -36,7 +42,7 @@ class ConfigManager: ObservableObject {
             let decoder = JSONDecoder()
             return try decoder.decode(Config.self, from: data)
         } catch {
-            print("Error loading config: \(error)")
+            os_log("Error loading config: %{public}@", log: logger, type: .error, error.localizedDescription)
             return Config()
         }
     }
@@ -54,7 +60,7 @@ class ConfigManager: ObservableObject {
             
             return true
         } catch {
-            print("Error saving config: \(error)")
+            os_log("Error saving config: %{public}@", log: logger, type: .error, error.localizedDescription)
             return false
         }
     }

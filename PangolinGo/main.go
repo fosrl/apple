@@ -113,6 +113,8 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 	// print the config for debugging
 	appLogger.Debug("Tunnel config: %+v", olmConfig)
 
+	olmpkg.StartApi()
+
 	// Start OLM tunnel with config
 	appLogger.Info("Starting OLM tunnel...")
 	go func() {
@@ -144,6 +146,7 @@ func stopTunnel() *C.char {
 
 	// Stop OLM tunnel
 	olmpkg.StopTunnel()
+	olmpkg.StopApi()
 
 	tunnelRunning = false
 	appLogger.Debug("Tunnel stopped successfully")

@@ -9,10 +9,11 @@ import Foundation
 import NetworkExtension
 import SystemExtensions
 import Combine
+import os.log
 
 class TunnelManager: NSObject, ObservableObject {
-    @Published var isConnected = false
-    @Published var statusText = "Disconnected"
+    @Published var isNEConnected = false
+    @Published var status: TunnelStatus = .disconnected
     @Published var isRegistering = false
     
     private var tunnelManager: NETunnelProviderManager?
@@ -24,11 +25,23 @@ class TunnelManager: NSObject, ObservableObject {
     private let configManager: ConfigManager
     private let secretManager: SecretManager
     private let authManager: AuthManager
+    private let socketManager: SocketManager
+    
+    private let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "TunnelManager")
+    }()
+    
+    // Socket polling
+    private var socketPollingTask: Task<Void, Never>?
+    private let socketPollInterval: TimeInterval = 2.0 // Poll every 2 seconds
+    private var isPollingSocket = false
     
     init(configManager: ConfigManager, secretManager: SecretManager, authManager: AuthManager) {
         self.configManager = configManager
         self.secretManager = secretManager
         self.authManager = authManager
+        self.socketManager = SocketManager()
         super.init()
         
         // Observe VPN status changes
@@ -56,47 +69,71 @@ class TunnelManager: NSObject, ObservableObject {
         if let observer = statusObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        stopSocketPolling()
     }
     
     @MainActor
     private func updateConnectionStatus() async {
         guard let manager = tunnelManager else {
-            isConnected = false
-            statusText = "Disconnected"
+            isNEConnected = false
+            status = .disconnected
+            stopSocketPolling()
             return
         }
         
-        let status = manager.connection.status
-        isConnected = (status == .connected)
+        let vpnStatus = manager.connection.status
         
-        switch status {
+        // Update status based on VPN connection status
+        // If we're connected, we'll use socket status as the source of truth
+        // Otherwise, use VPN status
+        switch vpnStatus {
         case .invalid:
-            statusText = "Invalid"
+            status = .invalid
+            isNEConnected = false
+            stopSocketPolling()
         case .disconnected:
-            statusText = "Disconnected"
+            status = .disconnected
+            isNEConnected = false
+            stopSocketPolling()
         case .connecting:
-            statusText = "Connecting..."
+            status = .connecting
+            isNEConnected = false
+            stopSocketPolling()
         case .connected:
-            statusText = "Connected"
+            // Once VPN extension is connected, enable disconnect button immediately
+            isNEConnected = true
+            // Start polling socket for actual status
+            if !isPollingSocket {
+                startSocketPolling()
+                // Show registering status until socket polling provides actual status
+                status = .registering
+            }
+            // If already polling, don't update status here - let socket polling handle it
         case .reasserting:
-            statusText = "Reconnecting..."
+            status = .reconnecting
+            isNEConnected = false
+            stopSocketPolling()
         case .disconnecting:
-            statusText = "Disconnecting..."
+            status = .disconnecting
+            isNEConnected = false
+            stopSocketPolling()
         @unknown default:
-            statusText = "Unknown"
+            status = .error
+            isNEConnected = false
+            stopSocketPolling()
         }
         
-        print("VPN Status changed: \(statusText) (status: \(status.rawValue))")
+        os_log("VPN Status changed: %{public}@ (VPN status: %d)", log: logger, type: .debug, status.displayText, vpnStatus.rawValue)
     }
     
     private func installSystemExtensionIfNeeded() async -> Bool {
         // Install/activate the system extension
         // Note: We can't check state beforehand, so we always try to activate
         // The delegate will handle cases where it's already activated
-        print("Installing/activating system extension...")
+        os_log("Installing/activating system extension...", log: logger, type: .info)
         await MainActor.run {
             isRegistering = true
-            statusText = "Installing system extension..."
+            status = .registering
         }
         
         let manager = OSSystemExtensionManager.shared
@@ -113,9 +150,9 @@ class TunnelManager: NSObject, ObservableObject {
                 manager.submitRequest(request)
             }
         } catch {
-            print("Failed to install system extension: \(error)")
+            os_log("Failed to install system extension: %{public}@", log: logger, type: .error, error.localizedDescription)
             await MainActor.run {
-                statusText = "Error: \(error.localizedDescription)"
+                status = .error
                 isRegistering = false
             }
             return false
@@ -146,7 +183,7 @@ class TunnelManager: NSObject, ObservableObject {
                 }
                 await updateConnectionStatus()
             } catch {
-                print("Error loading manager: \(error)")
+                os_log("Error loading manager: %{public}@", log: logger, type: .error, error.localizedDescription)
                 await MainActor.run {
                     isRegistering = false
                 }
@@ -180,21 +217,59 @@ class TunnelManager: NSObject, ObservableObject {
             }
             await updateConnectionStatus()
         } catch {
-            print("Error registering extension: \(error)")
+            os_log("Error registering extension: %{public}@", log: logger, type: .error, error.localizedDescription)
             await MainActor.run {
                 isRegistering = false
-                statusText = "Error: \(error.localizedDescription)"
+                status = .error
             }
         }
     }
     
     func connect() async {
+        // Check if tunnel is already running by querying the socket
+        if await socketManager.isRunning() {
+            os_log("Tunnel is already running (socket responds)", log: logger, type: .info)
+            await MainActor.run {
+                status = .connected
+                isNEConnected = true
+                AlertManager.shared.showAlertDialog(
+                    title: "Tunnel Already Running",
+                    message: "The tunnel is already running. Please disconnect it before connecting again."
+                )
+            }
+            return
+        }
+        
+        // Require an organization to be selected before connecting
+        guard let currentOrg = authManager.currentOrg else {
+            os_log("No organization selected, aborting connection", log: logger, type: .error)
+            await MainActor.run {
+                AlertManager.shared.showAlertDialog(
+                    title: "No Organization Selected",
+                    message: "Please select an organization before connecting."
+                )
+            }
+            return
+        }
+        
+        // Check org access before connecting
+        let hasAccess = await authManager.checkOrgAccess(orgId: currentOrg.orgId)
+        if !hasAccess {
+            os_log("Access denied for org %{public}@, aborting connection", log: logger, type: .error, currentOrg.orgId)
+            return
+        }
+        
+        // Ensure OLM credentials exist before connecting
+        if let userId = authManager.currentUser?.userId {
+            await authManager.ensureOlmCredentials(userId: userId)
+        }
+        
         // Ensure extension exists before connecting
         await ensureExtensionRegistered()
         
         guard let manager = tunnelManager else {
             await MainActor.run {
-                statusText = "Error: Extension not available"
+                status = .error
             }
             return
         }
@@ -206,7 +281,7 @@ class TunnelManager: NSObject, ObservableObject {
                 try await manager.saveToPreferences()
                 try await manager.loadFromPreferences()
             } catch {
-                print("Error enabling manager: \(error)")
+                os_log("Error enabling manager: %{public}@", log: logger, type: .error, error.localizedDescription)
             }
         }
         
@@ -240,12 +315,12 @@ class TunnelManager: NSObject, ObservableObject {
         do {
             // Start with options
             try manager.connection.startVPNTunnel(options: tunnelOptions.isEmpty ? nil : tunnelOptions)
-            // Don't set isConnected here - let updateConnectionStatus() handle it
+            // Don't set isNEConnected here - let updateConnectionStatus() handle it
             await updateConnectionStatus()
         } catch {
-            print("Error starting tunnel: \(error)")
+            os_log("Error starting tunnel: %{public}@", log: logger, type: .error, error.localizedDescription)
             await MainActor.run {
-                statusText = "Error: \(error.localizedDescription)"
+                status = .error
             }
         }
     }
@@ -255,6 +330,9 @@ class TunnelManager: NSObject, ObservableObject {
             return
         }
         
+        // Stop socket polling first
+        stopSocketPolling()
+        
         // Note: Go stopTunnel is called from within the PacketTunnelProvider system extension
         // when the tunnel stops, not from the app side
         
@@ -262,9 +340,25 @@ class TunnelManager: NSObject, ObservableObject {
         await updateConnectionStatus()
     }
     
+    func switchOrg(orgId: String) async {
+        // Only switch if tunnel is connected
+        guard isNEConnected else {
+            return
+        }
+        
+        do {
+            _ = try await socketManager.switchOrg(orgId: orgId)
+            os_log("Successfully switched to organization: %{public}@", log: logger, type: .info, orgId)
+        } catch {
+            os_log("Error switching organization: %{public}@", log: logger, type: .error, error.localizedDescription)
+        }
+    }
+    
     /// Synchronously stops the tunnel connection.
     /// This is intended for use during app termination when async operations may not complete.
     func stopTunnelSync() {
+        stopSocketPolling()
+        
         guard let manager = tunnelManager else {
             return
         }
@@ -273,24 +367,91 @@ class TunnelManager: NSObject, ObservableObject {
         // This is a synchronous operation that will signal the network extension to stop
         manager.connection.stopVPNTunnel()
     }
+    
+    // MARK: - Socket Polling
+    
+    private func startSocketPolling() {
+        // Stop any existing polling
+        stopSocketPolling()
+        
+        guard !isPollingSocket else { return }
+        
+        isPollingSocket = true
+        
+        socketPollingTask = Task { [weak self] in
+            guard let self = self else { return }
+            
+            while !Task.isCancelled && self.isPollingSocket {
+                do {
+                    // Query socket for status
+                    let socketStatus = try await self.socketManager.getStatus()
+                    
+                    await MainActor.run {
+                        // Update status text based on socket response
+                        // But keep isNEConnected = true as long as VPN extension is connected
+                        if socketStatus.connected {
+                                self.status = .connected
+                        } else if socketStatus.registered == true {
+                            // Registered but not connected yet
+                            self.status = .registering
+                        } else {
+                            // Not registered yet
+                            self.status = .registering
+                        }
+                        
+                        // Keep isNEConnected = true if VPN extension is still connected
+                        // This ensures the disconnect button is always available when VPN is up
+                        if let manager = self.tunnelManager,
+                           manager.connection.status == .connected {
+                            self.isNEConnected = true
+                        }
+                        
+                        os_log("Socket status: connected=%{public}@, registered=%{public}@, status=%{public}@", log: self.logger, type: .debug, String(socketStatus.connected), String(socketStatus.registered ?? false), socketStatus.status ?? "nil")
+                    }
+                } catch {
+                    // Socket not available or error - check if VPN is still connected
+                    // If VPN is disconnected, polling will be stopped by updateConnectionStatus
+                    await MainActor.run {
+                        // Only update if VPN is still connected (socket might be temporarily unavailable)
+                        if let manager = self.tunnelManager,
+                           manager.connection.status == .connected {
+                            // VPN is connected but socket not responding - might be starting up
+                            self.status = .registering
+                            // Keep isNEConnected = true so user can still disconnect
+                            self.isNEConnected = true
+                        }
+                    }
+                }
+                
+                // Wait before next poll
+                try? await Task.sleep(nanoseconds: UInt64(self.socketPollInterval * 1_000_000_000))
+            }
+        }
+    }
+    
+    private func stopSocketPolling() {
+        isPollingSocket = false
+        socketPollingTask?.cancel()
+        socketPollingTask = nil
+    }
 }
 
 // MARK: - OSSystemExtensionRequestDelegate
 extension TunnelManager: OSSystemExtensionRequestDelegate {
     func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
-        print("System extension request finished with result: \(result.rawValue)")
+        os_log("System extension request finished with result: %d", log: logger, type: .info, result.rawValue)
         
         let success = (result == .willCompleteAfterReboot || result == .completed)
         
         Task { @MainActor in
             if success {
                 if result == .willCompleteAfterReboot {
-                    statusText = "System extension will be installed after reboot"
+                    status = .registering
                 } else {
-                    statusText = "System extension installed"
+                    status = .disconnected
                 }
             } else {
-                statusText = "System extension installation failed"
+                status = .error
             }
             isRegistering = false
         }
@@ -301,10 +462,10 @@ extension TunnelManager: OSSystemExtensionRequestDelegate {
     }
     
     func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        print("System extension request failed: \(error.localizedDescription)")
+        os_log("System extension request failed: %{public}@", log: logger, type: .error, error.localizedDescription)
         
         Task { @MainActor in
-            statusText = "Error: \(error.localizedDescription)"
+            status = .error
             isRegistering = false
         }
         
@@ -314,7 +475,7 @@ extension TunnelManager: OSSystemExtensionRequestDelegate {
     }
     
     func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
-        print("System extension needs user approval - user should see System Preferences prompt")
+        os_log("System extension needs user approval - user should see System Preferences prompt", log: logger, type: .info)
         // The system will show a prompt to the user
         // User needs to go to System Preferences > Privacy & Security > System Extensions
         // and approve the extension
@@ -323,9 +484,8 @@ extension TunnelManager: OSSystemExtensionRequestDelegate {
     func request(_ request: OSSystemExtensionRequest,
                  actionForReplacingExtension existing: OSSystemExtensionProperties,
                  withExtension extension: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
-        print("System extension replacement requested")
+        os_log("System extension replacement requested", log: logger, type: .info)
         // Replace the existing extension
         return .replace
     }
 }
-
