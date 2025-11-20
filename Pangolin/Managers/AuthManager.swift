@@ -108,7 +108,7 @@ class AuthManager: ObservableObject {
             
             // Start device auth
             let startResponse = try await apiClient.startDeviceAuth(
-                applicationName: "Pangolin Menu Bar",
+                applicationName: "Pangolin macOS Client",
                 deviceName: deviceName
             )
             
