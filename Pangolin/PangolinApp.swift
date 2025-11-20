@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import os.log
+import Sparkle
 
 struct MenuBarIconView: View {
     @ObservedObject var tunnelManager: TunnelManager
@@ -54,8 +55,11 @@ struct PangolinApp: App {
     @StateObject private var tunnelManager: TunnelManager
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     
+    private let updaterController: SPUStandardUpdaterController
     
     init() {
+        // Initialize Sparkle updater
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
         let configMgr = ConfigManager()
         let secretMgr = SecretManager()
         let hostname = configMgr.getHostname()
@@ -80,7 +84,8 @@ struct PangolinApp: App {
                 configManager: configManager,
                 apiClient: apiClient,
                 authManager: authManager,
-                tunnelManager: tunnelManager
+                tunnelManager: tunnelManager,
+                updater: updaterController.updater
             )
             .onAppear {
                 // Set activation policy to accessory (menu bar only) on first appearance

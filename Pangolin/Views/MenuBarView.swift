@@ -7,12 +7,14 @@
 
 import SwiftUI
 import AppKit
+import Sparkle
 
 struct MenuBarView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var apiClient: APIClient
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
+    let updater: SPUUpdater
     @Environment(\.openWindow) private var openWindow
     @State private var menuOpenCount = 0
     @State private var isLoggedOut = false
@@ -139,6 +141,14 @@ struct MenuBarView: View {
             Button("Privacy Policy") {
                 openURL("https://pangolin.net/privacy-policy.html")
             }
+
+            Divider()
+
+            // Version information
+            Text("Version: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")")
+                .foregroundColor(.secondary)
+            
+            CheckForUpdatesView(updater: updater)
         }
         
         Divider()

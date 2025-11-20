@@ -24,7 +24,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         os_log("startTunnel called with options: %{public}@", log: logger, type: .debug, options?.description ?? "nil")
-        
+                
         // Validate that options are provided
         guard let options = options, !options.isEmpty else {
             let error = NSError(domain: "PacketTunnelProvider", code: -1, userInfo: [

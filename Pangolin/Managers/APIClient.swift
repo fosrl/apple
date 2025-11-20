@@ -74,7 +74,7 @@ class APIClient: ObservableObject {
         configuration.waitsForConnectivity = false
         configuration.allowsCellularAccess = true
         self.session = URLSession(configuration: configuration)
-        
+                
         os_log("APIClient initialized with baseURL: %{public}@", log: logger, type: .info, self.baseURL)
     }
     

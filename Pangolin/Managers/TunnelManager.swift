@@ -22,6 +22,9 @@ class TunnelManager: NSObject, ObservableObject {
     private var systemExtensionRequest: OSSystemExtensionRequest?
     private var systemExtensionInstallContinuation: CheckedContinuation<Bool, Error>?
     
+    // Version tracking for extension updates
+    private let extensionVersionKey = "net.pangolin.Pangolin.PacketTunnel.lastKnownVersion"
+    
     private let configManager: ConfigManager
     private let secretManager: SecretManager
     private let authManager: AuthManager
@@ -127,28 +130,31 @@ class TunnelManager: NSObject, ObservableObject {
     }
     
     private func installSystemExtensionIfNeeded() async -> Bool {
-        // Install/activate the system extension
-        // Note: We can't check state beforehand, so we always try to activate
-        // The delegate will handle cases where it's already activated
         os_log("Installing/activating system extension...", log: logger, type: .info)
+        
         await MainActor.run {
             isRegistering = true
             status = .registering
         }
         
         let manager = OSSystemExtensionManager.shared
+        // Always use activationRequest - the system will automatically detect if replacement is needed
+        // and call the delegate method actionForReplacingExtension
         let request = OSSystemExtensionRequest.activationRequest(
             forExtensionWithIdentifier: bundleIdentifier,
             queue: .main
         )
+        
         request.delegate = self
         
         do {
-            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+            let result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
                 systemExtensionInstallContinuation = continuation
                 systemExtensionRequest = request
                 manager.submitRequest(request)
             }
+            
+            return result
         } catch {
             os_log("Failed to install system extension: %{public}@", log: logger, type: .error, error.localizedDescription)
             await MainActor.run {
@@ -157,6 +163,68 @@ class TunnelManager: NSObject, ObservableObject {
             }
             return false
         }
+    }
+    
+    // MARK: - Extension Version Management
+    
+    /// Gets the current version of the PacketTunnel extension from its bundle
+    /// This is a public method for displaying the version in the UI
+    func getExtensionVersion() -> String? {
+        return getCurrentExtensionVersion()
+    }
+    
+    /// Gets the current version of the PacketTunnel extension from its bundle
+    private func getCurrentExtensionVersion() -> String? {
+        // The PacketTunnel extension bundle is embedded in the main app bundle
+        // Search for it by bundle identifier in the PlugIns directory
+        let mainBundle = Bundle.main.bundleURL
+        
+        // Look for the extension bundle in the app's PlugIns directory
+        let pluginsURL = mainBundle.appendingPathComponent("Contents/PlugIns", isDirectory: true)
+        
+        // Check if PlugIns directory exists
+        guard FileManager.default.fileExists(atPath: pluginsURL.path) else {
+            os_log("PlugIns directory does not exist at %{public}@ (this may be normal during early initialization)", log: logger, type: .debug, pluginsURL.path)
+            return nil
+        }
+        
+        // Search for the extension bundle by enumerating PlugIns directory
+        guard let pluginContents = try? FileManager.default.contentsOfDirectory(at: pluginsURL, includingPropertiesForKeys: nil, options: []) else {
+            os_log("Could not enumerate PlugIns directory", log: logger, type: .debug)
+            return nil
+        }
+        
+        // Find the extension bundle by checking its bundle identifier
+        for pluginURL in pluginContents {
+            guard pluginURL.pathExtension == "appex",
+                  let extensionBundle = Bundle(url: pluginURL),
+                  let pluginBundleId = extensionBundle.bundleIdentifier,
+                  pluginBundleId == bundleIdentifier else {
+                continue
+            }
+            
+            // Found the extension bundle, get its version
+            guard let version = extensionBundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String else {
+                os_log("Could not get CFBundleVersion from extension bundle at %{public}@", log: logger, type: .error, pluginURL.path)
+                return nil
+            }
+            
+            os_log("Found extension bundle at %{public}@ with version %{public}@", log: logger, type: .debug, pluginURL.path, version)
+            return version
+        }
+        
+        os_log("Could not find PacketTunnel extension bundle with identifier %{public}@ in PlugIns directory", log: logger, type: .debug, bundleIdentifier)
+        return nil
+    }
+    
+    /// Gets the last known version of the extension from UserDefaults
+    private func getLastKnownExtensionVersion() -> String? {
+        return UserDefaults.standard.string(forKey: extensionVersionKey)
+    }
+    
+    /// Stores the extension version in UserDefaults
+    private func setLastKnownExtensionVersion(_ version: String) {
+        UserDefaults.standard.set(version, forKey: extensionVersionKey)
     }
     
     func ensureExtensionRegistered() async {
@@ -488,9 +556,9 @@ extension TunnelManager: OSSystemExtensionRequestDelegate {
     
     func request(_ request: OSSystemExtensionRequest,
                  actionForReplacingExtension existing: OSSystemExtensionProperties,
-                 withExtension extension: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
-        os_log("System extension replacement requested", log: logger, type: .info)
-        // Replace the existing extension
+                 withExtension newExtension: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
+        os_log("System extension replacement requested, replacing...", log: logger, type: .info)
+        // Always replace the existing extension with the new version
         return .replace
     }
 }

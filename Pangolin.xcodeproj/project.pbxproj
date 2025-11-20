@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9039ACD52ECFB01000FCA982 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 9039ACD42ECFB01000FCA982 /* Sparkle */; };
 		90D1973A2EC96BEC00912E68 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90D1911A2EC9248100912E68 /* NetworkExtension.framework */; };
 		90D197442EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -120,6 +121,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9039ACD52ECFB01000FCA982 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +190,7 @@
 			);
 			name = Pangolin;
 			packageProductDependencies = (
+				9039ACD42ECFB01000FCA982 /* Sparkle */,
 			);
 			productName = Pangolin;
 			productReference = 90BC22B42EBC6C1D0072B44A /* Pangolin.app */;
@@ -242,6 +245,9 @@
 			);
 			mainGroup = 90BC22AB2EBC6C1D0072B44A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9039ACCF2ECFA69000FCA982 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90BC22B52EBC6C1D0072B44A /* Products */;
 			projectDirPath = "";
@@ -480,7 +486,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -546,7 +552,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -600,7 +606,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
@@ -653,7 +659,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
@@ -703,6 +709,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9039ACCF2ECFA69000FCA982 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9039ACD42ECFB01000FCA982 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9039ACCF2ECFA69000FCA982 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 90BC22AC2EBC6C1D0072B44A /* Project object */;
 }
