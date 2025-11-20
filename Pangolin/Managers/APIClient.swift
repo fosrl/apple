@@ -51,7 +51,7 @@ class APIClient: ObservableObject {
     private var sessionToken: String?
     private let sessionCookieName = "p_session_token"
     private let csrfToken = "x-csrf-protection"
-    private let agentName = "pangolin-menu-bar"
+    private let agentName = "pangolin-macOS"
     
     private let session: URLSession
     

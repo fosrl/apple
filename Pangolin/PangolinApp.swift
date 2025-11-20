@@ -9,6 +9,24 @@ import SwiftUI
 import AppKit
 import os.log
 
+struct MenuBarIconView: View {
+    @ObservedObject var tunnelManager: TunnelManager
+    
+    private var tunnelStatus: TunnelStatus {
+        tunnelManager.status
+    }
+    
+    var body: some View {
+        if tunnelStatus == .connected {
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+        } else {
+            Image("MenuBarIconDimmed")
+                .renderingMode(.template)
+        }
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     weak var tunnelManager: TunnelManager?
     
@@ -79,8 +97,7 @@ struct PangolinApp: App {
                 }
             }
         } label: {
-            Image("MenuBarIcon")
-                .renderingMode(.template)
+            MenuBarIconView(tunnelManager: tunnelManager)
         }
         
         // Main Window (Login)

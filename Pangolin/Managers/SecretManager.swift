@@ -10,7 +10,7 @@ import Security
 import Combine
 
 class SecretManager: ObservableObject {
-    private let service = "Pangolin: pangolin-menu-bar"
+    private let service = "Pangolin: pangolin-macOS"
     
     func saveSecret(key: String, value: String) -> Bool {
         guard let data = value.data(using: .utf8) else {
