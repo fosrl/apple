@@ -17,7 +17,6 @@ class AuthManager: ObservableObject {
     @Published var currentUser: User?
     @Published var currentOrg: Organization?
     @Published var organizations: [Organization] = []
-    @Published var isLoading = false
     @Published var isInitializing = true
     @Published var errorMessage: String?
     @Published var deviceAuthCode: String?
@@ -27,6 +26,8 @@ class AuthManager: ObservableObject {
     private let configManager: ConfigManager
     private let secretManager: SecretManager
     weak var tunnelManager: TunnelManager?
+    
+    private var deviceAuthTask: Task<Void, Error>?
     
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
@@ -62,10 +63,7 @@ class AuthManager: ObservableObject {
     }
     
     func loginWithCredentials(email: String, password: String, code: String?) async throws {
-        isLoading = true
         errorMessage = nil
-        
-        defer { isLoading = false }
         
         do {
             let (loginResponse, token) = try await apiClient.login(email: email, password: password, code: code)
@@ -96,98 +94,145 @@ class AuthManager: ObservableObject {
         }
     }
     
-    func loginWithDeviceAuth() async throws {
-        isLoading = true
+    func loginWithDeviceAuth(hostnameOverride: String? = nil) async throws {
         errorMessage = nil
         
-        defer { isLoading = false }
+        // Cancel any existing device auth task
+        deviceAuthTask?.cancel()
         
-        do {
-            // Get device name
-            let deviceName = ProcessInfo.processInfo.hostName
-            
-            // Start device auth
-            let startResponse = try await apiClient.startDeviceAuth(
-                applicationName: "Pangolin macOS Client",
-                deviceName: deviceName
-            )
-            
-            // Store code and URL for UI display
-            let code = startResponse.code
-            let loginURL = "\(apiClient.currentBaseURL)/auth/login/device"
-            
-            await MainActor.run {
-                self.deviceAuthCode = code
-                self.deviceAuthLoginURL = loginURL
-            }
-            
-            // Show notification with code
-            let content = UNMutableNotificationContent()
-            content.title = "Pangolin Login"
-            content.body = "Enter code: \(code)"
-            content.sound = .default
-            
-            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-            try await UNUserNotificationCenter.current().add(request)
-            
-            // Poll for verification
-            let expiresAt = Date(timeIntervalSince1970: TimeInterval(startResponse.expiresAt / 1000))
-            var verified = false
-            var sessionToken: String?
-            
-            while !verified && Date() < expiresAt {
-                try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        // Create the main login task that can be cancelled
+        deviceAuthTask = Task {
+            do {
+                // Get device name
+                let deviceName = ProcessInfo.processInfo.hostName
                 
-                let (pollResponse, token) = try await apiClient.pollDeviceAuth(code: code)
+                // Use override hostname if provided, otherwise use current baseURL
+                let hostname = hostnameOverride ?? apiClient.currentBaseURL
                 
-                if pollResponse.verified {
-                    verified = true
-                    if let token = token {
+                // Start device auth
+                let startResponse = try await apiClient.startDeviceAuth(
+                    applicationName: "Pangolin macOS Client",
+                    deviceName: deviceName,
+                    hostnameOverride: hostnameOverride
+                )
+                
+                // Store code and URL for UI display
+                let code = startResponse.code
+                let loginURL = "\(hostname)/auth/login/device"
+                
+                await MainActor.run {
+                    self.deviceAuthCode = code
+                    self.deviceAuthLoginURL = loginURL
+                }
+                
+                // Show notification with code
+                let content = UNMutableNotificationContent()
+                content.title = "Pangolin Login"
+                content.body = "Enter code: \(code)"
+                content.sound = .default
+                
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                try await UNUserNotificationCenter.current().add(request)
+                
+                // Poll for verification
+                let expiresAt = Date(timeIntervalSince1970: TimeInterval(startResponse.expiresAt / 1000))
+                var verified = false
+                var sessionToken: String?
+                
+                while !verified && Date() < expiresAt {
+                    // Check for cancellation
+                    try Task.checkCancellation()
+                    
+                    try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+                    
+                    // Check for cancellation again after sleep
+                    try Task.checkCancellation()
+                    
+                    let (pollResponse, token) = try await apiClient.pollDeviceAuth(code: code, hostnameOverride: hostnameOverride)
+                    
+                    if pollResponse.verified {
+                        verified = true
                         sessionToken = token
+                    } else if let message = pollResponse.message,
+                              (message.contains("expired") || message.contains("not found")) {
+                        await MainActor.run {
+                            self.deviceAuthCode = nil
+                            self.deviceAuthLoginURL = nil
+                        }
+                        throw AuthError.deviceCodeExpired
                     }
-                } else if let message = pollResponse.message,
-                          (message.contains("expired") || message.contains("not found")) {
+                }
+                
+                if !verified {
                     await MainActor.run {
                         self.deviceAuthCode = nil
                         self.deviceAuthLoginURL = nil
                     }
                     throw AuthError.deviceCodeExpired
                 }
-            }
+                
+                guard let token = sessionToken else {
+                    throw AuthError.invalidToken
+                }
             
-            if !verified {
+                // Save token
+                _ = secretManager.saveSecret(key: "session-token", value: token)
+                apiClient.updateSessionToken(token)
+                
+                // Update hostname in config and API client if override was provided
+                if let hostname = hostnameOverride {
+                    var config = configManager.config ?? Config()
+                    config.hostname = hostname
+                    _ = configManager.save(config)
+                    apiClient.updateBaseURL(hostname)
+                }
+                
+                // Get user info
+                let user = try await apiClient.getUser()
+                await handleSuccessfulAuth(user: user, token: token)
+                
+                // Clear device auth UI state after successful auth
                 await MainActor.run {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
+                    self.deviceAuthTask = nil
                 }
-                throw AuthError.deviceCodeExpired
+            } catch let error as APIError {
+                await MainActor.run {
+                    self.deviceAuthCode = nil
+                    self.deviceAuthLoginURL = nil
+                    self.deviceAuthTask = nil
+                }
+                errorMessage = error.errorDescription
+                throw error
+            } catch is CancellationError {
+                await MainActor.run {
+                    self.deviceAuthCode = nil
+                    self.deviceAuthLoginURL = nil
+                    self.deviceAuthTask = nil
+                }
+                throw CancellationError()
+            } catch {
+                await MainActor.run {
+                    self.deviceAuthCode = nil
+                    self.deviceAuthLoginURL = nil
+                    self.deviceAuthTask = nil
+                }
+                errorMessage = error.localizedDescription
+                throw error
             }
-            
-            guard let token = sessionToken else {
-                throw AuthError.invalidToken
-            }
-            
-            // Save token
-            _ = secretManager.saveSecret(key: "session-token", value: token)
-            apiClient.updateSessionToken(token)
-            
-            // Get user info
-            let user = try await apiClient.getUser()
-            await handleSuccessfulAuth(user: user, token: token)
-            
-            // Clear device auth UI state after successful auth
-            await MainActor.run {
-                self.deviceAuthCode = nil
-                self.deviceAuthLoginURL = nil
-            }
-            
-        } catch let error as APIError {
-            errorMessage = error.errorDescription
-            throw error
-        } catch {
-            errorMessage = error.localizedDescription
-            throw error
         }
+        
+        // Wait for the task to complete and re-throw any errors
+        try await deviceAuthTask?.value
+    }
+    
+    func cancelDeviceAuth() {
+        deviceAuthTask?.cancel()
+        deviceAuthTask = nil
+        deviceAuthCode = nil
+        deviceAuthLoginURL = nil
+        errorMessage = nil
     }
     
     private func handleSuccessfulAuth(user: User, token: String) async {
@@ -437,9 +482,6 @@ class AuthManager: ObservableObject {
     }
     
     func logout() async {
-        isLoading = true
-        defer { isLoading = false }
-        
         // Try to call logout endpoint (ignore errors)
         do {
             try await apiClient.logout()

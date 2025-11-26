@@ -75,9 +75,7 @@ struct MenuBarView: View {
             if authManager.isAuthenticated {
                 Button(isLoggedOut ? "Log back in" : "Log in to different account") {
                     if !isLoggedOut {
-                        // Log in to different account - logout first, then open login window
                         Task {
-                            await authManager.logout()
                             openLoginWindow()
                         }
                     } else {
@@ -85,19 +83,16 @@ struct MenuBarView: View {
                         openLoginWindow()
                     }
                 }
-                .disabled(authManager.isLoading)
             } else if hasSavedUserInfo {
                 // Has saved user info but not authenticated - show "Log back in"
                 Button("Log back in") {
                     openLoginWindow()
                 }
-                .disabled(authManager.isLoading)
             } else {
                 // Never logged in before - show "Login to account"
                 Button("Log in to account") {
                     openLoginWindow()
                 }
-                .disabled(authManager.isLoading)
             }
         }
         
@@ -111,7 +106,6 @@ struct MenuBarView: View {
                         await authManager.logout()
                     }
                 }
-                .disabled(authManager.isLoading)
             }
             
             Divider()

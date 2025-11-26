@@ -101,14 +101,16 @@ class APIClient: ObservableObject {
         return normalized
     }
     
-    private func apiURL(_ path: String) -> URL? {
+    private func apiURL(_ path: String, hostnameOverride: String? = nil) -> URL? {
         let fullPath = path.hasPrefix("/") ? path : "/\(path)"
         let apiPath = "/api/v1\(fullPath)"
-        let fullURL = baseURL + apiPath
+        let hostname = hostnameOverride ?? baseURL
+        let normalizedHostname = Self.normalizeBaseURL(hostname)
+        let fullURL = normalizedHostname + apiPath
         
         // Validate URL construction
         guard let url = URL(string: fullURL) else {
-            os_log("Error: Invalid URL constructed: %{public}@ (baseURL: %{public}@, path: %{public}@)", log: logger, type: .error, fullURL, baseURL, path)
+            os_log("Error: Invalid URL constructed: %{public}@ (hostname: %{public}@, path: %{public}@)", log: logger, type: .error, fullURL, normalizedHostname, path)
             return nil
         }
         
@@ -118,9 +120,10 @@ class APIClient: ObservableObject {
     private func makeRequest(
         method: String,
         path: String,
-        body: Data? = nil
+        body: Data? = nil,
+        hostnameOverride: String? = nil
     ) async throws -> (Data, HTTPURLResponse) {
-        guard let url = apiURL(path) else {
+        guard let url = apiURL(path, hostnameOverride: hostnameOverride) else {
             throw APIError.invalidURL
         }
         
@@ -294,17 +297,17 @@ class APIClient: ObservableObject {
         return (loginResponse, token)
     }
     
-    func startDeviceAuth(applicationName: String, deviceName: String?) async throws -> DeviceAuthStartResponse {
+    func startDeviceAuth(applicationName: String, deviceName: String?, hostnameOverride: String? = nil) async throws -> DeviceAuthStartResponse {
         let requestBody = DeviceAuthStartRequest(applicationName: applicationName, deviceName: deviceName)
         let bodyData = try JSONEncoder().encode(requestBody)
         
-        let (data, response) = try await makeRequest(method: "POST", path: "/auth/device-web-auth/start", body: bodyData)
+        let (data, response) = try await makeRequest(method: "POST", path: "/auth/device-web-auth/start", body: bodyData, hostnameOverride: hostnameOverride)
         
         return try parseResponse(data, response)
     }
     
-    func pollDeviceAuth(code: String) async throws -> (DeviceAuthPollResponse, String?) {
-        let (data, response) = try await makeRequest(method: "GET", path: "/auth/device-web-auth/poll/\(code)")
+    func pollDeviceAuth(code: String, hostnameOverride: String? = nil) async throws -> (DeviceAuthPollResponse, String?) {
+        let (data, response) = try await makeRequest(method: "GET", path: "/auth/device-web-auth/poll/\(code)", hostnameOverride: hostnameOverride)
         
         let pollResponse: DeviceAuthPollResponse = try parseResponse(data, response)
         

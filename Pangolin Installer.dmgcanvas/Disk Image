@@ -1,0 +1,64 @@
+{
+  "diskImage" : {
+    "appleID" : "numbat@fossorial.io",
+    "autoopen" : true,
+    "background" : {
+      "imageScaleOption" : 100,
+      "layoutObjects" : [
+        {
+          "bounds" : "{{166, 265}, {268, 67}}",
+          "filePath" : "\/Users\/miloschwartz\/fossorial\/pangolin\/public\/logo\/word_mark_black.png",
+          "identifier" : "word_mark_black",
+          "image" : "tohmujuvdv",
+          "layoutObjectType" : "image",
+          "relativeFilePath" : "..\/pangolin\/public\/logo\/word_mark_black.png",
+          "uid" : "tohmujuvdv"
+        }
+      ],
+      "type" : 3
+    },
+    "codeSigningIdentityString" : "5665EF63BD87774BF864AAC8FE662485307AAA2A",
+    "iconPreviewVisible" : false,
+    "iconSize" : 150,
+    "itemInfoVisible" : false,
+    "labelPosition" : 0,
+    "licenses" : [
+
+    ],
+    "nameFontSize" : 12,
+    "statusBarVisible" : false,
+    "suggestedDiskImageName" : "Disk Image.dmg",
+    "teamID" : "4668XHFAHF",
+    "toolbarVisible" : false,
+    "uid" : "knbwdghzqp",
+    "validationScheme" : 2,
+    "viewLayout" : 0,
+    "volumeIcon" : "volumeIcon",
+    "volumeName" : "Pangolin Installer",
+    "volumeSize" : 0,
+    "volumeSizeOption" : "Automatic",
+    "windowContentHeight" : 360,
+    "windowContents" : [
+      {
+        "filePath" : "\/Applications",
+        "iconSize" : 100,
+        "invisible" : false,
+        "isAnAlias" : true,
+        "location" : "{420, 157}",
+        "relativeFilePath" : "..\/..\/..\/..\/Applications"
+      },
+      {
+        "filePath" : "\/Users\/miloschwartz\/Downloads\/Pangolin\/Pangolin.app",
+        "iconSize" : 100,
+        "invisible" : false,
+        "isAnAlias" : false,
+        "location" : "{194, 157}",
+        "relativeFilePath" : "..\/..\/Downloads\/Pangolin\/Pangolin.app"
+      }
+    ],
+    "windowContentWidth" : 600,
+    "windowLeft" : 200,
+    "windowTop" : 120
+  },
+  "version" : 4
+}

@@ -21,6 +21,7 @@ struct LoginView: View {
     @State private var isSelfHostedButtonHovered = false
     @State private var showSuccess = false
     @State private var hasAutoOpenedBrowser = false
+    @State private var loginTask: Task<Void, Never>?
     
     @ObservedObject var authManager: AuthManager
     @ObservedObject var configManager: ConfigManager
@@ -106,7 +107,8 @@ struct LoginView: View {
             // Auto-open browser when code is generated
             if let code = newValue, !hasAutoOpenedBrowser {
                 hasAutoOpenedBrowser = true
-                let hostname = configManager.getHostname()
+                // Use temporary hostname from login flow
+                let hostname = getCurrentHostname()
                 if !hostname.isEmpty {
                     // Remove middle hyphen from code (e.g., "XXXX-XXXX" -> "XXXXXXXX")
                     let codeWithoutHyphen = code.replacingOccurrences(of: "-", with: "")
@@ -124,17 +126,16 @@ struct LoginView: View {
                 hasAutoOpenedBrowser = false
             }
         }
+        .onDisappear {
+            // Reset state when view disappears
+            resetLoginState()
+        }
     }
     
     private var hostingSelectionView: some View {
         VStack(alignment: .center, spacing: 16) {
             Button(action: {
                 hostingOption = .cloud
-                // Set cloud hostname
-                var config = configManager.config ?? Config()
-                config.hostname = "https://app.pangolin.net"
-                _ = configManager.save(config)
-                apiClient.updateBaseURL("https://app.pangolin.net")
                 // Immediately start device auth flow for cloud
                 performLogin()
             }) {
@@ -213,15 +214,6 @@ struct LoginView: View {
                 TextField("https://your-server.com", text: $selfHostedURL)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
-                    .onChange(of: selfHostedURL) { oldValue, newValue in
-                        // Update config and API client as user types
-                        var config = configManager.config ?? Config()
-                        config.hostname = newValue.isEmpty ? nil : newValue
-                        _ = configManager.save(config)
-                        if !newValue.isEmpty {
-                            apiClient.updateBaseURL(newValue)
-                        }
-                    }
                 
                 Text("Enter your Pangolin server URL")
                     .font(.caption)
@@ -284,8 +276,9 @@ struct LoginView: View {
             }
             
             // Manual URL instructions
-            if !configManager.getHostname().isEmpty {
-                Text("If the browser doesn't open, manually visit \(configManager.getHostname())/auth/device-web-auth/start to complete authentication.")
+            let currentHostname = getCurrentHostname()
+            if !currentHostname.isEmpty {
+                Text("If the browser doesn't open, manually visit \(currentHostname)/auth/device-web-auth/start to complete authentication.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -307,26 +300,52 @@ struct LoginView: View {
         return false
     }
     
+    private func getCurrentHostname() -> String {
+        if hostingOption == .cloud {
+            return "https://app.pangolin.net"
+        } else if hostingOption == .selfHosted {
+            let url = selfHostedURL.trimmingCharacters(in: .whitespaces)
+            if !url.isEmpty {
+                // Normalize the URL
+                var normalized = url
+                if !normalized.hasPrefix("http://") && !normalized.hasPrefix("https://") {
+                    normalized = "https://" + normalized
+                }
+                normalized = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                return normalized
+            }
+        }
+        return configManager.getHostname()
+    }
+    
     private func performLogin() {
         isLoggingIn = true
         
-        // Ensure server URL is configured
-        if hostingOption == .selfHosted {
+        // Determine hostname to use for login
+        let hostname: String?
+        if hostingOption == .cloud {
+            hostname = "https://app.pangolin.net"
+        } else if hostingOption == .selfHosted {
             let url = selfHostedURL.trimmingCharacters(in: .whitespaces)
             if url.isEmpty {
                 AlertManager.shared.showAlertDialog(title: "Error", message: "Please enter a server URL.")
                 isLoggingIn = false
                 return
             }
-            var config = configManager.config ?? Config()
-            config.hostname = url
-            _ = configManager.save(config)
-            apiClient.updateBaseURL(url)
+            // Normalize the URL
+            var normalized = url
+            if !normalized.hasPrefix("http://") && !normalized.hasPrefix("https://") {
+                normalized = "https://" + normalized
+            }
+            normalized = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            hostname = normalized
+        } else {
+            hostname = nil
         }
         
-        Task {
+        loginTask = Task {
             do {
-                try await authManager.loginWithDeviceAuth()
+                try await authManager.loginWithDeviceAuth(hostnameOverride: hostname)
                 
                 // Success - show success view, then close after 2 seconds
                 await MainActor.run {
@@ -340,7 +359,10 @@ struct LoginView: View {
                 }
             } catch {
                 await MainActor.run {
-                    AlertManager.shared.showErrorDialog(error)
+                    // Don't show error if task was cancelled
+                    if !Task.isCancelled {
+                        AlertManager.shared.showErrorDialog(error)
+                    }
                     isLoggingIn = false
                 }
             }
@@ -359,7 +381,26 @@ struct LoginView: View {
         }
     }
     
+    private func resetLoginState() {
+        // Cancel login task if it exists
+        loginTask?.cancel()
+        loginTask = nil
+        
+        // Cancel device auth polling
+        authManager.cancelDeviceAuth()
+        
+        // Reset local state
+        isLoggingIn = false
+        hostingOption = nil
+        selfHostedURL = ""
+        showSuccess = false
+        hasAutoOpenedBrowser = false
+    }
+    
     private func closeWindow() {
+        // Reset login state before closing
+        resetLoginState()
+        
         if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "main" }) {
             window.close()
             

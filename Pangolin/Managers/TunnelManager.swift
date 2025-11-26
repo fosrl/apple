@@ -324,6 +324,12 @@ class TunnelManager: NSObject, ObservableObject {
         let hasAccess = await authManager.checkOrgAccess(orgId: currentOrg.orgId)
         if !hasAccess {
             os_log("Access denied for org %{public}@, aborting connection", log: logger, type: .error, currentOrg.orgId)
+            await MainActor.run {
+                AlertManager.shared.showAlertDialog(
+                    title: "Access Denied",
+                    message: "You do not have access to the selected organization."
+                )
+            }
             return
         }
         
