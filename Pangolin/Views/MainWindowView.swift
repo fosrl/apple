@@ -107,6 +107,9 @@ struct MainWindowView: View {
             window.identifier = NSUserInterfaceItemIdentifier("main")
         }
         
+        // Make window float on top of all other windows
+        window.level = .floating
+        
         // Configure window style: remove minimize and maximize, keep close button
         var styleMask = window.styleMask
         styleMask.remove([.miniaturizable, .resizable])

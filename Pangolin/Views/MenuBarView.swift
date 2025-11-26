@@ -229,6 +229,9 @@ struct MenuBarView: View {
             styleMask.insert([.titled, .closable])
             window.styleMask = styleMask
             
+            // Make window float on top of all other windows
+            window.level = .floating
+            
             // Hide minimize and zoom buttons, keep only close button
             if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
                 minimizeButton.isHidden = true
@@ -260,6 +263,8 @@ struct MenuBarView: View {
                 if let window = NSApplication.shared.windows.first(where: { 
                     $0.identifier?.rawValue == "main" || $0.title == "Pangolin" 
                 }) {
+                    // Make window float on top of all other windows
+                    window.level = .floating
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()
                     NSApp.activate(ignoringOtherApps: true)
