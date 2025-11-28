@@ -67,6 +67,28 @@ struct LoginView: View {
             if !showSuccess {
                 VStack {
                     Spacer()
+                    
+                    // Terms and Privacy Policy text (only when showing device code)
+                        HStack(spacing: 4) {
+                            Text("By continuing, you agree to our")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Button("Terms of Service") {
+                                openBrowser(url: "https://pangolin.net/terms-of-service.html")
+                            }
+                            .font(.caption2)
+                            .buttonStyle(.plain)
+                            Text("and")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Button("Privacy Policy.") {
+                                openBrowser(url: "https://pangolin.net/privacy-policy.html")
+                            }
+                            .font(.caption2)
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.bottom, 8)
+                    
                     HStack {
                         Spacer()
                         

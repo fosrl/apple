@@ -38,8 +38,6 @@ struct MenuBarView: View {
                 UserEmailMenuItem(tunnelManager: tunnelManager)
             }
             
-            Divider()
-            
             // Check if user has previously logged in (has saved email)
             let hasSavedUserInfo = configManager.config?.email != nil
             
