@@ -28,24 +28,6 @@ struct MenuBarIconView: View {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
-    weak var tunnelManager: TunnelManager?
-    
-    private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "AppDelegate")
-    }()
-    
-    func applicationWillTerminate(_ notification: Notification) {
-        // Disconnect the tunnel when the app is about to terminate
-        // This ensures the packet tunnel network extension also exits when the app exits
-        if let tunnelManager = tunnelManager {
-            tunnelManager.stopTunnelSync()
-            os_log("Tunnel stopped due to app termination", log: logger, type: .info)
-        }
-    }
-}
-
 @main
 struct PangolinApp: App {
     @StateObject private var configManager = ConfigManager()
@@ -53,7 +35,6 @@ struct PangolinApp: App {
     @StateObject private var apiClient: APIClient
     @StateObject private var authManager: AuthManager
     @StateObject private var tunnelManager: TunnelManager
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     
     private let updaterController: SPUStandardUpdaterController
     
@@ -93,9 +74,6 @@ struct PangolinApp: App {
                     guard NSApp.activationPolicy() != .accessory else { return }
                     NSApp.setActivationPolicy(.accessory)
                 }
-                
-                // Set tunnel manager reference in app delegate for termination handling
-                appDelegate.tunnelManager = tunnelManager
                 
                 Task {
                     await authManager.initialize()

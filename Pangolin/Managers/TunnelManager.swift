@@ -433,20 +433,6 @@ class TunnelManager: NSObject, ObservableObject {
         }
     }
     
-    /// Synchronously stops the tunnel connection.
-    /// This is intended for use during app termination when async operations may not complete.
-    func stopTunnelSync() {
-        stopSocketPolling()
-        
-        guard let manager = tunnelManager else {
-            return
-        }
-        
-        // Stop the VPN tunnel connection directly
-        // This is a synchronous operation that will signal the network extension to stop
-        manager.connection.stopVPNTunnel()
-    }
-    
     // MARK: - Socket Polling
     
     private func startSocketPolling() {
