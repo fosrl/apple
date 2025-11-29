@@ -107,5 +107,13 @@ struct PangolinApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
         }
+        
+        // Logs Window
+        WindowGroup("Logs", id: "logs") {
+            LogView(tunnelManager: tunnelManager)
+                .handlesExternalEvents(preferring: ["logs"], allowing: ["logs"])
+        }
+        .defaultSize(width: 800, height: 600)
+        .windowResizability(.contentSize)
     }
 }

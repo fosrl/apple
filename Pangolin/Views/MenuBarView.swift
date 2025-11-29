@@ -141,6 +141,10 @@ struct MenuBarView: View {
                 .foregroundColor(.secondary)
             
             CheckForUpdatesView(updater: updater)
+            
+            Button("View Logs") {
+                openLogsWindow()
+            }
         }
         
         Divider()
@@ -263,6 +267,49 @@ struct MenuBarView: View {
                 }) {
                     // Make window float on top of all other windows
                     window.level = .floating
+                    window.makeKeyAndOrderFront(nil)
+                    window.orderFrontRegardless()
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+        }
+    }
+    
+    private func openLogsWindow() {
+        // Show app in dock when opening window
+        DispatchQueue.main.async {
+            guard NSApp.activationPolicy() != .regular else { return }
+            NSApp.setActivationPolicy(.regular)
+        }
+        
+        // Find existing logs window by identifier
+        let existingWindow = NSApplication.shared.windows.first { window in
+            window.identifier?.rawValue == "logs"
+        }
+        
+        if let window = existingWindow {
+            // Window exists - close any duplicates first
+            let allLogsWindows = NSApplication.shared.windows.filter { w in
+                w.identifier?.rawValue == "logs" && w != window
+            }
+            for duplicateWindow in allLogsWindows {
+                duplicateWindow.close()
+            }
+            
+            // Bring existing window to front
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            // No window exists - open a new one
+            openWindow(id: "logs")
+            NSApp.activate(ignoringOtherApps: true)
+            
+            // Bring the newly created window to front after it's created
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if let window = NSApplication.shared.windows.first(where: { 
+                    $0.identifier?.rawValue == "logs"
+                }) {
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()
                     NSApp.activate(ignoringOtherApps: true)

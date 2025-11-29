@@ -15,6 +15,7 @@ class TunnelManager: NSObject, ObservableObject {
     @Published var isNEConnected = false
     @Published var status: TunnelStatus = .disconnected
     @Published var isRegistering = false
+    @Published var socketStatus: SocketStatusResponse? = nil
     
     private var tunnelManager: NETunnelProviderManager?
     private let bundleIdentifier = "net.pangolin.Pangolin.PacketTunnel"
@@ -452,6 +453,9 @@ class TunnelManager: NSObject, ObservableObject {
                     let socketStatus = try await self.socketManager.getStatus()
                     
                     await MainActor.run {
+                        // Store the raw socket status for observers (like LogView)
+                        self.socketStatus = socketStatus
+                        
                         // Update status text based on socket response
                         // But keep isNEConnected = true as long as VPN extension is connected
                         if socketStatus.connected {
@@ -477,6 +481,9 @@ class TunnelManager: NSObject, ObservableObject {
                     // Socket not available or error - check if VPN is still connected
                     // If VPN is disconnected, polling will be stopped by updateConnectionStatus
                     await MainActor.run {
+                        // Clear socket status on error
+                        self.socketStatus = nil
+                        
                         // Only update if VPN is still connected (socket might be temporarily unavailable)
                         if let manager = self.tunnelManager,
                            manager.connection.status == .connected {
@@ -498,6 +505,9 @@ class TunnelManager: NSObject, ObservableObject {
         isPollingSocket = false
         socketPollingTask?.cancel()
         socketPollingTask = nil
+        
+        // Clear socket status when polling stops
+        socketStatus = nil
     }
 }
 
