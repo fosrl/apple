@@ -425,29 +425,28 @@ class AuthManager: ObservableObject {
     func ensureOlmCredentials(userId: String) async {
         // Check if OLM credentials already exist locally
         if secretManager.hasOlmCredentials(userId: userId) {
-            // Verify OLM exists on server by getting the client
-            if let olmIdString = secretManager.getOlmId(userId: userId),
-               let clientId = Int(olmIdString) {
+            // Verify OLM exists on server by getting the OLM directly
+            if let olmIdString = secretManager.getOlmId(userId: userId) {
                 do {
-                    let client = try await apiClient.getClient(clientId: clientId)
+                    let olm = try await apiClient.getUserOlm(userId: userId, olmId: olmIdString)
                     
-                    // Verify the olmId matches
-                    if let clientOlmId = client.olmId, clientOlmId == olmIdString {
+                    // Verify the olmId and userId match
+                    if olm.olmId == olmIdString && olm.userId == userId {
                         os_log("OLM credentials verified successfully", log: logger, type: .debug)
                     } else {
-                        os_log("OLM ID mismatch - client olmId: %{public}@, stored olmId: %{public}@", log: logger, type: .error, client.olmId ?? "nil", olmIdString)
+                        os_log("OLM mismatch - returned olmId: %{public}@, userId: %{public}@, stored olmId: %{public}@", log: logger, type: .error, olm.olmId, olm.userId, olmIdString)
                         // Clear invalid credentials
                         _ = secretManager.deleteOlmCredentials(userId: userId)
                     }
                 } catch {
-                    // If getting client fails, the OLM might not exist
+                    // If getting OLM fails, the OLM might not exist
                     os_log("Failed to verify OLM credentials: %{public}@", log: logger, type: .error, error.localizedDescription)
                     // Clear invalid credentials so we can try to create new ones
                     _ = secretManager.deleteOlmCredentials(userId: userId)
                 }
             } else {
-                // Can't convert olmId to Int, clear credentials
-                os_log("Cannot verify OLM - olmId is not a valid clientId", log: logger, type: .error)
+                // No olmId found, clear credentials
+                os_log("Cannot verify OLM - olmId not found", log: logger, type: .error)
                 _ = secretManager.deleteOlmCredentials(userId: userId)
             }
         }

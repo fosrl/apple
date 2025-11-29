@@ -153,6 +153,13 @@ struct Pagination: Codable {
 
 // MARK: - OLM
 
+struct Olm: Codable {
+    let olmId: String
+    let userId: String
+    let name: String?
+    let secret: String?
+}
+
 struct CreateOlmRequest: Codable {
     let name: String
 }

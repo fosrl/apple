@@ -351,6 +351,11 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    func getUserOlm(userId: String, olmId: String) async throws -> Olm {
+        let (data, response) = try await makeRequest(method: "GET", path: "/user/\(userId)/olm/\(olmId)")
+        return try parseResponse(data, response)
+    }
+    
     // MARK: - Organization
     
     func getOrg(orgId: String) async throws -> GetOrgResponse {
