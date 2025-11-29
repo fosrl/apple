@@ -358,10 +358,21 @@ class AuthManager: ObservableObject {
                                policyLogMessage)
                         
                         // Show alert about org policy preventing access
+                        // Get hostname for the resolution URL
+                        let hostname = configManager.getHostname()
+                        let resolutionURL = "\(hostname)/\(orgId)"
+                        
+                        // Build message similar to Go implementation
+                        var message = "Access denied due to organization policy violations."
+                        if let error = policyResponse.error, !error.isEmpty {
+                            message = "Access denied: \(error)"
+                        }
+                        message += "\n\nSee more and resolve the issues by visiting: \(resolutionURL)"
+                        
                         await MainActor.run {
                             AlertManager.shared.showAlertDialog(
                                 title: "Access Denied",
-                                message: "Org policy preventing access to this org"
+                                message: message
                             )
                         }
                         return false
