@@ -236,6 +236,11 @@ class AuthManager: ObservableObject {
     }
     
     private func handleSuccessfulAuth(user: User, token: String) async {
+        // Disconnect tunnel on successful login to ensure clean state
+        if let tunnelManager = tunnelManager {
+            await tunnelManager.disconnect()
+        }
+        
         // Save user info to config
         var config = configManager.config ?? Config()
         config.userId = user.userId
@@ -481,6 +486,11 @@ class AuthManager: ObservableObject {
     }
     
     func logout() async {
+        // Disconnect tunnel before logging out
+        if let tunnelManager = tunnelManager {
+            await tunnelManager.disconnect()
+        }
+        
         // Try to call logout endpoint (ignore errors)
         do {
             try await apiClient.logout()
