@@ -68,7 +68,8 @@ struct LoginView: View {
                 VStack {
                     Spacer()
                     
-                    // Terms and Privacy Policy text (only when showing device code)
+                    // Terms and Privacy Policy text (only on hosting selection page)
+                    if hostingOption == nil {
                         HStack(spacing: 4) {
                             Text("By continuing, you agree to our")
                                 .font(.caption2)
@@ -88,6 +89,7 @@ struct LoginView: View {
                             .buttonStyle(.plain)
                         }
                         .padding(.bottom, 8)
+                    }
                     
                     HStack {
                         Spacer()
@@ -300,7 +302,7 @@ struct LoginView: View {
             // Manual URL instructions
             let currentHostname = getCurrentHostname()
             if !currentHostname.isEmpty {
-                Text("If the browser doesn't open, manually visit \(currentHostname)/auth/device-web-auth/start to complete authentication.")
+                Text("\(currentHostname)/auth/login/device")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)

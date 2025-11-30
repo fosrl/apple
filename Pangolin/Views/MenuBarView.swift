@@ -67,6 +67,8 @@ struct MenuBarView: View {
             // Organization selector (when authenticated, has orgs, and not logged out)
             if authManager.isAuthenticated && !authManager.organizations.isEmpty && !isLoggedOut {
                 OrganizationsMenu(authManager: authManager, tunnelManager: tunnelManager)
+                
+                Divider()
             }
             
             // Login button
