@@ -112,7 +112,6 @@ struct LoginView: View {
                             closeWindow()
                         }
                         .keyboardShortcut(.cancelAction)
-                        .disabled(isLoggingIn)
                         
                         if hostingOption != nil && authManager.deviceAuthCode == nil {
                             Button("Log in") {
@@ -238,10 +237,6 @@ struct LoginView: View {
                 TextField("https://your-server.com", text: $selfHostedURL)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
-                
-                Text("Enter your Pangolin server URL")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             } else {
                 Text("Pangolin Cloud")
                     .font(.headline)
