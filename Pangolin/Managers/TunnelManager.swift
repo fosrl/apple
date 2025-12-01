@@ -456,6 +456,13 @@ class TunnelManager: NSObject, ObservableObject {
                     // Query socket for status
                     let socketStatus = try await self.socketManager.getStatus()
                     
+                    // Check if tunnel has been terminated - if so, disconnect the network extension
+                    if socketStatus.terminated {
+                        os_log("Tunnel terminated, disconnecting network extension", log: self.logger, type: .info)
+                        await self.disconnect()
+                        break
+                    }
+                    
                     await MainActor.run {
                         // Only update if socket status has actually changed
                         let statusChanged = self.socketStatus != socketStatus

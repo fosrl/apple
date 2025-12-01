@@ -191,6 +191,7 @@ enum TunnelStatus: String, CaseIterable {
 struct SocketStatusResponse: Codable, Equatable {
     let status: String?
     let connected: Bool
+    let terminated: Bool
     let tunnelIP: String?
     let version: String?
     let peers: [String: SocketPeer]?
