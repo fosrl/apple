@@ -16,6 +16,9 @@ struct Config: Codable {
     var orgId: String?
     var username: String?
     var name: String?
+    var dnsOverrideEnabled: Bool?
+    var primaryDNSServer: String?
+    var secondaryDNSServer: String?
 }
 
 // MARK: - API Response Types

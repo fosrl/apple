@@ -15,6 +15,7 @@ class ConfigManager: ObservableObject {
     
     private let configPath: URL
     private let defaultHostname = "https://app.pangolin.net"
+    private let defaultPrimaryDNS = "1.1.1.1"
     
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
@@ -30,6 +31,39 @@ class ConfigManager: ObservableObject {
         
         self.configPath = pangolinDir.appendingPathComponent("pangolin.json")
         self.config = load()
+        ensureDNSDefaults()
+    }
+    
+    private func ensureDNSDefaults() {
+        var updatedConfig = config ?? Config()
+        var needsSave = false
+        
+        // Ensure primary DNS has default value if not set
+        if updatedConfig.primaryDNSServer == nil || updatedConfig.primaryDNSServer?.isEmpty == true {
+            updatedConfig.primaryDNSServer = defaultPrimaryDNS
+            needsSave = true
+        }
+        
+        // Ensure DNS override has default value if not set
+        if updatedConfig.dnsOverrideEnabled == nil {
+            updatedConfig.dnsOverrideEnabled = true
+            needsSave = true
+        }
+        
+        // Secondary DNS can remain nil/empty, no default needed
+        
+        if needsSave {
+            // Update config synchronously during init to avoid async issues
+            do {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let data = try encoder.encode(updatedConfig)
+                try data.write(to: configPath)
+                self.config = updatedConfig
+            } catch {
+                os_log("Error saving DNS defaults: %{public}@", log: logger, type: .error, error.localizedDescription)
+            }
+        }
     }
     
     func load() -> Config? {
@@ -78,6 +112,52 @@ class ConfigManager: ObservableObject {
     
     func getHostname() -> String {
         return config?.hostname ?? defaultHostname
+    }
+    
+    // MARK: - DNS Settings
+    
+    func getDNSOverrideEnabled() -> Bool {
+        return config?.dnsOverrideEnabled ?? true
+    }
+    
+    func getPrimaryDNSServer() -> String {
+        // Config should always have a value after ensureDNSDefaults, but return default as fallback
+        return config?.primaryDNSServer ?? defaultPrimaryDNS
+    }
+    
+    func getDefaultPrimaryDNS() -> String {
+        return defaultPrimaryDNS
+    }
+    
+    func getSecondaryDNSServer() -> String {
+        // Return empty string if not set (no default for secondary)
+        return config?.secondaryDNSServer ?? ""
+    }
+    
+    func setDNSOverrideEnabled(_ enabled: Bool) -> Bool {
+        var updatedConfig = config ?? Config()
+        updatedConfig.dnsOverrideEnabled = enabled
+        return save(updatedConfig)
+    }
+    
+    func setPrimaryDNSServer(_ server: String) -> Bool {
+        var updatedConfig = config ?? Config()
+        updatedConfig.primaryDNSServer = server.isEmpty ? nil : server
+        return save(updatedConfig)
+    }
+    
+    func setSecondaryDNSServer(_ server: String) -> Bool {
+        var updatedConfig = config ?? Config()
+        updatedConfig.secondaryDNSServer = server.isEmpty ? nil : server
+        return save(updatedConfig)
+    }
+    
+    func setDNSSettings(overrideEnabled: Bool, primary: String, secondary: String) -> Bool {
+        var updatedConfig = config ?? Config()
+        updatedConfig.dnsOverrideEnabled = overrideEnabled
+        updatedConfig.primaryDNSServer = primary.isEmpty ? nil : primary
+        updatedConfig.secondaryDNSServer = secondary.isEmpty ? nil : secondary
+        return save(updatedConfig)
     }
 }
 

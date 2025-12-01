@@ -85,11 +85,10 @@ struct PangolinApp: App {
         
         // Main Window (Login)
         WindowGroup("Pangolin", id: "main") {
-            MainWindowView(
-                configManager: configManager,
-                apiClient: apiClient,
+            LoginView(
                 authManager: authManager,
-                tunnelManager: tunnelManager
+                configManager: configManager,
+                apiClient: apiClient
             )
             .handlesExternalEvents(preferring: ["main"], allowing: ["main"])
             .onAppear {
@@ -108,12 +107,28 @@ struct PangolinApp: App {
             CommandGroup(replacing: .newItem) {}
         }
         
-        // Logs Window
-        WindowGroup("Logs", id: "logs") {
-            LogView(tunnelManager: tunnelManager)
-                .handlesExternalEvents(preferring: ["logs"], allowing: ["logs"])
+        // Preferences Window
+        WindowGroup("Preferences", id: "preferences") {
+            PreferencesWindow(
+                configManager: configManager,
+                tunnelManager: tunnelManager
+            )
+            .handlesExternalEvents(preferring: ["preferences"], allowing: ["preferences"])
         }
         .defaultSize(width: 800, height: 600)
         .windowResizability(.contentSize)
+        .commands {
+            // Hide all menu bar items for preferences window
+            CommandGroup(replacing: .appInfo) {}
+            CommandGroup(replacing: .appSettings) {}
+            CommandGroup(replacing: .appTermination) {}
+            CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .pasteboard) {}
+            CommandGroup(replacing: .sidebar) {}
+            CommandGroup(replacing: .textEditing) {}
+            CommandGroup(replacing: .textFormatting) {}
+            CommandGroup(replacing: .toolbar) {}
+            CommandGroup(replacing: .undoRedo) {}
+        }
     }
 }

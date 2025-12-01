@@ -390,11 +390,35 @@ class TunnelManager: NSObject, ObservableObject {
         
         // Tunnel configuration options
         tunnelOptions["mtu"] = NSNumber(value: 1280)
-        tunnelOptions["dns"] = "8.8.8.8" as NSString
-        tunnelOptions["upstreamDNS"] = ["8.8.8.8:53"] as NSArray
         tunnelOptions["holepunch"] = NSNumber(value: false)
         tunnelOptions["pingIntervalSeconds"] = NSNumber(value: 5)
         tunnelOptions["pingTimeoutSeconds"] = NSNumber(value: 5)
+        
+        // DNS override settings from config
+        let dnsOverrideEnabled = configManager.getDNSOverrideEnabled()
+        tunnelOptions["overrideDNS"] = NSNumber(value: dnsOverrideEnabled)
+        
+        // Build upstream DNS servers array with :53 appended
+        var upstreamDNSServers: [String] = []
+        let primaryDNS = configManager.getPrimaryDNSServer()
+        if !primaryDNS.isEmpty {
+            upstreamDNSServers.append("\(primaryDNS):53")
+        }
+        let secondaryDNS = configManager.getSecondaryDNSServer()
+        if !secondaryDNS.isEmpty {
+            upstreamDNSServers.append("\(secondaryDNS):53")
+        }
+        // If no DNS servers configured, use default from config manager
+        if upstreamDNSServers.isEmpty {
+            let defaultDNS = configManager.getDefaultPrimaryDNS()
+            upstreamDNSServers.append("\(defaultDNS):53")
+        }
+        tunnelOptions["upstreamDNS"] = upstreamDNSServers as NSArray
+        
+        // Set DNS to primary DNS server (or default from config manager if not configured)
+        let defaultDNS = configManager.getDefaultPrimaryDNS()
+        let dnsValue = primaryDNS.isEmpty ? defaultDNS : primaryDNS
+        tunnelOptions["dns"] = dnsValue as NSString
         
         do {
             // Start with options
@@ -481,7 +505,7 @@ class TunnelManager: NSObject, ObservableObject {
                         
                         // Only update published properties if values have changed
                         if statusChanged {
-                            // Store the raw socket status for observers (like LogView)
+                            // Store the raw socket status for observers (like OLMStatusContentView)
                             self.socketStatus = socketStatus
                         }
                         

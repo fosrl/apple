@@ -35,6 +35,7 @@ type StartTunnelConfig struct {
 	UserToken           string   `json:"userToken"`
 	OrgID               string   `json:"orgId"`
 	UpstreamDNS         []string `json:"upstreamDNS"`
+	OverrideDNS         bool     `json:"overrideDNS"`
 }
 
 var (
@@ -112,7 +113,7 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		PingTimeoutDuration:  time.Duration(config.PingTimeoutSeconds) * time.Second,
 		FileDescriptorTun:    uint32(fd),
 		UserToken:            config.UserToken,
-		OverrideDNS:          true,
+		OverrideDNS:          config.OverrideDNS,
 		UpstreamDNS:          config.UpstreamDNS,
 		OrgID:                config.OrgID,
 	}

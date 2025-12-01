@@ -15,9 +15,19 @@ struct MenuBarView: View {
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
     let updater: SPUUpdater
+    @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
     @Environment(\.openWindow) private var openWindow
     @State private var menuOpenCount = 0
     @State private var isLoggedOut = false
+    
+    init(configManager: ConfigManager, apiClient: APIClient, authManager: AuthManager, tunnelManager: TunnelManager, updater: SPUUpdater) {
+        self.configManager = configManager
+        self.apiClient = apiClient
+        self.authManager = authManager
+        self.tunnelManager = tunnelManager
+        self.updater = updater
+        self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
+    }
     
     var body: some View {
         Group {
@@ -142,10 +152,11 @@ struct MenuBarView: View {
             Text("Version: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")")
                 .foregroundColor(.secondary)
             
-            CheckForUpdatesView(updater: updater)
+            Button("Check for Updates", action: updater.checkForUpdates)
+                .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
             
-            Button("View Logs") {
-                openLogsWindow()
+            Button("Preferences") {
+                openPreferencesWindow()
             }
         }
         
@@ -285,24 +296,24 @@ struct MenuBarView: View {
         }
     }
     
-    private func openLogsWindow() {
+    private func openPreferencesWindow() {
         // Show app in dock when opening window
         DispatchQueue.main.async {
             guard NSApp.activationPolicy() != .regular else { return }
             NSApp.setActivationPolicy(.regular)
         }
         
-        // Find existing logs window by identifier
+        // Find existing preferences window by identifier
         let existingWindow = NSApplication.shared.windows.first { window in
-            window.identifier?.rawValue == "logs"
+            window.identifier?.rawValue == "preferences"
         }
         
         if let window = existingWindow {
             // Window exists - close any duplicates first
-            let allLogsWindows = NSApplication.shared.windows.filter { w in
-                w.identifier?.rawValue == "logs" && w != window
+            let allPreferencesWindows = NSApplication.shared.windows.filter { w in
+                w.identifier?.rawValue == "preferences" && w != window
             }
-            for duplicateWindow in allLogsWindows {
+            for duplicateWindow in allPreferencesWindows {
                 duplicateWindow.close()
             }
             
@@ -312,13 +323,13 @@ struct MenuBarView: View {
             NSApp.activate(ignoringOtherApps: true)
         } else {
             // No window exists - open a new one
-            openWindow(id: "logs")
+            openWindow(id: "preferences")
             NSApp.activate(ignoringOtherApps: true)
             
             // Bring the newly created window to front after it's created
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 if let window = NSApplication.shared.windows.first(where: { 
-                    $0.identifier?.rawValue == "logs"
+                    $0.identifier?.rawValue == "preferences"
                 }) {
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()
