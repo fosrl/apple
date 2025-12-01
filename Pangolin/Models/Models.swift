@@ -51,7 +51,7 @@ struct DeviceAuthStartRequest: Codable {
 
 struct DeviceAuthStartResponse: Codable {
     let code: String
-    let expiresAt: Int64
+    let expiresInSeconds: Int64
 }
 
 struct DeviceAuthPollResponse: Codable {

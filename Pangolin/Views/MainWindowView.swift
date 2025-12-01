@@ -132,6 +132,11 @@ struct MainWindowView: View {
         
         // Set window to not be resizable
         window.isMovableByWindowBackground = false
+        
+        // Set window size explicitly
+        var frame = window.frame
+        frame.size = NSSize(width: 440, height: 300)
+        window.setContentSize(frame.size)
     }
 }
 

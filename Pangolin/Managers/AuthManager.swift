@@ -135,7 +135,7 @@ class AuthManager: ObservableObject {
                 try await UNUserNotificationCenter.current().add(request)
                 
                 // Poll for verification
-                let expiresAt = Date(timeIntervalSince1970: TimeInterval(startResponse.expiresAt / 1000))
+                let expiresAt = Date().addingTimeInterval(TimeInterval(startResponse.expiresInSeconds))
                 var verified = false
                 var sessionToken: String?
                 

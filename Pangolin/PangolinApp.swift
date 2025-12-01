@@ -102,7 +102,7 @@ struct PangolinApp: App {
             }
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 500, height: 450)
+        .defaultSize(width: 440, height: 300)
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {}

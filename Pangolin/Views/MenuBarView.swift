@@ -363,6 +363,8 @@ struct OrganizationsMenu: View {
             Text(organizations.count == 1 ? "1 Organization" : "\(organizations.count) Organizations")
                 .foregroundColor(.secondary)
             
+            Divider()
+            
             ForEach(organizations, id: \.orgId) { org in
                 Button {
                     Task {

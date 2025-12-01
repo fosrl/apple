@@ -58,8 +58,7 @@ struct LoginView: View {
                         .frame(height: 60)
                     Spacer()
                 }
-                .padding(.top, 10)
-                .padding(.bottom, 10)
+                .padding(.bottom, 15)
                 Spacer()
             }
             
@@ -124,8 +123,8 @@ struct LoginView: View {
                 }
             }
         }
-        .padding()
-        .frame(width: 450, height: 400)
+        .frame(width: 440, height: 300)
+        .padding(12)
         .onChange(of: authManager.deviceAuthCode) { oldValue, newValue in
             // Auto-open browser when code is generated
             if let code = newValue, !hasAutoOpenedBrowser {
@@ -156,7 +155,7 @@ struct LoginView: View {
     }
     
     private var hostingSelectionView: some View {
-        VStack(alignment: .center, spacing: 16) {
+        VStack(alignment: .center, spacing: 8) {
             Button(action: {
                 hostingOption = .cloud
                 // Immediately start device auth flow for cloud
@@ -372,7 +371,7 @@ struct LoginView: View {
                     isLoggingIn = false
                     
                     // Close window after 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         closeWindow()
                     }
                 }
