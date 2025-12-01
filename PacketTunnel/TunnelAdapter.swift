@@ -220,15 +220,15 @@ public class TunnelAdapter {
               let dns = options["dns"] as? String,
               let holepunch = (options["holepunch"] as? NSNumber)?.boolValue,
               let pingIntervalSeconds = (options["pingIntervalSeconds"] as? NSNumber)?.intValue,
+              let userToken: String = options["userToken"] as? String,
+              let orgId = options["orgId"] as? String,
+              let upstreamDNS = options["upstreamDNS"] as? [String],
               let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue else {
             let error = NSError(domain: "TunnelAdapter", code: -1, userInfo: [NSLocalizedDescriptionKey: "Required tunnel configuration options are missing"])
             os_log("Required tunnel configuration options are missing", log: logger, type: .error)
             completionHandler(error)
             return
         }
-        
-        // Get user token (optional)
-        let userToken = options["userToken"] as? String ?? ""
         
         // Tunnel configuration
         let config: [String: Any] = [
@@ -240,7 +240,9 @@ public class TunnelAdapter {
             "holepunch": holepunch,
             "pingIntervalSeconds": pingIntervalSeconds,
             "pingTimeoutSeconds": pingTimeoutSeconds,
-            "userToken": userToken
+            "userToken": userToken,
+            "orgId": orgId,
+            "upstreamDNS": upstreamDNS
         ]
         
         // Convert config to JSON string

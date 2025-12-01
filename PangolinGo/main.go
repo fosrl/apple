@@ -24,15 +24,17 @@ type InitOlmConfig struct {
 
 // StartTunnelConfig represents the JSON configuration for startTunnel
 type StartTunnelConfig struct {
-	Endpoint            string `json:"endpoint"`
-	ID                  string `json:"id"`
-	Secret              string `json:"secret"`
-	MTU                 int    `json:"mtu"`
-	DNS                 string `json:"dns"`
-	Holepunch           bool   `json:"holepunch"`
-	PingIntervalSeconds int    `json:"pingIntervalSeconds"`
-	PingTimeoutSeconds  int    `json:"pingTimeoutSeconds"`
-	UserToken           string `json:"userToken"`
+	Endpoint            string   `json:"endpoint"`
+	ID                  string   `json:"id"`
+	Secret              string   `json:"secret"`
+	MTU                 int      `json:"mtu"`
+	DNS                 string   `json:"dns"`
+	Holepunch           bool     `json:"holepunch"`
+	PingIntervalSeconds int      `json:"pingIntervalSeconds"`
+	PingTimeoutSeconds  int      `json:"pingTimeoutSeconds"`
+	UserToken           string   `json:"userToken"`
+	OrgID               string   `json:"orgId"`
+	UpstreamDNS         []string `json:"upstreamDNS"`
 }
 
 var (
@@ -110,6 +112,9 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		PingTimeoutDuration:  time.Duration(config.PingTimeoutSeconds) * time.Second,
 		FileDescriptorTun:    uint32(fd),
 		UserToken:            config.UserToken,
+		OverrideDNS:          true,
+		UpstreamDNS:          config.UpstreamDNS,
+		OrgID:                config.OrgID,
 	}
 
 	// print the config for debugging

@@ -188,7 +188,7 @@ enum TunnelStatus: String, CaseIterable {
 
 // MARK: - Socket API
 
-struct SocketStatusResponse: Codable {
+struct SocketStatusResponse: Codable, Equatable {
     let status: String?
     let connected: Bool
     let tunnelIP: String?
@@ -196,15 +196,72 @@ struct SocketStatusResponse: Codable {
     let peers: [String: SocketPeer]?
     let registered: Bool?
     let orgId: String?
+    let networkSettings: NetworkSettings?
 }
 
-struct SocketPeer: Codable {
+struct SocketPeer: Codable, Equatable {
     let siteId: Int?
     let connected: Bool?
     let rtt: Int64? // nanoseconds
     let lastSeen: String?
     let endpoint: String?
     let isRelay: Bool?
+}
+
+struct NetworkSettings: Codable, Equatable {
+    let tunnelRemoteAddress: String?
+    let mtu: Int?
+    let dnsServers: [String]?
+    let ipv4Addresses: [String]?
+    let ipv4SubnetMasks: [String]?
+    let ipv4IncludedRoutes: [IPv4Route]?
+    let ipv4ExcludedRoutes: [IPv4Route]?
+    let ipv6Addresses: [String]?
+    let ipv6NetworkPrefixes: [String]?
+    let ipv6IncludedRoutes: [IPv6Route]?
+    let ipv6ExcludedRoutes: [IPv6Route]?
+    
+    enum CodingKeys: String, CodingKey {
+        case tunnelRemoteAddress = "tunnel_remote_address"
+        case mtu
+        case dnsServers = "dns_servers"
+        case ipv4Addresses = "ipv4_addresses"
+        case ipv4SubnetMasks = "ipv4_subnet_masks"
+        case ipv4IncludedRoutes = "ipv4_included_routes"
+        case ipv4ExcludedRoutes = "ipv4_excluded_routes"
+        case ipv6Addresses = "ipv6_addresses"
+        case ipv6NetworkPrefixes = "ipv6_network_prefixes"
+        case ipv6IncludedRoutes = "ipv6_included_routes"
+        case ipv6ExcludedRoutes = "ipv6_excluded_routes"
+    }
+}
+
+struct IPv4Route: Codable, Equatable {
+    let destinationAddress: String
+    let subnetMask: String?
+    let gatewayAddress: String?
+    let isDefault: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case destinationAddress = "destination_address"
+        case subnetMask = "subnet_mask"
+        case gatewayAddress = "gateway_address"
+        case isDefault = "is_default"
+    }
+}
+
+struct IPv6Route: Codable, Equatable {
+    let destinationAddress: String
+    let networkPrefixLength: Int?
+    let gatewayAddress: String?
+    let isDefault: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case destinationAddress = "destination_address"
+        case networkPrefixLength = "network_prefix_length"
+        case gatewayAddress = "gateway_address"
+        case isDefault = "is_default"
+    }
 }
 
 struct SocketExitResponse: Codable {

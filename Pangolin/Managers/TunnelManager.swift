@@ -385,9 +385,13 @@ class TunnelManager: NSObject, ObservableObject {
             tunnelOptions["userToken"] = userToken as NSString
         }
         
+        // Get orgId from current organization
+        tunnelOptions["orgId"] = currentOrg.orgId as NSString
+        
         // Tunnel configuration options
         tunnelOptions["mtu"] = NSNumber(value: 1280)
         tunnelOptions["dns"] = "8.8.8.8" as NSString
+        tunnelOptions["upstreamDNS"] = ["8.8.8.8:53"] as NSArray
         tunnelOptions["holepunch"] = NSNumber(value: false)
         tunnelOptions["pingIntervalSeconds"] = NSNumber(value: 5)
         tunnelOptions["pingTimeoutSeconds"] = NSNumber(value: 5)
@@ -453,44 +457,74 @@ class TunnelManager: NSObject, ObservableObject {
                     let socketStatus = try await self.socketManager.getStatus()
                     
                     await MainActor.run {
-                        // Store the raw socket status for observers (like LogView)
-                        self.socketStatus = socketStatus
+                        // Only update if socket status has actually changed
+                        let statusChanged = self.socketStatus != socketStatus
                         
-                        // Update status text based on socket response
-                        // But keep isNEConnected = true as long as VPN extension is connected
+                        // Determine the new tunnel status based on socket response
+                        let newStatus: TunnelStatus
                         if socketStatus.connected {
-                                self.status = .connected
+                            newStatus = .connected
                         } else if socketStatus.registered == true {
                             // Registered but not connected yet
-                            self.status = .registering
+                            newStatus = .registering
                         } else {
                             // Not registered yet
-                            self.status = .registering
+                            newStatus = .registering
+                        }
+                        
+                        // Only update published properties if values have changed
+                        if statusChanged {
+                            // Store the raw socket status for observers (like LogView)
+                            self.socketStatus = socketStatus
+                        }
+                        
+                        // Only update status if it's different
+                        if self.status != newStatus {
+                            self.status = newStatus
                         }
                         
                         // Keep isNEConnected = true if VPN extension is still connected
                         // This ensures the disconnect button is always available when VPN is up
                         if let manager = self.tunnelManager,
                            manager.connection.status == .connected {
-                            self.isNEConnected = true
+                            // Only update if it's changing
+                            if !self.isNEConnected {
+                                self.isNEConnected = true
+                            }
                         }
                         
-                        os_log("Socket status: connected=%{public}@, registered=%{public}@, status=%{public}@", log: self.logger, type: .debug, String(socketStatus.connected), String(socketStatus.registered ?? false), socketStatus.status ?? "nil")
+                        // Only log if status changed to reduce log noise
+                        if statusChanged {
+                            os_log("Socket status: connected=%{public}@, registered=%{public}@, status=%{public}@", log: self.logger, type: .debug, String(socketStatus.connected), String(socketStatus.registered ?? false), socketStatus.status ?? "nil")
+                        }
                     }
                 } catch {
                     // Socket not available or error - check if VPN is still connected
                     // If VPN is disconnected, polling will be stopped by updateConnectionStatus
                     await MainActor.run {
-                        // Clear socket status on error
-                        self.socketStatus = nil
+                        // Only update if socket status is changing (from non-nil to nil)
+                        let hadStatus = self.socketStatus != nil
                         
                         // Only update if VPN is still connected (socket might be temporarily unavailable)
                         if let manager = self.tunnelManager,
                            manager.connection.status == .connected {
                             // VPN is connected but socket not responding - might be starting up
-                            self.status = .registering
+                            let newStatus: TunnelStatus = .registering
+                            
+                            // Only update if values are actually changing
+                            if hadStatus {
+                                self.socketStatus = nil
+                            }
+                            if self.status != newStatus {
+                                self.status = newStatus
+                            }
                             // Keep isNEConnected = true so user can still disconnect
-                            self.isNEConnected = true
+                            if !self.isNEConnected {
+                                self.isNEConnected = true
+                            }
+                        } else if hadStatus {
+                            // VPN disconnected, clear socket status if it was set
+                            self.socketStatus = nil
                         }
                     }
                 }
