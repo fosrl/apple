@@ -153,7 +153,15 @@ struct MenuBarView: View {
         
         // Quit
         Button("Quit") {
-            NSApplication.shared.terminate(nil)
+            Task {
+                // Disconnect tunnel before quitting
+                await tunnelManager.disconnect()
+                // Small delay to ensure disconnect completes
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                await MainActor.run {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
         }
         .keyboardShortcut("q")
         }
