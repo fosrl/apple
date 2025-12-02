@@ -11,7 +11,7 @@ HEADER_ARM64 := $(GO_DIR)/$(LIB_NAME)_arm64.h
 HEADER_X86_64 := $(GO_DIR)/$(LIB_NAME)_x86_64.h
 
 # Default target
-all: build
+all: clean build
 
 # Build the Go library as a universal C archive (arm64 + x86_64)
 build: $(ARCHIVE)
