@@ -17,14 +17,42 @@ struct MenuBarIconView: View {
         tunnelManager.status
     }
     
+    private var isInIntermediateState: Bool {
+        switch tunnelStatus {
+        case .connecting, .registering, .reconnecting, .disconnecting:
+            return true
+        default:
+            return false
+        }
+    }
+    
     var body: some View {
         if tunnelStatus == .connected {
             Image("MenuBarIcon")
                 .renderingMode(.template)
+        } else if isInIntermediateState {
+            AnimatedLoadingIcon()
         } else {
             Image("MenuBarIconDimmed")
                 .renderingMode(.template)
         }
+    }
+}
+
+struct AnimatedLoadingIcon: View {
+    @State private var currentFrame = 1
+    
+    private let frameNames = ["MenuBarIconLoading1", "MenuBarIconLoading2", "MenuBarIconLoading3"]
+    
+    var body: some View {
+        Image(frameNames[currentFrame - 1])
+            .renderingMode(.template)
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                    currentFrame = (currentFrame % 3) + 1
+                }
+            }
     }
 }
 
