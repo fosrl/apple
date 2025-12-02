@@ -34,7 +34,7 @@ struct PreferencesContentView: View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
-                    Section {
+                    Section(header: Text("DNS Settings")) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("DNS Override")
