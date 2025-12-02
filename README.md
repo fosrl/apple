@@ -16,4 +16,4 @@ This client can be used with both:
 
 ## Documentation
 
-Documentation for the macOS client and all other documentation for Pangolin can be found at [docs.pangolin.net](https://docs.pangolin.net/manage/clients/macos)
+Documentation for the macOS client and all other documentation for Pangolin can be found at [docs.pangolin.net](https://docs.pangolin.net/manage/clients/macos).
