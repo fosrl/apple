@@ -329,40 +329,28 @@ class AuthManager: ObservableObject {
             if case .httpError(let statusCode, _) = error,
                statusCode == 401 || statusCode == 403 {
                 
-                // Try to get org policy to understand why access was denied
+                // Try to get org policy to determine access
                 if let userId = currentUser?.userId {
                     do {
                         let policyResponse = try await apiClient.checkOrgUserAccess(orgId: orgId, userId: userId)
                         
-                        // Log the policy details
-                        var policyDetails: [String] = []
-                        if let policies = policyResponse.policies {
-                            if let requiredTwoFactor = policies.requiredTwoFactor {
-                                policyDetails.append("requiredTwoFactor: \(requiredTwoFactor)")
-                            }
-                            if let maxSessionLength = policies.maxSessionLength {
-                                policyDetails.append("maxSessionLength: compliant=\(maxSessionLength.compliant), maxHours=\(maxSessionLength.maxSessionLengthHours), currentHours=\(maxSessionLength.sessionAgeHours)")
-                            }
-                            if let passwordAge = policies.passwordAge {
-                                policyDetails.append("passwordAge: compliant=\(passwordAge.compliant), maxDays=\(passwordAge.maxPasswordAgeDays), currentDays=\(passwordAge.passwordAgeDays)")
-                            }
+                        // Determine access based on policyResponse.allowed
+                        if policyResponse.allowed {
+                            return true
                         }
                         
-                        let policyLogMessage = policyDetails.isEmpty ? "none" : policyDetails.joined(separator: ", ")
-                        os_log("Org policy check for org %{public}@: allowed=%{public}@, error=%{public}@, policies=[%{public}@]", 
+                        // Access denied - show alert
+                        os_log("Org access denied for org %{public}@: error=%{public}@", 
                                log: logger, 
                                type: .error,
                                orgId,
-                               String(policyResponse.allowed),
-                               policyResponse.error ?? "none",
-                               policyLogMessage)
+                               policyResponse.error ?? "none")
                         
-                        // Show alert about org policy preventing access
                         // Get hostname for the resolution URL
                         let hostname = configManager.getHostname()
                         let resolutionURL = "\(hostname)/\(orgId)"
                         
-                        // Build message similar to Go implementation
+                        // Build message
                         var message = "Access denied due to organization policy violations."
                         if let error = policyResponse.error, !error.isEmpty {
                             message = "Access denied: \(error)"
