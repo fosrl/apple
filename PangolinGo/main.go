@@ -67,7 +67,7 @@ func initOlm(configJSON *C.char) *C.char {
 		LogLevel:   GetLogLevelString(),
 		EnableAPI:  config.EnableAPI,
 		SocketPath: config.SocketPath,
-		Version:    "1",
+		Version:    "Pangolin macOS Client",
 	}
 
 	// Initialize OLM with context and GlobalConfig
