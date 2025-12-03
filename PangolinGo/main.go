@@ -20,6 +20,8 @@ type InitOlmConfig struct {
 	EnableAPI  bool   `json:"enableAPI"`
 	SocketPath string `json:"socketPath"`
 	LogLevel   string `json:"logLevel"`
+	Version    string `json:"version"`
+	Agent      string `json:"agent"`
 }
 
 // StartTunnelConfig represents the JSON configuration for startTunnel
@@ -62,12 +64,13 @@ func initOlm(configJSON *C.char) *C.char {
 	// Create context for OLM
 	olmContext = context.Background()
 
-	// Create OLM GlobalConfig with hardcoded values from Swift
+	// Create OLM GlobalConfig with values from Swift
 	olmConfig := olmpkg.GlobalConfig{
 		LogLevel:   GetLogLevelString(),
 		EnableAPI:  config.EnableAPI,
 		SocketPath: config.SocketPath,
-		Version:    "Pangolin macOS Client",
+		Version:    config.Version,
+		Agent:      config.Agent,
 	}
 
 	// Initialize OLM with context and GlobalConfig

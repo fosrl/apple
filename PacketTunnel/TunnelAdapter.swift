@@ -93,11 +93,17 @@ public class TunnelAdapter {
         // Set log level for Go logger to debug
         PangolinGo.setLogLevel(Int32(LogLevel.debug.rawValue))
         
-        // Hardcoded default values for OLM initialization configuration
+        // Get app version from bundle (semver)
+        let appVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1.0.0"
+        let agent = "Pangolin macOS Client"
+        
+        // OLM initialization configuration with version and agent from Swift
         let config: [String: Any] = [
             "enableAPI": true,
             "socketPath": "/var/run/olm.sock",
-            "logLevel": "debug"
+            "logLevel": "debug",
+            "version": appVersion,
+            "agent": agent
         ]
         
         // Convert config to JSON string
