@@ -390,7 +390,7 @@ class TunnelManager: NSObject, ObservableObject {
         
         // Tunnel configuration options
         tunnelOptions["mtu"] = NSNumber(value: 1280)
-        tunnelOptions["holepunch"] = NSNumber(value: false)
+        tunnelOptions["holepunch"] = NSNumber(value: true)
         tunnelOptions["pingIntervalSeconds"] = NSNumber(value: 5)
         tunnelOptions["pingTimeoutSeconds"] = NSNumber(value: 5)
         
@@ -488,8 +488,8 @@ class TunnelManager: NSObject, ObservableObject {
                     }
                     
                     await MainActor.run {
-                        // Only update if socket status has actually changed
-                        let statusChanged = self.socketStatus != socketStatus
+                        // Check if socket status object has actually changed
+                        let socketStatusChanged = self.socketStatus != socketStatus
                         
                         // Determine the new tunnel status based on socket response
                         let newStatus: TunnelStatus
@@ -503,14 +503,17 @@ class TunnelManager: NSObject, ObservableObject {
                             newStatus = .registering
                         }
                         
-                        // Only update published properties if values have changed
-                        if statusChanged {
-                            // Store the raw socket status for observers (like OLMStatusContentView)
+                        // Check if the computed status (what menu bar cares about) has changed
+                        let computedStatusChanged = self.status != newStatus
+                        
+                        // Always update socketStatus for OLMStatusContentView to show full updated status
+                        // Only update if it actually changed to minimize unnecessary rerenders
+                        if socketStatusChanged {
                             self.socketStatus = socketStatus
                         }
                         
-                        // Only update status if it's different
-                        if self.status != newStatus {
+                        // Only update status if the computed status changed
+                        if computedStatusChanged {
                             self.status = newStatus
                         }
                         
@@ -524,9 +527,9 @@ class TunnelManager: NSObject, ObservableObject {
                             }
                         }
                         
-                        // Only log if status changed to reduce log noise
-                        if statusChanged {
-                            os_log("Socket status: connected=%{public}@, registered=%{public}@, status=%{public}@", log: self.logger, type: .debug, String(socketStatus.connected), String(socketStatus.registered ?? false), socketStatus.status ?? "nil")
+                        // Only log if computed status changed to reduce log noise
+                        if computedStatusChanged {
+                            os_log("Socket status: connected=%{public}@, registered=%{public}@, status=%{public}@, computed status changed to %{public}@", log: self.logger, type: .debug, String(socketStatus.connected), String(socketStatus.registered ?? false), socketStatus.status ?? "nil", newStatus.displayText)
                         }
                     }
                 } catch {
