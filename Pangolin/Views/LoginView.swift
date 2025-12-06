@@ -162,11 +162,8 @@ struct LoginView: View {
             configureWindow(window)
         })
         .onAppear {
-            // Show app in dock when window appears
+            // Configure window without showing dock icon
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                guard NSApp.activationPolicy() != .regular else { return }
-                NSApp.setActivationPolicy(.regular)
-                
                 // Ensure window identifier is set and close duplicates
                 // Find this window by title first
                 if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }) {
@@ -249,11 +246,6 @@ struct LoginView: View {
             .buttonStyle(.plain)
             .onHover { hovering in
                 isCloudButtonHovered = hovering
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
             }
             
             Button(action: {
@@ -285,11 +277,6 @@ struct LoginView: View {
             .buttonStyle(.plain)
             .onHover { hovering in
                 isSelfHostedButtonHovered = hovering
-                if hovering {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
             }
         }
     }
@@ -526,17 +513,6 @@ struct LoginView: View {
         
         if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "main" }) {
             window.close()
-            
-            // Hide app from dock when window closes
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                let hasOtherWindows = NSApplication.shared.windows.contains { w in
-                    w.isVisible && (w.identifier?.rawValue == "main" || w.title == "Pangolin")
-                }
-                if !hasOtherWindows {
-                    guard NSApp.activationPolicy() != .accessory else { return }
-                    NSApp.setActivationPolicy(.accessory)
-                }
-            }
         }
     }
 }

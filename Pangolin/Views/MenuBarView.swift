@@ -226,12 +226,6 @@ struct MenuBarView: View {
     }
     
     private func openLoginWindow() {
-        // Show app in dock when opening window
-        DispatchQueue.main.async {
-            guard NSApp.activationPolicy() != .regular else { return }
-            NSApp.setActivationPolicy(.regular)
-        }
-        
         // Find existing window by identifier or title
         let existingWindow = NSApplication.shared.windows.first { window in
             window.identifier?.rawValue == "main" || window.title == "Pangolin"
