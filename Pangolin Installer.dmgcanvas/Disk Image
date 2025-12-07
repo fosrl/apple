@@ -3,17 +3,8 @@
     "appleID" : "numbat@fossorial.io",
     "autoopen" : true,
     "background" : {
-      "imageScaleOption" : 100,
       "layoutObjects" : [
-        {
-          "bounds" : "{{166, 265}, {268, 67}}",
-          "filePath" : "\/Users\/miloschwartz\/fossorial\/pangolin\/public\/logo\/word_mark_black.png",
-          "identifier" : "word_mark_black",
-          "image" : "tohmujuvdv",
-          "layoutObjectType" : "image",
-          "relativeFilePath" : "..\/pangolin\/public\/logo\/word_mark_black.png",
-          "uid" : "tohmujuvdv"
-        }
+
       ],
       "type" : 3
     },
@@ -27,7 +18,7 @@
     ],
     "nameFontSize" : 12,
     "statusBarVisible" : false,
-    "suggestedDiskImageName" : "Disk Image.dmg",
+    "suggestedDiskImageName" : "Pangolin_Installer_1.0.0.dmg",
     "teamID" : "4668XHFAHF",
     "toolbarVisible" : false,
     "uid" : "knbwdghzqp",
@@ -44,16 +35,16 @@
         "iconSize" : 100,
         "invisible" : false,
         "isAnAlias" : true,
-        "location" : "{420, 157}",
+        "location" : "{425, 180}",
         "relativeFilePath" : "..\/..\/..\/..\/Applications"
       },
       {
-        "filePath" : "\/Users\/miloschwartz\/Downloads\/Pangolin\/Pangolin.app",
+        "filePath" : "\/Users\/miloschwartz\/Downloads\/Pangolin.app",
         "iconSize" : 100,
         "invisible" : false,
         "isAnAlias" : false,
-        "location" : "{194, 157}",
-        "relativeFilePath" : "..\/..\/Downloads\/Pangolin\/Pangolin.app"
+        "location" : "{169, 180}",
+        "relativeFilePath" : "..\/..\/Downloads\/Pangolin.app"
       }
     ],
     "windowContentWidth" : 600,

@@ -30,7 +30,7 @@
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://pangolin.net/appcast.xml</string>
+	<string>https://static.pangolin.net/mac-client/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>it0RcWHf76QE8eC1HVDTy2nP3xi7NrcyZRaW7F7jQtE=</string>
 </dict>

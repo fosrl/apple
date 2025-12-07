@@ -485,7 +485,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
@@ -551,7 +551,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
@@ -605,7 +605,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
@@ -658,7 +658,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 1;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
