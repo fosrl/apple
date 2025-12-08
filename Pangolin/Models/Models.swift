@@ -205,6 +205,7 @@ struct SocketStatusResponse: Codable, Equatable {
 
 struct SocketPeer: Codable, Equatable {
     let siteId: Int?
+    let name: String?
     let connected: Bool?
     let rtt: Int64? // nanoseconds
     let lastSeen: String?

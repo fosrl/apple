@@ -18,7 +18,7 @@
     ],
     "nameFontSize" : 12,
     "statusBarVisible" : false,
-    "suggestedDiskImageName" : "Pangolin_Installer_1.0.0.dmg",
+    "suggestedDiskImageName" : "Fossorial - PIIA (Varun Narravula).dmg",
     "teamID" : "4668XHFAHF",
     "toolbarVisible" : false,
     "uid" : "knbwdghzqp",
@@ -43,7 +43,7 @@
         "iconSize" : 100,
         "invisible" : false,
         "isAnAlias" : false,
-        "location" : "{169, 180}",
+        "location" : "{176, 180}",
         "relativeFilePath" : "..\/..\/Downloads\/Pangolin.app"
       }
     ],
