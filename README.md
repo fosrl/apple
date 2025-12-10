@@ -1,4 +1,4 @@
-# [Pangolin](https://pangolin.net) for Apple Devices
+# [Pangolin](https://pangolin.net) Client for Apple Devices
 
 This is the official Pangolin client with GUI for Apple devices. 
 
@@ -11,7 +11,7 @@ This client can be used with both:
 
 ## Download & Install
 
-- Pangolin for macOS Installer - This is the official page to download the latest installer file for macOS.
+- [Pangolin for macOS Installer](https://pangolin.net/downloads/mac) - This is the official page to download the latest installer file for macOS.
 - [Older Versions](https://github.com/fosrl/apple/releases) - The releases section of this repository contains release notes and download artifacts for the latest version and all older versions.
 
 ## Compatibility
