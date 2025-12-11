@@ -125,7 +125,7 @@ struct MenuBarView: View {
                 .foregroundColor(.secondary)
             
             Button("How Pangolin Works") {
-                openURL("https://docs.pangolin.net/")
+                openURL("https://docs.pangolin.net/about/how-pangolin-works")
             }
             
             Button("Documentation") {
