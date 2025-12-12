@@ -75,7 +75,7 @@ struct User: Codable {
     let emailVerified: Bool?
     let serverAdmin: Bool?
     let idpName: String?
-    let idpId: String?
+    let idpId: Int?
 }
 
 // MARK: - Organizations
