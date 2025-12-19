@@ -230,6 +230,7 @@ public class TunnelAdapter {
               let orgId = options["orgId"] as? String,
               let upstreamDNS = options["upstreamDNS"] as? [String],
               let overrideDNS = (options["overrideDNS"] as? NSNumber)?.boolValue,
+              let tunnelDNS = (options["tunnelDNS"] as? NSNumber)?.boolValue,
               let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue else {
             let error = NSError(domain: "TunnelAdapter", code: -1, userInfo: [NSLocalizedDescriptionKey: "Required tunnel configuration options are missing"])
             os_log("Required tunnel configuration options are missing", log: logger, type: .error)
@@ -250,7 +251,8 @@ public class TunnelAdapter {
             "userToken": userToken,
             "orgId": orgId,
             "upstreamDNS": upstreamDNS,
-            "overrideDNS": overrideDNS
+            "overrideDNS": overrideDNS,
+           	"tunnelDNS": tunnelDNS 
         ]
         
         // Convert config to JSON string
