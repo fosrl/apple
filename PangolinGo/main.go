@@ -38,6 +38,7 @@ type StartTunnelConfig struct {
 	OrgID               string   `json:"orgId"`
 	UpstreamDNS         []string `json:"upstreamDNS"`
 	OverrideDNS         bool     `json:"overrideDNS"`
+	TunnelDNS           bool     `json:"tunnelDNS"`
 }
 
 var (
@@ -117,6 +118,7 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		FileDescriptorTun:    uint32(fd),
 		UserToken:            config.UserToken,
 		OverrideDNS:          config.OverrideDNS,
+		TunnelDNS:            config.TunnelDNS,
 		UpstreamDNS:          config.UpstreamDNS,
 		OrgID:                config.OrgID,
 	}

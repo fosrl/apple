@@ -17,6 +17,7 @@ struct Config: Codable {
     var username: String?
     var name: String?
     var dnsOverrideEnabled: Bool?
+    var dnsTunnelEnabled: Bool?
     var primaryDNSServer: String?
     var secondaryDNSServer: String?
 }

@@ -18,6 +18,10 @@ struct PreferencesContentView: View {
         configManager.getDNSOverrideEnabled()
     }
     
+    private var dnsTunnelEnabled: Bool {
+		configManager.getDNSTunnelEnabled()
+	}
+    
     private var primaryDNSServer: String {
         configManager.getPrimaryDNSServer()
     }
@@ -53,6 +57,25 @@ struct PreferencesContentView: View {
                             .toggleStyle(.switch)
                             .labelsHidden()
                         }
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("DNS Tunnel")
+                                    .font(.system(size: 13))
+                                Text("When enabled, DNS queries are sent through the tunnel to a resource. A private resource must be created for the address for it to work and resolve to the correct site.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { dnsTunnelEnabled },
+                                set: { newValue in
+                                    _ = configManager.setDNSTunnelEnabled(newValue)
+                                }
+                            ))
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        } 
                         
                         HStack {
                             Text("Primary Upstream DNS Server")

@@ -47,6 +47,7 @@ class ConfigManager: ObservableObject {
         // Ensure DNS override has default value if not set
         if updatedConfig.dnsOverrideEnabled == nil {
             updatedConfig.dnsOverrideEnabled = true
+            updatedConfig.dnsTunnelEnabled = false
             needsSave = true
         }
         
@@ -120,6 +121,10 @@ class ConfigManager: ObservableObject {
         return config?.dnsOverrideEnabled ?? true
     }
     
+    func getDNSTunnelEnabled() -> Bool {
+        return config?.dnsTunnelEnabled ?? false
+    }
+    
     func getPrimaryDNSServer() -> String {
         // Config should always have a value after ensureDNSDefaults, but return default as fallback
         return config?.primaryDNSServer ?? defaultPrimaryDNS
@@ -140,6 +145,12 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
     
+	func setDNSTunnelEnabled(_ enabled: Bool) -> Bool {
+        var updatedConfig = config ?? Config()
+        updatedConfig.dnsTunnelEnabled = enabled
+        return save(updatedConfig)
+    } 
+    
     func setPrimaryDNSServer(_ server: String) -> Bool {
         var updatedConfig = config ?? Config()
         updatedConfig.primaryDNSServer = server.isEmpty ? nil : server
@@ -155,6 +166,7 @@ class ConfigManager: ObservableObject {
     func setDNSSettings(overrideEnabled: Bool, primary: String, secondary: String) -> Bool {
         var updatedConfig = config ?? Config()
         updatedConfig.dnsOverrideEnabled = overrideEnabled
+        updatedConfig.dnsTunnelEnabled = overrideEnabled
         updatedConfig.primaryDNSServer = primary.isEmpty ? nil : primary
         updatedConfig.secondaryDNSServer = secondary.isEmpty ? nil : secondary
         return save(updatedConfig)

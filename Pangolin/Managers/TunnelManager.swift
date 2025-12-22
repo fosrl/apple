@@ -398,6 +398,9 @@ class TunnelManager: NSObject, ObservableObject {
         let dnsOverrideEnabled = configManager.getDNSOverrideEnabled()
         tunnelOptions["overrideDNS"] = NSNumber(value: dnsOverrideEnabled)
         
+        let dnsTunnelEnabled = configManager.getDNSTunnelEnabled()
+		tunnelOptions["tunnelDNS"] = NSNumber(value: dnsTunnelEnabled)
+        
         // Build upstream DNS servers array with :53 appended
         var upstreamDNSServers: [String] = []
         let primaryDNS = configManager.getPrimaryDNSServer()
