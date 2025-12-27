@@ -22,6 +22,27 @@ struct Config: Codable {
     var secondaryDNSServer: String?
 }
 
+// MARK: - Account Types
+
+struct Account: Identifiable, Codable, Hashable {
+    var id: String { userId }
+
+    let userId: String
+    let hostname: String
+    let email: String
+    let orgId: String
+}
+
+struct AccountStore: Codable {
+    var activeUserId: String
+    var accounts: [String: Account]
+
+    init(activeUserId: String = "", accounts: [String: Account] = [:]) {
+        self.accounts = accounts
+        self.activeUserId = activeUserId
+    }
+}
+
 // MARK: - API Response Types
 
 struct APIResponse<T: Codable>: Codable {
