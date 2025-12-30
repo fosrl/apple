@@ -31,55 +31,105 @@ struct AboutContentView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                Spacer()
-                    .frame(height: 40)
-                
-                // App icon and name
+        VStack(spacing: 0) {
+            ScrollView {
+                // App icon and name header
                 VStack(spacing: 12) {
                     if let icon = appIcon {
                         Image(nsImage: icon)
                             .resizable()
-                            .frame(width: 128, height: 128)
-                            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+                            .frame(width: 64, height: 64)
+                            .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
                     }
                     
                     Text(appName)
-                        .font(.system(size: 28, weight: .light))
+                        .font(.system(size: 22, weight: .medium))
                     
                     Text("Version \(appVersion) (\(buildNumber))")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.bottom, 40)
+                .padding(.top, 20)
+                .padding(.bottom, 16)
                 
-                // Copyright
-                Text(copyright)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 30)
-                
-                // Links section
-                VStack(spacing: 8) {
-                    Link("Documentation", destination: URL(string: "https://docs.pangolin.net/")!)
-                        .font(.system(size: 13))
+                Form {
+                    Section {
+                        HStack {
+                            Text("Version")
+                                .font(.system(size: 13))
+                            Spacer()
+                            Text("\(appVersion) (\(buildNumber))")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Text("Copyright")
+                                .font(.system(size: 13))
+                            Spacer()
+                            Text(copyright)
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                    } header: {
+                        Text("Application")
+                    }
                     
-                    Link("How Pangolin Works", destination: URL(string: "https://docs.pangolin.net/about/how-pangolin-works")!)
-                        .font(.system(size: 13))
+                    Section {
+                        Link(destination: URL(string: "https://docs.pangolin.net/")!) {
+                            HStack {
+                                Text("Documentation")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Link(destination: URL(string: "https://docs.pangolin.net/about/how-pangolin-works")!) {
+                            HStack {
+                                Text("How Pangolin Works")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("Resources")
+                    }
                     
-                    Divider()
-                        .padding(.vertical, 8)
-                    
-                    Link("Terms of Service", destination: URL(string: "https://pangolin.net/terms-of-service.html")!)
-                        .font(.system(size: 13))
-                    
-                    Link("Privacy Policy", destination: URL(string: "https://pangolin.net/privacy-policy.html")!)
-                        .font(.system(size: 13))
+                    Section {
+                        Link(destination: URL(string: "https://pangolin.net/terms-of-service.html")!) {
+                            HStack {
+                                Text("Terms of Service")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Link(destination: URL(string: "https://pangolin.net/privacy-policy.html")!) {
+                            HStack {
+                                Text("Privacy Policy")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("Legal")
+                    }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 40)
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

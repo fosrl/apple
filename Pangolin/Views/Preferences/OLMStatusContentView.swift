@@ -113,7 +113,7 @@ struct OLMStatusContentView: View {
                             Text("Agent")
                                 .font(.system(size: 13))
                             Spacer()
-                            Text("Pangolin")
+                            Text(status.agent ?? "Unknown")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }

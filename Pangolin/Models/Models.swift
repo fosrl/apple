@@ -198,6 +198,7 @@ struct SocketStatusResponse: Codable, Equatable {
     let terminated: Bool
     let tunnelIP: String?
     let version: String?
+    let agent: String?
     let peers: [String: SocketPeer]?
     let registered: Bool?
     let orgId: String?
