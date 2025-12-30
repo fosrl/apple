@@ -32,6 +32,9 @@ struct PreferencesWindow: View {
         .onAppear {
             handleWindowAppear()
         }
+        .onChange(of: selectedSection) { _ in
+            updateWindowTitle()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             if let window = notification.object as? NSWindow, window.identifier?.rawValue == "preferences" {
                 configureWindow(window)
@@ -105,8 +108,17 @@ struct PreferencesWindow: View {
             closeButton.isHidden = false
         }
         
+        // Update window title based on current section
+        updateWindowTitle()
+        
         // Hide menu bar items when preferences window is key
         hideMenuBarItems()
+    }
+    
+    private func updateWindowTitle() {
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
+            window.title = selectedSection.rawValue
+        }
     }
     
     private func hideMenuBarItems() {
