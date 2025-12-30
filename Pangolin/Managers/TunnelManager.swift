@@ -15,7 +15,6 @@ class TunnelManager: NSObject, ObservableObject {
     @Published var isNEConnected = false
     @Published var status: TunnelStatus = .disconnected
     @Published var isRegistering = false
-    @Published var socketStatus: SocketStatusResponse? = nil
     
     private var tunnelManager: NETunnelProviderManager?
     private let bundleIdentifier = "net.pangolin.Pangolin.PacketTunnel"
@@ -31,6 +30,9 @@ class TunnelManager: NSObject, ObservableObject {
     private let authManager: AuthManager
     private let socketManager: SocketManager
     
+    // Separate manager for OLM status to avoid menu bar re-renders
+    let olmStatusManager: OLMStatusManager
+    
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
         return OSLog(subsystem: subsystem, category: "TunnelManager")
@@ -41,11 +43,16 @@ class TunnelManager: NSObject, ObservableObject {
     private let socketPollInterval: TimeInterval = 2.0 // Poll every 2 seconds
     private var isPollingSocket = false
     
+    // Cache last known values to avoid unnecessary updates
+    private nonisolated(unsafe) var lastTunnelStatus: TunnelStatus?
+    private nonisolated(unsafe) var lastIsNEConnected: Bool = false
+    
     init(configManager: ConfigManager, secretManager: SecretManager, authManager: AuthManager) {
         self.configManager = configManager
         self.secretManager = secretManager
         self.authManager = authManager
         self.socketManager = SocketManager()
+        self.olmStatusManager = OLMStatusManager(socketManager: SocketManager())
         super.init()
         
         // Observe VPN status changes
@@ -490,78 +497,53 @@ class TunnelManager: NSObject, ObservableObject {
                         break
                     }
                     
-                    await MainActor.run {
-                        // Check if socket status object has actually changed
-                        let socketStatusChanged = self.socketStatus != socketStatus
-                        
-                        // Determine the new tunnel status based on socket response
-                        let newStatus: TunnelStatus
-                        if socketStatus.connected {
-                            newStatus = .connected
-                        } else if socketStatus.registered == true {
-                            // Registered but not connected yet
-                            newStatus = .registering
-                        } else {
-                            // Not registered yet
-                            newStatus = .registering
+                    // Determine the new tunnel status based on socket response
+                    let newStatus: TunnelStatus
+                    if socketStatus.connected {
+                        newStatus = .connected
+                    } else if socketStatus.registered == true {
+                        newStatus = .registering
+                    } else {
+                        newStatus = .registering
+                    }
+                    
+                    // Only update if status actually changed
+                    let statusChanged = lastTunnelStatus != newStatus
+                    let needsNEUpdate = !lastIsNEConnected
+                    
+                    if statusChanged || needsNEUpdate {
+                        lastTunnelStatus = newStatus
+                        if needsNEUpdate {
+                            lastIsNEConnected = true
                         }
                         
-                        // Check if the computed status (what menu bar cares about) has changed
-                        let computedStatusChanged = self.status != newStatus
-                        
-                        // Always update socketStatus for OLMStatusContentView to show full updated status
-                        // Only update if it actually changed to minimize unnecessary rerenders
-                        if socketStatusChanged {
-                            self.socketStatus = socketStatus
-                        }
-                        
-                        // Only update status if the computed status changed
-                        if computedStatusChanged {
-                            self.status = newStatus
-                        }
-                        
-                        // Keep isNEConnected = true if VPN extension is still connected
-                        // This ensures the disconnect button is always available when VPN is up
-                        if let manager = self.tunnelManager,
-                           manager.connection.status == .connected {
-                            // Only update if it's changing
-                            if !self.isNEConnected {
+                        await MainActor.run {
+                            if statusChanged {
+                                self.status = newStatus
+                                os_log("Tunnel status changed to: %{public}@", log: self.logger, type: .debug, newStatus.displayText)
+                            }
+                            
+                            if needsNEUpdate {
                                 self.isNEConnected = true
                             }
-                        }
-                        
-                        // Only log if computed status changed to reduce log noise
-                        if computedStatusChanged {
-                            os_log("Socket status: connected=%{public}@, registered=%{public}@, status=%{public}@, computed status changed to %{public}@", log: self.logger, type: .debug, String(socketStatus.connected), String(socketStatus.registered ?? false), socketStatus.status ?? "nil", newStatus.displayText)
                         }
                     }
                 } catch {
-                    // Socket not available or error - check if VPN is still connected
-                    // If VPN is disconnected, polling will be stopped by updateConnectionStatus
-                    await MainActor.run {
-                        // Only update if socket status is changing (from non-nil to nil)
-                        let hadStatus = self.socketStatus != nil
+                    // Socket not available - only update if status needs to change
+                    let statusNeedsUpdate = lastTunnelStatus != .registering
+                    
+                    if statusNeedsUpdate {
+                        lastTunnelStatus = .registering
                         
-                        // Only update if VPN is still connected (socket might be temporarily unavailable)
-                        if let manager = self.tunnelManager,
-                           manager.connection.status == .connected {
-                            // VPN is connected but socket not responding - might be starting up
-                            let newStatus: TunnelStatus = .registering
-                            
-                            // Only update if values are actually changing
-                            if hadStatus {
-                                self.socketStatus = nil
+                        await MainActor.run {
+                            // Check if VPN is still connected
+                            if let manager = self.tunnelManager,
+                               manager.connection.status == .connected {
+                                self.status = .registering
+                                if !self.isNEConnected {
+                                    self.isNEConnected = true
+                                }
                             }
-                            if self.status != newStatus {
-                                self.status = newStatus
-                            }
-                            // Keep isNEConnected = true so user can still disconnect
-                            if !self.isNEConnected {
-                                self.isNEConnected = true
-                            }
-                        } else if hadStatus {
-                            // VPN disconnected, clear socket status if it was set
-                            self.socketStatus = nil
                         }
                     }
                 }
@@ -577,8 +559,9 @@ class TunnelManager: NSObject, ObservableObject {
         socketPollingTask?.cancel()
         socketPollingTask = nil
         
-        // Clear socket status when polling stops
-        socketStatus = nil
+        // Clear cached values
+        lastTunnelStatus = nil
+        lastIsNEConnected = false
     }
 }
 

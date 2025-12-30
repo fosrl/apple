@@ -171,7 +171,7 @@ struct PreferencesDetailView: View {
             case .preferences:
                 PreferencesContentView(configManager: configManager)
             case .olmStatus:
-                OLMStatusContentView(tunnelManager: tunnelManager)
+                OLMStatusContentView(olmStatusManager: tunnelManager.olmStatusManager)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

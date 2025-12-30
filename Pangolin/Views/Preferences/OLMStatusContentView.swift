@@ -9,11 +9,11 @@ import SwiftUI
 import AppKit
 
 struct OLMStatusContentView: View {
-    @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var olmStatusManager: OLMStatusManager
     
     // Computed property to format socket status as JSON
     private var statusJSON: String? {
-        guard let socketStatus = tunnelManager.socketStatus else {
+        guard let socketStatus = olmStatusManager.socketStatus else {
             return nil
         }
         
@@ -44,6 +44,14 @@ struct OLMStatusContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            // Start separate polling for live updates when view appears
+            olmStatusManager.startPolling()
+        }
+        .onDisappear {
+            // Stop polling when view disappears to avoid unnecessary work
+            olmStatusManager.stopPolling()
+        }
     }
 }
 
