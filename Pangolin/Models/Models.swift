@@ -10,12 +10,6 @@ import Foundation
 // MARK: - Configuration
 
 struct Config: Codable {
-    var hostname: String?
-    var userId: String?
-    var email: String?
-    var orgId: String?
-    var username: String?
-    var name: String?
     var dnsOverrideEnabled: Bool?
     var dnsTunnelEnabled: Bool?
     var primaryDNSServer: String?
@@ -30,7 +24,7 @@ struct Account: Identifiable, Codable, Hashable {
     let userId: String
     let hostname: String
     let email: String
-    let orgId: String
+    var orgId: String
 }
 
 struct AccountStore: Codable {
@@ -205,7 +199,7 @@ enum TunnelStatus: String, CaseIterable {
     case disconnecting = "Disconnecting..."
     case invalid = "Invalid"
     case error = "Error"
-    
+
     var displayText: String {
         return self.rawValue
     }
@@ -229,7 +223,7 @@ struct SocketPeer: Codable, Equatable {
     let siteId: Int?
     let name: String?
     let connected: Bool?
-    let rtt: Int64? // nanoseconds
+    let rtt: Int64?  // nanoseconds
     let lastSeen: String?
     let endpoint: String?
     let isRelay: Bool?
@@ -247,7 +241,7 @@ struct NetworkSettings: Codable, Equatable {
     let ipv6NetworkPrefixes: [String]?
     let ipv6IncludedRoutes: [IPv6Route]?
     let ipv6ExcludedRoutes: [IPv6Route]?
-    
+
     enum CodingKeys: String, CodingKey {
         case tunnelRemoteAddress = "tunnel_remote_address"
         case mtu
@@ -268,7 +262,7 @@ struct IPv4Route: Codable, Equatable {
     let subnetMask: String?
     let gatewayAddress: String?
     let isDefault: Bool?
-    
+
     enum CodingKeys: String, CodingKey {
         case destinationAddress = "destination_address"
         case subnetMask = "subnet_mask"
@@ -282,7 +276,7 @@ struct IPv6Route: Codable, Equatable {
     let networkPrefixLength: Int?
     let gatewayAddress: String?
     let isDefault: Bool?
-    
+
     enum CodingKeys: String, CodingKey {
         case destinationAddress = "destination_address"
         case networkPrefixLength = "network_prefix_length"
@@ -302,4 +296,3 @@ struct SocketSwitchOrgRequest: Codable {
 struct SocketSwitchOrgResponse: Codable {
     let status: String
 }
-

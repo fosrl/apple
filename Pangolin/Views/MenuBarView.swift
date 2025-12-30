@@ -11,6 +11,7 @@ import Sparkle
 
 struct MenuBarView: View {
     @ObservedObject var configManager: ConfigManager
+    @ObservedObject var accountManager: AccountManager
     @ObservedObject var apiClient: APIClient
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
@@ -20,8 +21,16 @@ struct MenuBarView: View {
     @State private var menuOpenCount = 0
     @State private var isLoggedOut = false
     
-    init(configManager: ConfigManager, apiClient: APIClient, authManager: AuthManager, tunnelManager: TunnelManager, updater: SPUUpdater) {
+    init(
+        configManager: ConfigManager, 
+        accountManager: AccountManager, 
+        apiClient: APIClient, 
+        authManager: AuthManager, 
+        tunnelManager: TunnelManager, 
+        updater: SPUUpdater,
+    ) {
         self.configManager = configManager
+        self.accountManager = accountManager
         self.apiClient = apiClient
         self.authManager = authManager
         self.tunnelManager = tunnelManager
@@ -49,21 +58,12 @@ struct MenuBarView: View {
             }
             
             // Check if user has previously logged in (has saved email)
-            let hasSavedUserInfo = configManager.config?.email != nil
+            let hasSavedUserInfo = accountManager.activeAccount != nil
             
             // Email text (when authenticated or has saved user info)
             if authManager.isAuthenticated || hasSavedUserInfo {
                 Group {
-                    if authManager.isAuthenticated {
-                        if let email = authManager.currentUser?.email {
-                            Text(isLoggedOut ? "\(email) (Logged out)" : email)
-                        } else if let savedEmail = configManager.config?.email {
-                            Text("\(savedEmail) (Logged out)")
-                        }
-                    } else if let savedEmail = configManager.config?.email {
-                        // Not authenticated but has saved email - show logged out state
-                        Text("\(savedEmail) (Logged out)")
-                    }
+                    Text(accountManager.activeAccount?.email ?? "(Logged Out)")
                 }
                 .id(menuOpenCount) // Force view recreation to trigger task
                 .task {
