@@ -21,6 +21,14 @@ class AccountManager: ObservableObject {
         return store.accounts[store.activeUserId]
     }
 
+    var accounts: [String: Account] {
+        return store.accounts
+    }
+
+    var activeUserId: String {
+        store.activeUserId
+    }
+
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
         return OSLog(subsystem: subsystem, category: "AccountManager")

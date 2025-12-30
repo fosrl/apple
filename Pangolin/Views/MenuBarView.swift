@@ -5,9 +5,9 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
-import SwiftUI
 import AppKit
 import Sparkle
+import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var configManager: ConfigManager
@@ -20,13 +20,13 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var menuOpenCount = 0
     @State private var isLoggedOut = false
-    
+
     init(
-        configManager: ConfigManager, 
-        accountManager: AccountManager, 
-        apiClient: APIClient, 
-        authManager: AuthManager, 
-        tunnelManager: TunnelManager, 
+        configManager: ConfigManager,
+        accountManager: AccountManager,
+        apiClient: APIClient,
+        authManager: AuthManager,
+        tunnelManager: TunnelManager,
         updater: SPUUpdater,
     ) {
         self.configManager = configManager
@@ -37,7 +37,7 @@ struct MenuBarView: View {
         self.updater = updater
         self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
     }
-    
+
     var body: some View {
         Group {
             // Show loading state during initialization
@@ -49,138 +49,112 @@ struct MenuBarView: View {
                         .foregroundColor(.secondary)
                 }
             } else {
-            // Connect toggle (when authenticated and not logged out)
-            if authManager.isAuthenticated && !isLoggedOut {
-                Text(tunnelManager.status.displayText)
-                    .foregroundColor(.secondary)
-                
-                UserEmailMenuItem(tunnelManager: tunnelManager)
-            }
-            
-            // Check if user has previously logged in (has saved email)
-            let hasSavedUserInfo = accountManager.activeAccount != nil
-            
-            // Email text (when authenticated or has saved user info)
-            if authManager.isAuthenticated || hasSavedUserInfo {
-                Group {
-                    Text(accountManager.activeAccount?.email ?? "(Logged Out)")
-                }
-                .id(menuOpenCount) // Force view recreation to trigger task
-                .task {
-                    // Handle menu open logic when menu opens (only if authenticated)
-                    if authManager.isAuthenticated {
-                        await handleMenuOpen()
+                if authManager.isAuthenticated && !isLoggedOut {
+                    if accountManager.activeAccount != nil {
+                        Text(tunnelManager.status.displayText)
+                            .foregroundColor(.secondary)
+
+                        // Connect toggle (when authenticated and not logged out)
+                        ConnectButtonItem(tunnelManager: tunnelManager)
+
+                        Divider()
                     }
                 }
-            }
-            
-            // Organization selector (when authenticated, has orgs, and not logged out)
-            if authManager.isAuthenticated && !authManager.organizations.isEmpty && !isLoggedOut {
-                OrganizationsMenu(authManager: authManager, tunnelManager: tunnelManager)
-                
-                Divider()
-            }
-            
-            // Login button
-            if authManager.isAuthenticated {
-                Button(isLoggedOut ? "Log back in" : "Log in to different account") {
-                    if !isLoggedOut {
-                        Task {
-                            openLoginWindow()
+
+                if accountManager.accounts.count > 0 {
+                    AccountsMenu(
+                        authManager: authManager,
+                        accountManager: accountManager,
+                        tunnelManager: tunnelManager,
+                        openLoginWindow: openLoginWindow
+                    )
+                    .id(menuOpenCount)  // Force view recreation to trigger task
+                    .task {
+                        // Handle menu open logic when menu opens (only if authenticated)
+                        if authManager.isAuthenticated {
+                            await handleMenuOpen()
                         }
-                    } else {
-                        // Log back in - just open login window
+                    }
+                } else {
+                    Button("Login") {
                         openLoginWindow()
                     }
                 }
-            } else if hasSavedUserInfo {
-                // Has saved user info but not authenticated - show "Log back in"
-                Button("Log back in") {
-                    openLoginWindow()
+
+                if authManager.isAuthenticated && !isLoggedOut {
+                    OrganizationsMenu(authManager: authManager, tunnelManager: tunnelManager)
                 }
-            } else {
-                // Never logged in before - show "Login to account"
-                Button("Log in to account") {
-                    openLoginWindow()
+
+            }
+
+            Divider()
+
+            // More submenu
+            Menu("More") {
+                // Support section
+                Text("Support")
+                    .foregroundColor(.secondary)
+
+                Button("How Pangolin Works") {
+                    openURL("https://docs.pangolin.net/about/how-pangolin-works")
+                }
+
+                Button("Documentation") {
+                    openURL("https://docs.pangolin.net/")
+                }
+
+                Divider()
+
+                // Copyright
+                Text("© \(String(Calendar.current.component(.year, from: Date()))) Fossorial, Inc.")
+                    .foregroundColor(.secondary)
+
+                Button("Terms of Service") {
+                    openURL("https://pangolin.net/terms-of-service.html")
+                }
+
+                Button("Privacy Policy") {
+                    openURL("https://pangolin.net/privacy-policy.html")
+                }
+
+                Divider()
+
+                // Version information
+                Text(
+                    "Version: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")"
+                )
+                .foregroundColor(.secondary)
+
+                Button("Check for Updates", action: updater.checkForUpdates)
+                    .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
+
+                Button("Preferences") {
+                    openPreferencesWindow()
                 }
             }
-        }
-        
-        Divider()
-        
-        // More submenu
-        Menu("More") {
-            if !authManager.isInitializing && authManager.isAuthenticated && !isLoggedOut {
-                Button("Logout") {
-                    Task {
-                        await authManager.logout()
+
+            Divider()
+
+            // Quit
+            Button("Quit") {
+                Task {
+                    // Disconnect tunnel before quitting
+                    await tunnelManager.disconnect()
+                    // Small delay to ensure disconnect completes
+                    try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5 seconds
+                    await MainActor.run {
+                        NSApplication.shared.terminate(nil)
                     }
                 }
             }
-            
-            Divider()
-            
-            // Support section
-            Text("Support")
-                .foregroundColor(.secondary)
-            
-            Button("How Pangolin Works") {
-                openURL("https://docs.pangolin.net/about/how-pangolin-works")
-            }
-            
-            Button("Documentation") {
-                openURL("https://docs.pangolin.net/")
-            }
-            
-            Divider()
-            
-            // Copyright
-            Text("© \(String(Calendar.current.component(.year, from: Date()))) Fossorial, Inc.")
-                .foregroundColor(.secondary)
-            
-            Button("Terms of Service") {
-                openURL("https://pangolin.net/terms-of-service.html")
-            }
-            
-            Button("Privacy Policy") {
-                openURL("https://pangolin.net/privacy-policy.html")
-            }
-
-            Divider()
-
-            // Version information
-            Text("Version: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")")
-                .foregroundColor(.secondary)
-            
-            Button("Check for Updates", action: updater.checkForUpdates)
-                .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
-            
-            Button("Preferences") {
-                openPreferencesWindow()
-            }
-        }
-        
-        Divider()
-        
-        // Quit
-        Button("Quit") {
-            Task {
-                // Disconnect tunnel before quitting
-                await tunnelManager.disconnect()
-                // Small delay to ensure disconnect completes
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                await MainActor.run {
-                    NSApplication.shared.terminate(nil)
-                }
-            }
-        }
-        .keyboardShortcut("q")
+            .keyboardShortcut("q")
         }
         .onAppear {
             // Increment counter to force view recreation and trigger task
             menuOpenCount += 1
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) {
+            _ in
             // Also handle menu open logic when menu begins tracking (menu is opening)
             if authManager.isAuthenticated {
                 Task {
@@ -195,7 +169,7 @@ struct MenuBarView: View {
             }
         }
     }
-    
+
     private func handleMenuOpen() async {
         // First, try to get the user to verify session is still valid
         do {
@@ -213,24 +187,24 @@ struct MenuBarView: View {
                 isLoggedOut = true
             }
         }
-        
+
         // Refresh organizations in background
         if authManager.isAuthenticated {
             await authManager.refreshOrganizations()
         }
     }
-    
+
     private func openURL(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
         NSWorkspace.shared.open(url)
     }
-    
+
     private func openLoginWindow() {
         // Find existing window by identifier or title
         let existingWindow = NSApplication.shared.windows.first { window in
             window.identifier?.rawValue == "main" || window.title == "Pangolin"
         }
-        
+
         if let window = existingWindow {
             // Window exists - close any duplicates first
             let allMainWindows = NSApplication.shared.windows.filter { w in
@@ -239,16 +213,16 @@ struct MenuBarView: View {
             for duplicateWindow in allMainWindows {
                 duplicateWindow.close()
             }
-            
+
             // Configure window
             var styleMask = window.styleMask
             styleMask.remove([.miniaturizable, .resizable])
             styleMask.insert([.titled, .closable])
             window.styleMask = styleMask
-            
+
             // Make window float on top of all other windows
             window.level = .floating
-            
+
             // Hide minimize and zoom buttons, keep only close button
             if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
                 minimizeButton.isHidden = true
@@ -259,12 +233,12 @@ struct MenuBarView: View {
             if let closeButton = window.standardWindowButton(.closeButton) {
                 closeButton.isHidden = false
             }
-            
+
             // Bring existing window to front
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
-            
+
             // Ensure identifier is set
             if window.identifier?.rawValue != "main" {
                 window.identifier = NSUserInterfaceItemIdentifier("main")
@@ -273,12 +247,12 @@ struct MenuBarView: View {
             // No window exists - open a new one
             openWindow(id: "main")
             NSApp.activate(ignoringOtherApps: true)
-            
+
             // Bring the newly created window to front after it's created
             // Use a small delay to ensure the window is created, but check for existence first
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if let window = NSApplication.shared.windows.first(where: { 
-                    $0.identifier?.rawValue == "main" || $0.title == "Pangolin" 
+                if let window = NSApplication.shared.windows.first(where: {
+                    $0.identifier?.rawValue == "main" || $0.title == "Pangolin"
                 }) {
                     // Make window float on top of all other windows
                     window.level = .floating
@@ -289,19 +263,19 @@ struct MenuBarView: View {
             }
         }
     }
-    
+
     private func openPreferencesWindow() {
         // Show app in dock when opening window
         DispatchQueue.main.async {
             guard NSApp.activationPolicy() != .regular else { return }
             NSApp.setActivationPolicy(.regular)
         }
-        
+
         // Find existing preferences window by identifier
         let existingWindow = NSApplication.shared.windows.first { window in
             window.identifier?.rawValue == "preferences"
         }
-        
+
         if let window = existingWindow {
             // Window exists - close any duplicates first
             let allPreferencesWindows = NSApplication.shared.windows.filter { w in
@@ -310,7 +284,7 @@ struct MenuBarView: View {
             for duplicateWindow in allPreferencesWindows {
                 duplicateWindow.close()
             }
-            
+
             // Bring existing window to front
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
@@ -319,10 +293,10 @@ struct MenuBarView: View {
             // No window exists - open a new one
             openWindow(id: "preferences")
             NSApp.activate(ignoringOtherApps: true)
-            
+
             // Bring the newly created window to front after it's created
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if let window = NSApplication.shared.windows.first(where: { 
+                if let window = NSApplication.shared.windows.first(where: {
                     $0.identifier?.rawValue == "preferences"
                 }) {
                     window.makeKeyAndOrderFront(nil)
@@ -337,22 +311,22 @@ struct MenuBarView: View {
 struct OrganizationsMenu: View {
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
-    
+
     private var organizations: [Organization] {
         authManager.organizations
     }
-    
+
     private var currentOrgId: String? {
         authManager.currentOrg?.orgId
     }
-    
+
     private var menuTitle: String {
         if let currentOrg = authManager.currentOrg {
             return currentOrg.name
         }
         return "Organizations"
     }
-    
+
     private var shouldDisableOrgButtons: Bool {
         switch tunnelManager.status {
         case .connecting, .registering, .reconnecting, .disconnecting:
@@ -361,15 +335,17 @@ struct OrganizationsMenu: View {
             return false
         }
     }
-    
+
     var body: some View {
         Menu {
             // Show organization count
-            Text(organizations.count == 1 ? "1 Organization" : "\(organizations.count) Organizations")
-                .foregroundColor(.secondary)
-            
+            Text(
+                organizations.count == 1 ? "1 Organization" : "\(organizations.count) Organizations"
+            )
+            .foregroundColor(.secondary)
+
             Divider()
-            
+
             ForEach(organizations, id: \.orgId) { org in
                 Button {
                     Task {
@@ -392,9 +368,104 @@ struct OrganizationsMenu: View {
     }
 }
 
-struct UserEmailMenuItem: View {
+struct AccountsMenu: View {
+    @ObservedObject var authManager: AuthManager
+    @ObservedObject var accountManager: AccountManager
     @ObservedObject var tunnelManager: TunnelManager
-    
+
+    let openLoginWindow: () -> Void
+
+    private var accounts: [Account] {
+        return Array(accountManager.accounts.values)
+    }
+
+    private var emailCounts: [String: Int] {
+        Dictionary(grouping: accounts, by: { $0.email }).mapValues { $0.count }
+    }
+
+    private var currentAccountUserId: String? {
+        accountManager.activeAccount?.userId
+    }
+
+    private var menuTitle: String {
+        if let activeAccount = accountManager.activeAccount {
+            return formatEmailHostname(account: activeAccount)
+        }
+
+        return "Select Account"
+    }
+
+    private var shouldDisableAccountButton: Bool {
+        switch tunnelManager.status {
+        case .connecting, .registering, .reconnecting, .disconnecting:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func formatEmailHostname(account: Account) -> String {
+        let count = emailCounts[account.email, default: 0]
+
+        let text =
+            count > 1
+            ? "\(account.email) (\(account.hostname))"
+            : account.email
+
+        return text
+    }
+
+    var body: some View {
+        Menu {
+            Text(
+                "Available Accounts"
+            )
+            .foregroundColor(.secondary)
+
+            Divider()
+
+            ForEach(accounts, id: \.userId) { account in
+                let accountLabelText = formatEmailHostname(account: account)
+
+                Button {
+                    Task {
+                        // TODO: switch account impl here
+                        await authManager.switchAccount(userId: account.userId)
+                    }
+                } label: {
+                    HStack {
+                        Text(accountLabelText)
+                        if currentAccountUserId == account.userId {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .disabled(shouldDisableAccountButton)
+            }
+
+            Divider()
+
+            Button("Add Account") {
+                openLoginWindow()
+            }
+
+            if accountManager.activeAccount != nil {
+                Button("Logout") {
+                    Task {
+                        await authManager.logout()
+                    }
+                }
+            }
+        } label: {
+            Text(menuTitle)
+        }
+    }
+}
+
+struct ConnectButtonItem: View {
+    @ObservedObject var tunnelManager: TunnelManager
+
     var body: some View {
         Button(tunnelManager.isNEConnected ? "Disconnect" : "Connect") {
             Task {
@@ -404,8 +475,7 @@ struct UserEmailMenuItem: View {
                     await tunnelManager.disconnect()
                 }
             }
-        }   
+        }
         .disabled(tunnelManager.isRegistering)
     }
 }
-

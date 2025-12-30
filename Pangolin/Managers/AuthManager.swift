@@ -274,7 +274,9 @@ class AuthManager: ObservableObject {
                     currentOrg = selected
                     return selected.orgId
                 }
-            } else if !organizations.isEmpty {
+            }
+
+            if !organizations.isEmpty {
                 let autoSelectedOrg = organizations[0]
                 currentOrg = autoSelectedOrg
                 return autoSelectedOrg.orgId
@@ -322,6 +324,71 @@ class AuthManager: ObservableObject {
                 "Failed to refresh organizations in background: %{public}@", log: logger,
                 type: .error, error.localizedDescription)
         }
+    }
+
+    func switchAccount(userId: String) async {
+        isAuthenticated = false
+        defer {
+            isAuthenticated = true
+        }
+
+        guard let accountToSwitchTo = accountManager.accounts[userId] else {
+            os_log(
+                "Account with userId %{public}@ does not exist", log: logger, type: .error, userId)
+            return
+        }
+
+        guard let token = secretManager.getSessionToken(userId: userId) else {
+            os_log(
+                "Session token does not exist for %{public}@", log: logger, type: .error, userId)
+            return
+        }
+
+        // Disconnect tunnel before switching accounts
+        if let tunnelManager = tunnelManager {
+            await tunnelManager.disconnect()
+        }
+
+        let prevToken = secretManager.getSessionToken(userId: accountManager.activeUserId)
+        let prevBaseURL = apiClient.currentBaseURL
+
+        // Update the API client with the new account's values and
+        // fetch the current user's data
+        do {
+            apiClient.updateSessionToken(token)
+            apiClient.updateBaseURL(accountToSwitchTo.hostname)
+
+            let user = try await apiClient.getUser()
+            currentUser = user
+        } catch {
+            // In case a failure happens when switching, log it
+            // and switch the API client back to the previous
+            // values.
+            os_log(
+                "Error switching accounts: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
+
+            apiClient.updateSessionToken(prevToken)
+            apiClient.updateBaseURL(prevBaseURL)
+
+            return
+        }
+
+        let selectedOrgId: String
+        do {
+            selectedOrgId = try await ensureOrgIsSelected()
+        } catch {
+            // Failure to select an organization is non-fatal,
+            // so let's just indicate the failure through the logs
+            // and move on.
+            os_log(
+                "Error ensuring org accounts: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
+            selectedOrgId = ""
+        }
+
+        accountManager.setActiveUser(userId: userId)
+        accountManager.setUserOrganization(userId: userId, orgId: selectedOrgId)
     }
 
     func checkOrgAccess(orgId: String) async -> Bool {
@@ -503,6 +570,12 @@ class AuthManager: ObservableObject {
     }
 
     func logout() async {
+        guard let activeAccount = accountManager.activeAccount else {
+            return
+        }
+
+        let userId = activeAccount.userId
+
         // Disconnect tunnel before logging out
         if let tunnelManager = tunnelManager {
             await tunnelManager.disconnect()
@@ -516,6 +589,11 @@ class AuthManager: ObservableObject {
         }
 
         // Clear local data
+        _ = secretManager.deleteSessionToken(userId: userId)
+        _ = secretManager.deleteOlmCredentials(userId: userId)
+
+        accountManager.removeAccount(userId: userId)
+
         apiClient.updateSessionToken(nil)
 
         isAuthenticated = false
