@@ -184,6 +184,8 @@ struct PreferencesDetailView: View {
                 PreferencesContentView(configManager: configManager)
             case .olmStatus:
                 OLMStatusContentView(olmStatusManager: tunnelManager.olmStatusManager)
+            case .about:
+                AboutContentView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
