@@ -17,7 +17,7 @@ class OLMStatusManager: ObservableObject {
     private let socketManager: SocketManager
     private var olmStatusPollingTask: Task<Void, Never>?
     private var isPollingOlmStatus = false
-    private let socketPollInterval: TimeInterval = 2.0 // Poll every 2 seconds
+    private let socketPollInterval: TimeInterval = 1.0 
     
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
