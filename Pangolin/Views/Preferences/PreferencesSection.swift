@@ -9,7 +9,7 @@ import SwiftUI
 
 enum PreferencesSection: String, CaseIterable, Identifiable {
     case preferences = "Preferences"
-    case olmStatus = "OLM Status"
+    case olmStatus = "Status"
     
     var id: String { rawValue }
     
