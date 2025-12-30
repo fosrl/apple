@@ -44,10 +44,6 @@ struct AboutContentView: View {
                     
                     Text(appName)
                         .font(.system(size: 22, weight: .medium))
-                    
-                    Text("Version \(appVersion) (\(buildNumber))")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 20)
