@@ -67,19 +67,36 @@ struct OLMStatusContentView: View {
     
     private var jsonView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                if let json = statusJSON {
+            if let json = statusJSON {
+                VStack(alignment: .leading, spacing: 12) {
                     Text(json)
                         .font(.system(.body, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
-                } else {
-                    Text("Unable to get status via socket. Is the tunnel extension running?")
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .padding()
                 }
+            } else {
+                Form {
+                    Section {
+                        HStack {
+                            Text("Status")
+                                .font(.system(size: 13))
+                            Spacer()
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color.gray)
+                                    .frame(width: 8, height: 8)
+                                Text("Disconnected")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("Connection Status")
+                    }
+                }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
             }
         }
     }
@@ -164,12 +181,27 @@ struct OLMStatusContentView: View {
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
             } else {
-                VStack {
-                    Text("Unable to get status. Is the tunnel running?")
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .padding()
+                Form {
+                    Section {
+                        HStack {
+                            Text("Status")
+                                .font(.system(size: 13))
+                            Spacer()
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color.gray)
+                                    .frame(width: 8, height: 8)
+                                Text("Disconnected")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("Connection Status")
+                    }
                 }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
             }
         }
     }
