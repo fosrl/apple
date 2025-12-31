@@ -87,13 +87,21 @@ class AuthManager: ObservableObject {
         // Create the main login task that can be cancelled
         deviceAuthTask = Task {
             do {
-                // Get device name
-                let deviceName = ProcessInfo.processInfo.hostName
+                // Get device name (user's computer/device name)
+                let deviceName = DeviceInfo.getDeviceName()
 
                 let hostname = loginApiClient.currentBaseURL
 
+                #if os(iOS)
+                let applicationName = "Pangolin iOS Client"
+                #elseif os(macOS)
+                let applicationName = "Pangolin macOS Client"
+                #else
+                let applicationName = "Pangolin Client"
+                #endif
+
                 let startResponse = try await loginApiClient.startDeviceAuth(
-                    applicationName: "Pangolin macOS Client",
+                    applicationName: applicationName,
                     deviceName: deviceName,
                 )
 
@@ -538,7 +546,8 @@ class AuthManager: ObservableObject {
         // If credentials don't exist or were cleared, create new ones
         if !secretManager.hasOlmCredentials(userId: userId) {
             do {
-                let deviceName = DeviceInfo.getDeviceModelName()
+                // Use the actual device name (user's computer/device name) for OLM
+                let deviceName = DeviceInfo.getDeviceName()
                 let olmResponse = try await apiClient.createOlm(userId: userId, name: deviceName)
 
                 // Save OLM credentials

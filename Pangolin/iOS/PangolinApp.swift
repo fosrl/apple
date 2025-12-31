@@ -58,14 +58,66 @@ struct PangolinApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // iOS main view - will need to be created
-            // For now, using a placeholder that shows login
-            LoginView(
-                authManager: authManager,
-                accountManager: accountManager,
-                configManager: configManager,
-                apiClient: apiClient
-            )
+            Group {
+                if authManager.isInitializing {
+                    // Show loading state during initialization
+                    VStack {
+                        ProgressView()
+                        Text("Loading...")
+                            .foregroundColor(.secondary)
+                            .padding(.top, 8)
+                    }
+                } else if authManager.isAuthenticated {
+                    // Main view - will be implemented in next steps
+                    NavigationView {
+                        List {
+                            Section {
+                                // User info
+                                if let user = authManager.currentUser {
+                                    HStack {
+                                        Image(systemName: "person.circle.fill")
+                                            .foregroundColor(.accentColor)
+                                            .font(.title2)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(user.email)
+                                                .font(.headline)
+                                            if let org = authManager.currentOrg {
+                                                Text(org.name)
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+
+                            Section {
+                                Button(role: .destructive, action: {
+                                    Task {
+                                        await authManager.logout()
+                                    }
+                                }) {
+                                    HStack {
+                                        Spacer()
+                                        Text("Sign Out")
+                                        Spacer()
+                                    }
+                                }
+                            }
+                        }
+                        .navigationTitle("Pangolin")
+                    }
+                } else {
+                    // Show login view when not authenticated
+                    LoginView(
+                        authManager: authManager,
+                        accountManager: accountManager,
+                        configManager: configManager,
+                        apiClient: apiClient
+                    )
+                }
+            }
             .onAppear {
                 Task {
                     await authManager.initialize()

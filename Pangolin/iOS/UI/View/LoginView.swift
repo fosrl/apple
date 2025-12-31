@@ -7,6 +7,7 @@
 
 #if os(iOS)
 import SwiftUI
+import UIKit
 
 enum HostingOption {
     case cloud
@@ -18,153 +19,318 @@ struct LoginView: View {
     @State private var selfHostedURL: String = ""
     @State private var isLoggingIn = false
     @State private var showSuccess = false
+    @State private var hasAutoOpenedBrowser = false
     @State private var loginTask: Task<Void, Never>?
 
     @ObservedObject var authManager: AuthManager
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var apiClient: APIClient
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 30) {
-                // Logo
-                Image("PangolinLogo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: 80)
-                    .padding(.top, 40)
-                
-                if showSuccess {
-                    successView
-                } else if hostingOption == nil {
-                    hostingSelectionView
-                } else if authManager.deviceAuthCode != nil {
-                    deviceAuthCodeView
-                } else if hostingOption == .selfHosted {
-                    readyToLoginView
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Logo
+                    Image("PangolinLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 60)
+                        .padding(.top, 20)
+
+                    if showSuccess {
+                        // Success view
+                        successView
+                    } else if hostingOption == nil {
+                        // Step 1: Select hosting option
+                        hostingSelectionView
+                    } else if authManager.deviceAuthCode != nil {
+                        // Step 3: Show code (after starting auth)
+                        deviceAuthCodeView
+                    } else if hostingOption == .selfHosted {
+                        // Step 2: Ready to login (only for self-hosted)
+                        readyToLoginView
+                    }
                 }
-                
-                Spacer()
+                .padding()
             }
-            .padding()
-            .navigationTitle("Pangolin")
+            .navigationTitle("Sign In")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if hostingOption != nil && !showSuccess {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Back") {
+                            if authManager.deviceAuthCode != nil {
+                                // Cancel the auth flow
+                                authManager.deviceAuthCode = nil
+                                authManager.deviceAuthLoginURL = nil
+                            } else {
+                                hostingOption = nil
+                                selfHostedURL = ""
+                            }
+                        }
+                        .disabled(isLoggingIn)
+                    }
+                }
+            }
+            .onChange(of: authManager.deviceAuthCode) { oldValue, newValue in
+                // Auto-open browser when code is generated
+                if let code = newValue, !hasAutoOpenedBrowser {
+                    hasAutoOpenedBrowser = true
+                    // Use temporary hostname from login flow
+                    let hostname = getCurrentHostname()
+                    if !hostname.isEmpty {
+                        // Remove middle hyphen from code (e.g., "XXXX-XXXX" -> "XXXXXXXX")
+                        let codeWithoutHyphen = code.replacingOccurrences(of: "-", with: "")
+                        let autoOpenURL = "\(hostname)/auth/login/device?code=\(codeWithoutHyphen)"
+                        openBrowser(url: autoOpenURL)
+                    }
+                } else if newValue == nil {
+                    // Reset flag when code is cleared
+                    hasAutoOpenedBrowser = false
+                }
+            }
+            .onChange(of: hostingOption) { oldValue, newValue in
+                // Reset auto-open flag when hosting option changes
+                if newValue == nil {
+                    hasAutoOpenedBrowser = false
+                }
+            }
+            .onDisappear {
+                // Reset state when view disappears
+                resetLoginState()
+            }
         }
     }
-    
+
     private var hostingSelectionView: some View {
-        VStack(spacing: 20) {
-            Text("Choose your hosting option")
-                .font(.headline)
-                .padding(.bottom, 10)
-            
+        VStack(spacing: 16) {
             Button(action: {
                 hostingOption = .cloud
+                // Immediately start device auth flow for cloud
+                performLogin()
             }) {
                 HStack {
-                    Image(systemName: "cloud.fill")
-                    Text("Cloud Hosted")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Pangolin Cloud")
+                            .font(.headline)
+                        Text("app.pangolin.net")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
                 }
-                .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
+                .background(Color(.systemGray6))
                 .cornerRadius(10)
             }
-            
+            .buttonStyle(.plain)
+
             Button(action: {
                 hostingOption = .selfHosted
+                // Prefill with saved hostname if it exists and is not cloud
+                let savedHostname = accountManager.activeAccount?.hostname ?? ""
+
+                if !savedHostname.isEmpty && savedHostname != "https://app.pangolin.net" {
+                    selfHostedURL = savedHostname
+                }
             }) {
                 HStack {
-                    Image(systemName: "server.rack")
-                    Text("Self Hosted")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Self-hosted or dedicated instance")
+                            .font(.headline)
+                        Text("Enter your custom hostname")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
+            .buttonStyle(.plain)
+
+            // Terms and Privacy Policy
+            HStack(spacing: 4) {
+                Text("By continuing, you agree to our")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Button("Terms of Service") {
+                    openBrowser(url: "https://pangolin.net/terms-of-service.html")
+                }
+                .font(.caption)
+                .buttonStyle(.plain)
+                Text("and")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Button("Privacy Policy") {
+                    openBrowser(url: "https://pangolin.net/privacy-policy.html")
+                }
+                .font(.caption)
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    private var readyToLoginView: some View {
+        VStack(spacing: 20) {
+            if hostingOption == .selfHosted {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Server URL")
+                        .font(.headline)
+                    
+                    TextField("https://your-server.com", text: $selfHostedURL)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        .autocapitalization(.none)
+                        .keyboardType(.URL)
+                        .textContentType(.URL)
+                }
+            } else {
+                VStack(spacing: 8) {
+                    Text("Pangolin Cloud")
+                        .font(.headline)
+                    Text("app.pangolin.net")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Button(action: performLogin) {
+                HStack {
+                    if isLoggingIn {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    Text(isLoggingIn ? "Logging in..." : "Continue")
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.gray)
+                .background(isLoggingIn || !isReadyToLogin ? Color.gray : Color.accentColor)
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
+            .disabled(isLoggingIn || !isReadyToLogin)
         }
-        .padding()
     }
-    
-    private var readyToLoginView: some View {
-        VStack(spacing: 20) {
-            Text("Enter your server URL")
-                .font(.headline)
-            
-            TextField("https://your-server.com", text: $selfHostedURL)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-                .keyboardType(.URL)
-            
-            Button(action: performLogin) {
-                if isLoggingIn {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                } else {
-                    Text("Continue")
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(isLoggingIn ? Color.gray : Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(10)
-            .disabled(isLoggingIn)
-            
-            Button(action: {
-                hostingOption = nil
-            }) {
-                Text("Back")
-            }
+
+    private var successView: some View {
+        VStack(alignment: .center, spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 64))
+                .foregroundColor(.green)
+
+            Text("Authentication Successful")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Text("You have been successfully logged in.")
+                .font(.body)
+                .foregroundColor(.secondary)
         }
-        .padding()
     }
-    
+
     private var deviceAuthCodeView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             Text("Enter this code on the login page")
                 .font(.headline)
-            
-            if let code = authManager.deviceAuthCode {
-                Text(code)
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                
-                if let url = authManager.deviceAuthLoginURL {
-                    Link("Open Login Page", destination: URL(string: url)!)
-                        .buttonStyle(.borderedProminent)
+                .multilineTextAlignment(.center)
+
+            // Code display - compact PIN style that fits on all screen sizes
+            // For 8 characters: ~32pt width each + 4pt spacing = ~284pt total, fits on all iPhones
+            if let deviceCode = authManager.deviceAuthCode {
+                HStack(spacing: 4) {
+                    ForEach(Array(deviceCode), id: \.self) { digit in
+                        Text(String(digit))
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                            .frame(width: 32, height: 44)
+                            .background(Color(.systemGray5))
+                            .cornerRadius(8)
+                    }
                 }
             }
-            
-            Button(action: {
-                authManager.deviceAuthCode = nil
-                authManager.deviceAuthLoginURL = nil
-            }) {
-                Text("Cancel")
+
+            // Buttons
+            VStack(spacing: 12) {
+                if let deviceCode = authManager.deviceAuthCode {
+                    Button(action: {
+                        copyToClipboard(deviceCode)
+                    }) {
+                        Label("Copy Code", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                    }
+                    .buttonStyle(.plain)
+
+                    if let loginURL = authManager.deviceAuthLoginURL {
+                        Button(action: {
+                            openBrowser(url: loginURL)
+                        }) {
+                            Label("Open Login Page", systemImage: "safari")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            // Manual URL instructions
+            let currentHostname = getCurrentHostname()
+            if !currentHostname.isEmpty {
+                Text("Or visit: \(currentHostname)/auth/login/device")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            ProgressView()
+                .padding(.top, 8)
+        }
+    }
+
+    private var isReadyToLogin: Bool {
+        if hostingOption == .cloud {
+            return true
+        } else if hostingOption == .selfHosted {
+            return !selfHostedURL.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        return false
+    }
+
+    private func getCurrentHostname() -> String {
+        if hostingOption == .cloud {
+            return "https://app.pangolin.net"
+        } else if hostingOption == .selfHosted {
+            let url = selfHostedURL.trimmingCharacters(in: .whitespaces)
+            if !url.isEmpty {
+                // Normalize the URL
+                var normalized = url
+                if !normalized.hasPrefix("http://") && !normalized.hasPrefix("https://") {
+                    normalized = "https://" + normalized
+                }
+                normalized = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                return normalized
             }
         }
-        .padding()
+
+        return accountManager.activeAccount?.hostname ?? ConfigManager.defaultHostname
     }
-    
-    private var successView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.green)
-            
-            Text("Login Successful!")
-                .font(.headline)
-        }
-        .padding()
-    }
-    
+
     private func performLogin() {
         isLoggingIn = true
 
@@ -195,10 +361,16 @@ struct LoginView: View {
             do {
                 try await authManager.loginWithDeviceAuth(hostnameOverride: hostname)
 
-                // Success - show success view
+                // Success - show success view, then dismiss after 2 seconds
                 await MainActor.run {
                     showSuccess = true
                     isLoggingIn = false
+
+                    // Dismiss after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        // Reset state after showing success
+                        resetLoginState()
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -210,6 +382,32 @@ struct LoginView: View {
                 }
             }
         }
+    }
+
+    private func copyToClipboard(_ text: String) {
+        UIPasteboard.general.string = text
+    }
+
+    private func openBrowser(url: String) {
+        if let url = URL(string: url) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private func resetLoginState() {
+        // Cancel login task if it exists
+        loginTask?.cancel()
+        loginTask = nil
+
+        // Cancel device auth polling
+        authManager.cancelDeviceAuth()
+
+        // Reset local state
+        isLoggingIn = false
+        hostingOption = nil
+        selfHostedURL = ""
+        showSuccess = false
+        hasAutoOpenedBrowser = false
     }
 }
 #endif
