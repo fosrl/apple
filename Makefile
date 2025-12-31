@@ -1,4 +1,4 @@
-.PHONY: build clean help build-arm64 build-x86_64 build-ios-arm64 build-ios-simulator
+.PHONY: build clean help build-arm64 build-x86_64 build-ios-arm64 build-ios-simulator build-ios build-macos build-ios-all
 
 # Variables
 GO_DIR := PangolinGo
@@ -23,8 +23,12 @@ SDKROOT ?= $(shell xcrun --sdk $(PLATFORM_NAME) --show-sdk-path 2>/dev/null || e
 # Default target
 all: clean build
 
+# Build both iOS (device) and macOS
+build: build-ios build-macos
+	@echo "Build complete: iOS (device) and macOS"
+
 # Build the Go library as a universal C archive (arm64 + x86_64) for macOS
-build: $(ARCHIVE)
+build-macos: $(ARCHIVE)
 
 $(ARCHIVE): $(ARCHIVE_ARM64) $(ARCHIVE_X86_64)
 	@echo "Creating universal binary for macOS..."
@@ -105,9 +109,13 @@ $(ARCHIVE_IOS_SIM_X86_64): $(GO_DIR)/main.go $(GO_DIR)/go.mod
 	go build --buildmode=c-archive -o $(LIB_NAME)_ios_sim_x86_64.a
 	@echo "iOS simulator x86_64 build complete: $(ARCHIVE_IOS_SIM_X86_64)"
 
-# Build all iOS variants
-build-ios: build-ios-arm64 build-ios-simulator-arm64 build-ios-simulator-x86_64
-	@echo "All iOS builds complete"
+# Build iOS device only (no simulators)
+build-ios: build-ios-arm64
+	@echo "iOS device build complete"
+
+# Build all iOS variants (including simulators)
+build-ios-all: build-ios-arm64 build-ios-simulator-arm64 build-ios-simulator-x86_64
+	@echo "All iOS builds complete (including simulators)"
 
 # Clean build artifacts
 clean:
@@ -122,13 +130,15 @@ clean:
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  make build                    - Build the Go library as a universal C archive for macOS (arm64 + x86_64)"
+	@echo "  make build                    - Build iOS (device) and macOS (universal)"
+	@echo "  make build-macos              - Build the Go library as a universal C archive for macOS (arm64 + x86_64)"
 	@echo "  make build-arm64              - Build only for macOS arm64 (Apple Silicon)"
 	@echo "  make build-x86_64             - Build only for macOS x86_64 (Intel)"
+	@echo "  make build-ios                - Build for iOS device (arm64) only"
 	@echo "  make build-ios-arm64          - Build for iOS device (arm64)"
 	@echo "  make build-ios-simulator-arm64 - Build for iOS simulator arm64 (Apple Silicon Macs)"
 	@echo "  make build-ios-simulator-x86_64 - Build for iOS simulator x86_64 (Intel Macs)"
-	@echo "  make build-ios                - Build all iOS variants"
+	@echo "  make build-ios-all            - Build all iOS variants (device + simulators)"
 	@echo "  make clean                    - Remove build artifacts"
 	@echo "  make help                     - Show this help message"
 
