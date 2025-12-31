@@ -9,7 +9,8 @@ import SwiftUI
 
 enum PreferencesSection: String, CaseIterable, Identifiable {
     case preferences = "Preferences"
-    case olmStatus = "OLM Status"
+    case olmStatus = "Status"
+    case about = "About"
     
     var id: String { rawValue }
     
@@ -19,6 +20,8 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
             return "gear"
         case .olmStatus:
             return "chart.bar.doc.horizontal"
+        case .about:
+            return "info.circle"
         }
     }
 }

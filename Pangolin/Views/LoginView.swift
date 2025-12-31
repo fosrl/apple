@@ -5,21 +5,24 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
+        let a: UInt64
+        let r: UInt64
+        let g: UInt64
+        let b: UInt64
         switch hex.count {
-        case 3: // RGB (12-bit)
+        case 3:  // RGB (12-bit)
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
+        case 6:  // RGB (24-bit)
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
+        case 8:  // ARGB (32-bit)
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default:
             (a, r, g, b) = (255, 0, 0, 0)
@@ -48,16 +51,17 @@ struct LoginView: View {
     @State private var showSuccess = false
     @State private var hasAutoOpenedBrowser = false
     @State private var loginTask: Task<Void, Never>?
-    
+
     @ObservedObject var authManager: AuthManager
+    @ObservedObject var accountManager: AccountManager
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var apiClient: APIClient
     @Environment(\.colorScheme) private var colorScheme
-    
+
     private var windowBackgroundColor: Color {
         colorScheme == .dark ? Color(hex: "161618") : Color(hex: "FDFDFD")
     }
-    
+
     var body: some View {
         ZStack {
             // Middle content - centered in entire window
@@ -75,10 +79,10 @@ struct LoginView: View {
                     // Step 2: Ready to login (only for self-hosted)
                     readyToLoginView
                 }
-                
+
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
+
             // Logo at top center (fixed position)
             VStack {
                 HStack {
@@ -92,12 +96,12 @@ struct LoginView: View {
                 .padding(.bottom, 15)
                 Spacer()
             }
-            
+
             // Action buttons at bottom right (fixed position)
             if !showSuccess {
                 VStack {
                     Spacer()
-                    
+
                     // Terms and Privacy Policy text (only on hosting selection page)
                     if hostingOption == nil {
                         HStack(spacing: 4) {
@@ -120,10 +124,10 @@ struct LoginView: View {
                         }
                         .padding(.bottom, 8)
                     }
-                    
+
                     HStack {
                         Spacer()
-                        
+
                         if hostingOption != nil {
                             Button("Back") {
                                 if authManager.deviceAuthCode != nil {
@@ -137,12 +141,12 @@ struct LoginView: View {
                             }
                             .disabled(isLoggingIn)
                         }
-                        
+
                         Button("Cancel") {
                             closeWindow()
                         }
                         .keyboardShortcut(.cancelAction)
-                        
+
                         if hostingOption != nil && authManager.deviceAuthCode == nil {
                             Button("Log in") {
                                 performLogin()
@@ -158,17 +162,20 @@ struct LoginView: View {
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(windowBackgroundColor)
-        .background(WindowAccessor { window in
-            configureWindow(window)
-        })
+        .background(
+            WindowAccessor { window in
+                configureWindow(window)
+            }
+        )
         .onAppear {
             // Configure window without showing dock icon
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 // Ensure window identifier is set and close duplicates
                 // Find this window by title first
-                if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }) {
+                if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }
+                ) {
                     configureWindow(window)
-                    
+
                     // Close any other windows with the same identifier or title
                     let duplicates = NSApplication.shared.windows.filter { w in
                         (w.identifier?.rawValue == "main" || w.title == "Pangolin") && w != window
@@ -176,7 +183,7 @@ struct LoginView: View {
                     for duplicate in duplicates {
                         duplicate.close()
                     }
-                    
+
                     // Bring window to front
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()
@@ -184,8 +191,10 @@ struct LoginView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
-            if let window = notification.object as? NSWindow, window.identifier?.rawValue == "main" {
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) {
+            notification in
+            if let window = notification.object as? NSWindow, window.identifier?.rawValue == "main"
+            {
                 configureWindow(window)
             }
         }
@@ -217,7 +226,7 @@ struct LoginView: View {
             resetLoginState()
         }
     }
-    
+
     private var hostingSelectionView: some View {
         VStack(alignment: .center, spacing: 8) {
             Button(action: {
@@ -240,18 +249,20 @@ struct LoginView: View {
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isCloudButtonHovered ? Color.accentColor : Color.clear, lineWidth: 2)
+                        .stroke(
+                            isCloudButtonHovered ? Color.accentColor : Color.clear, lineWidth: 2)
                 )
             }
             .buttonStyle(.plain)
             .onHover { hovering in
                 isCloudButtonHovered = hovering
             }
-            
+
             Button(action: {
                 hostingOption = .selfHosted
                 // Prefill with saved hostname if it exists and is not cloud
-                let savedHostname = configManager.getHostname()
+                let savedHostname = accountManager.activeAccount?.hostname ?? ""
+
                 if !savedHostname.isEmpty && savedHostname != "https://app.pangolin.net" {
                     selfHostedURL = savedHostname
                 }
@@ -271,7 +282,9 @@ struct LoginView: View {
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelfHostedButtonHovered ? Color.accentColor : Color.clear, lineWidth: 2)
+                        .stroke(
+                            isSelfHostedButtonHovered ? Color.accentColor : Color.clear,
+                            lineWidth: 2)
                 )
             }
             .buttonStyle(.plain)
@@ -280,43 +293,43 @@ struct LoginView: View {
             }
         }
     }
-    
+
     private var readyToLoginView: some View {
         VStack(alignment: .center, spacing: 12) {
             if hostingOption == .selfHosted {
                 Text("Pangolin Server URL")
                     .font(.headline)
-                
+
                 TextField("https://your-server.com", text: $selfHostedURL)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
             } else {
                 Text("Pangolin Cloud")
                     .font(.headline)
-                
+
                 Text("app.pangolin.net")
                     .font(.body)
                     .foregroundColor(.secondary)
             }
         }
     }
-    
+
     private var successView: some View {
         VStack(alignment: .center, spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 64))
                 .foregroundColor(.green)
-            
+
             Text("Authentication Successful")
                 .font(.title2)
                 .fontWeight(.bold)
-            
+
             Text("You have been successfully logged in.")
                 .font(.body)
                 .foregroundColor(.secondary)
         }
     }
-    
+
     private var deviceAuthCodeView: some View {
         VStack(alignment: .center, spacing: 12) {
             // Code display - PIN style with each digit in a box
@@ -331,14 +344,14 @@ struct LoginView: View {
                     }
                 }
             }
-            
+
             // Buttons
             HStack(spacing: 8) {
                 if let deviceCode = authManager.deviceAuthCode {
                     Button("Copy Code") {
                         copyToClipboard(deviceCode)
                     }
-                    
+
                     if let loginURL = authManager.deviceAuthLoginURL {
                         Button("Open Browser") {
                             openBrowser(url: loginURL)
@@ -346,7 +359,7 @@ struct LoginView: View {
                     }
                 }
             }
-            
+
             // Manual URL instructions
             let currentHostname = getCurrentHostname()
             if !currentHostname.isEmpty {
@@ -356,13 +369,13 @@ struct LoginView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
-            
+
             ProgressView()
                 .scaleEffect(0.8)
         }
         .padding(.top, 30)
     }
-    
+
     private var isReadyToLogin: Bool {
         if hostingOption == .cloud {
             return true
@@ -371,7 +384,7 @@ struct LoginView: View {
         }
         return false
     }
-    
+
     private func getCurrentHostname() -> String {
         if hostingOption == .cloud {
             return "https://app.pangolin.net"
@@ -387,12 +400,13 @@ struct LoginView: View {
                 return normalized
             }
         }
-        return configManager.getHostname()
+
+        return accountManager.activeAccount?.hostname ?? ConfigManager.defaultHostname
     }
-    
+
     private func performLogin() {
         isLoggingIn = true
-        
+
         // Determine hostname to use for login
         let hostname: String?
         if hostingOption == .cloud {
@@ -400,7 +414,8 @@ struct LoginView: View {
         } else if hostingOption == .selfHosted {
             let url = selfHostedURL.trimmingCharacters(in: .whitespaces)
             if url.isEmpty {
-                AlertManager.shared.showAlertDialog(title: "Error", message: "Please enter a server URL.")
+                AlertManager.shared.showAlertDialog(
+                    title: "Error", message: "Please enter a server URL.")
                 isLoggingIn = false
                 return
             }
@@ -414,16 +429,16 @@ struct LoginView: View {
         } else {
             hostname = nil
         }
-        
+
         loginTask = Task {
             do {
                 try await authManager.loginWithDeviceAuth(hostnameOverride: hostname)
-                
+
                 // Success - show success view, then close after 2 seconds
                 await MainActor.run {
                     showSuccess = true
                     isLoggingIn = false
-                    
+
                     // Close window after 2 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         closeWindow()
@@ -440,27 +455,27 @@ struct LoginView: View {
             }
         }
     }
-    
+
     private func copyToClipboard(_ text: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
     }
-    
+
     private func openBrowser(url: String) {
         if let url = URL(string: url) {
             NSWorkspace.shared.open(url)
         }
     }
-    
+
     private func resetLoginState() {
         // Cancel login task if it exists
         loginTask?.cancel()
         loginTask = nil
-        
+
         // Cancel device auth polling
         authManager.cancelDeviceAuth()
-        
+
         // Reset local state
         isLoggingIn = false
         hostingOption = nil
@@ -468,25 +483,25 @@ struct LoginView: View {
         showSuccess = false
         hasAutoOpenedBrowser = false
     }
-    
+
     private func configureWindow(_ window: NSWindow) {
         // Set identifier if not set
         if window.identifier?.rawValue != "main" {
             window.identifier = NSUserInterfaceItemIdentifier("main")
         }
-        
+
         // Make window float on top of all other windows
         window.level = .floating
-        
+
         // Configure window style: remove minimize and maximize, keep close button
         var styleMask = window.styleMask
         styleMask.remove([.miniaturizable, .resizable])
         styleMask.insert([.titled, .closable])
         window.styleMask = styleMask
-        
+
         // Ensure resizing is disabled
         window.styleMask.remove(.resizable)
-        
+
         // Hide minimize and zoom buttons, keep only close button
         if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
             minimizeButton.isHidden = true
@@ -497,21 +512,23 @@ struct LoginView: View {
         if let closeButton = window.standardWindowButton(.closeButton) {
             closeButton.isHidden = false
         }
-        
+
         // Set window to not be resizable
         window.isMovableByWindowBackground = false
-        
+
         // Set window size explicitly
         var frame = window.frame
         frame.size = NSSize(width: 440, height: 300)
         window.setContentSize(frame.size)
     }
-    
+
     private func closeWindow() {
         // Reset login state before closing
         resetLoginState()
-        
-        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+
+        if let window = NSApplication.shared.windows.first(where: {
+            $0.identifier?.rawValue == "main"
+        }) {
             window.close()
         }
     }
@@ -520,7 +537,7 @@ struct LoginView: View {
 // Helper view to access NSWindow
 struct WindowAccessor: NSViewRepresentable {
     var callback: (NSWindow) -> Void
-    
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -530,7 +547,7 @@ struct WindowAccessor: NSViewRepresentable {
         }
         return view
     }
-    
+
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             if let window = nsView.window {
