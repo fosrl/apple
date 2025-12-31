@@ -60,6 +60,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         
         completionHandler()
+        
+        #if os(macOS)
+        // HACK: This is a workaround for Apple bug 32073323.
+        // System extensions on macOS sometimes don't terminate properly without this.
+        exit(0)
+        #endif
     }
     
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {

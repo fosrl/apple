@@ -10,6 +10,7 @@ import Sparkle
 import SwiftUI
 import os.log
 
+#if os(macOS)
 struct MenuBarIconView: View {
     @ObservedObject var tunnelManager: TunnelManager
 
@@ -185,3 +186,4 @@ struct PangolinApp: App {
         }
     }
 }
+#endif

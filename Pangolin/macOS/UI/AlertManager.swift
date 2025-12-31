@@ -5,6 +5,7 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
+#if os(macOS)
 import Foundation
 import AppKit
 import Combine
@@ -60,4 +61,5 @@ class AlertManager: ObservableObject {
         showAlertDialog(title: title, message: message)
     }
 }
+#endif
 

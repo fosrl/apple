@@ -5,6 +5,7 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
+#if os(macOS)
 import AppKit
 import SwiftUI
 
@@ -556,3 +557,4 @@ struct WindowAccessor: NSViewRepresentable {
         }
     }
 }
+#endif

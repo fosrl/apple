@@ -8,7 +8,9 @@
 import Combine
 import Foundation
 import NetworkExtension
+#if os(macOS)
 import SystemExtensions
+#endif
 import os.log
 
 class TunnelManager: NSObject, ObservableObject {
@@ -19,8 +21,10 @@ class TunnelManager: NSObject, ObservableObject {
     private var tunnelManager: NETunnelProviderManager?
     private let bundleIdentifier = "net.pangolin.Pangolin.PacketTunnel"
     private var statusObserver: NSObjectProtocol?
+    #if os(macOS)
     private var systemExtensionRequest: OSSystemExtensionRequest?
     private var systemExtensionInstallContinuation: CheckedContinuation<Bool, Error>?
+    #endif
 
     // Version tracking for extension updates
     private let extensionVersionKey = "net.pangolin.Pangolin.PacketTunnel.lastKnownVersion"
@@ -74,12 +78,18 @@ class TunnelManager: NSObject, ObservableObject {
         }
 
         Task {
+            #if os(macOS)
             // First, ensure system extension is installed
             let isInstalled = await installSystemExtensionIfNeeded()
             if isInstalled {
                 await ensureExtensionRegistered()
                 await updateConnectionStatus()
             }
+            #else
+            // On iOS, just ensure extension is registered
+            await ensureExtensionRegistered()
+            await updateConnectionStatus()
+            #endif
         }
     }
 
@@ -146,6 +156,7 @@ class TunnelManager: NSObject, ObservableObject {
             status.displayText, vpnStatus.rawValue)
     }
 
+    #if os(macOS)
     private func installSystemExtensionIfNeeded() async -> Bool {
         os_log("Installing/activating system extension...", log: logger, type: .info)
 
@@ -184,6 +195,7 @@ class TunnelManager: NSObject, ObservableObject {
             return false
         }
     }
+    #endif
 
     // MARK: - Extension Version Management
 
@@ -625,6 +637,7 @@ class TunnelManager: NSObject, ObservableObject {
 }
 
 // MARK: - OSSystemExtensionRequestDelegate
+#if os(macOS)
 extension TunnelManager: OSSystemExtensionRequestDelegate {
     func request(
         _ request: OSSystemExtensionRequest,
@@ -688,3 +701,4 @@ extension TunnelManager: OSSystemExtensionRequestDelegate {
         return .replace
     }
 }
+#endif

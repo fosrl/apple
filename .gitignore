@@ -65,3 +65,4 @@ GoogleService-Info.plist
 ## Go build artifacts (generated libraries and headers)
 PangolinGo/libpangolin*.a
 PangolinGo/libpangolin*.h
+wireguard-apple/

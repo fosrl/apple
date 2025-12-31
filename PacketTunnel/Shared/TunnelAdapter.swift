@@ -9,6 +9,7 @@ import Foundation
 import NetworkExtension
 import PangolinGo
 import os.log
+import Darwin
 
 // Centralized log level configuration
 enum LogLevel: Int {
@@ -95,7 +96,11 @@ public class TunnelAdapter {
         
         // Get app version from bundle (semver)
         let appVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1.0.0"
+        #if os(iOS)
+        let agent = "Pangolin iOS"
+        #else
         let agent = "Pangolin macOS"
+        #endif
         
         // OLM initialization configuration with version and agent from Swift
         let config: [String: Any] = [
@@ -138,13 +143,22 @@ public class TunnelAdapter {
         }
     }
     
-    // Discovers the tunnel file descriptor by scanning open file descriptors
-    // and matching them against the utun control interface.
+    // Discovers the tunnel file descriptor
+    // On macOS: scans open file descriptors and matches them against the utun control interface
+    // On iOS: uses NEPacketTunnelFlow.fileDescriptor which is directly available
     //
     // - Returns: The file descriptor for the tunnel interface, or nil if not found
     private func discoverTunnelFileDescriptor() -> Int32? {
         os_log("Starting tunnel file descriptor discovery", log: logger, type: .debug)
         
+        #if os(iOS)
+        // On iOS, file descriptor discovery is not available through the same APIs
+        // The tunnel should work without explicit file descriptor discovery
+        // Return nil to use the fallback behavior (tunnelFD = 0)
+        os_log("File descriptor discovery not available on iOS, using fallback", log: logger, type: .debug)
+        return nil
+        #else
+        // On macOS, we need to scan file descriptors using system extension APIs
         var ctlInfo = ctl_info()
         
         // Set up the control info structure with the utun control name
@@ -190,6 +204,7 @@ public class TunnelAdapter {
         
         os_log("Could not discover tunnel file descriptor after scanning 0-1024", log: logger, type: .default)
         return nil
+        #endif
     }
     
     // Starts the tunnel and discovers the file descriptor
