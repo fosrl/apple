@@ -68,46 +68,13 @@ struct PangolinApp: App {
                             .padding(.top, 8)
                     }
                 } else if authManager.isAuthenticated {
-                    // Main view - will be implemented in next steps
-                    NavigationView {
-                        List {
-                            Section {
-                                // User info
-                                if let user = authManager.currentUser {
-                                    HStack {
-                                        Image(systemName: "person.circle.fill")
-                                            .foregroundColor(.accentColor)
-                                            .font(.title2)
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(user.email)
-                                                .font(.headline)
-                                            if let org = authManager.currentOrg {
-                                                Text(org.name)
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        }
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                            }
-
-                            Section {
-                                Button(role: .destructive, action: {
-                                    Task {
-                                        await authManager.logout()
-                                    }
-                                }) {
-                                    HStack {
-                                        Spacer()
-                                        Text("Sign Out")
-                                        Spacer()
-                                    }
-                                }
-                            }
-                        }
-                        .navigationTitle("Pangolin")
-                    }
+                    // Main view with tunnel controls and settings
+                    MainView(
+                        configManager: configManager,
+                        authManager: authManager,
+                        accountManager: accountManager,
+                        tunnelManager: tunnelManager
+                    )
                 } else {
                     // Show login view when not authenticated
                     LoginView(

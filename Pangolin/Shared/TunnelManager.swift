@@ -19,7 +19,11 @@ class TunnelManager: NSObject, ObservableObject {
     @Published var isRegistering = false
 
     private var tunnelManager: NETunnelProviderManager?
+    #if os(iOS)
+    private let bundleIdentifier = "net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS"
+    #else
     private let bundleIdentifier = "net.pangolin.Pangolin.PacketTunnel"
+    #endif
     private var statusObserver: NSObjectProtocol?
     #if os(macOS)
     private var systemExtensionRequest: OSSystemExtensionRequest?
@@ -212,7 +216,12 @@ class TunnelManager: NSObject, ObservableObject {
         let mainBundle = Bundle.main.bundleURL
 
         // Look for the extension bundle in the app's PlugIns directory
+        // On macOS: Contents/PlugIns, on iOS: PlugIns
+        #if os(iOS)
+        let pluginsURL = mainBundle.appendingPathComponent("PlugIns", isDirectory: true)
+        #else
         let pluginsURL = mainBundle.appendingPathComponent("Contents/PlugIns", isDirectory: true)
+        #endif
 
         // Check if PlugIns directory exists
         guard FileManager.default.fileExists(atPath: pluginsURL.path) else {

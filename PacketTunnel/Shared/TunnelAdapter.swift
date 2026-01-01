@@ -102,10 +102,13 @@ public class TunnelAdapter {
         let agent = "Pangolin macOS"
         #endif
         
+        // Use the shared function to get the platform-appropriate socket path
+        let socketPath = getSocketPath()
+        
         // OLM initialization configuration with version and agent from Swift
         let config: [String: Any] = [
             "enableAPI": true,
-            "socketPath": "/var/run/olm.sock",
+            "socketPath": socketPath,
             "logLevel": "debug",
             "version": appVersion,
             "agent": agent
@@ -144,21 +147,15 @@ public class TunnelAdapter {
     }
     
     // Discovers the tunnel file descriptor
-    // On macOS: scans open file descriptors and matches them against the utun control interface
-    // On iOS: uses NEPacketTunnelFlow.fileDescriptor which is directly available
+    // Scans open file descriptors and matches them against the utun control interface
+    // Works on both macOS and iOS
     //
     // - Returns: The file descriptor for the tunnel interface, or nil if not found
     private func discoverTunnelFileDescriptor() -> Int32? {
-        os_log("Starting tunnel file descriptor discovery", log: logger, type: .debug)
+        os_log("discoverTunnelFileDescriptor() called", log: logger, type: .info)
+        os_log("Starting tunnel file descriptor discovery", log: logger, type: .info)
         
-        #if os(iOS)
-        // On iOS, file descriptor discovery is not available through the same APIs
-        // The tunnel should work without explicit file descriptor discovery
-        // Return nil to use the fallback behavior (tunnelFD = 0)
-        os_log("File descriptor discovery not available on iOS, using fallback", log: logger, type: .debug)
-        return nil
-        #else
-        // On macOS, we need to scan file descriptors using system extension APIs
+        // Scan file descriptors using system extension APIs
         var ctlInfo = ctl_info()
         
         // Set up the control info structure with the utun control name
@@ -204,7 +201,6 @@ public class TunnelAdapter {
         
         os_log("Could not discover tunnel file descriptor after scanning 0-1024", log: logger, type: .default)
         return nil
-        #endif
     }
     
     // Starts the tunnel and discovers the file descriptor
@@ -462,14 +458,20 @@ public class TunnelAdapter {
         // Set DNS settings (use JSON value if provided, otherwise preserve existing)
         if let dnsServers = json.dnsServers, !dnsServers.isEmpty {
             let dnsSettings = NEDNSSettings(servers: dnsServers)
+            // Set search domains to empty array to match all domains
+            dnsSettings.matchDomains = [""]
             settings.dnsSettings = dnsSettings
         } else if let existingDNS = existing?.dnsSettings {
+            existingDNS.matchDomains = [""]
             settings.dnsSettings = existingDNS
         }
         
         // Set IPv4 settings
         if let ipv4Addresses = json.ipv4Addresses, !ipv4Addresses.isEmpty {
+            // Log raw values from JSON before creating settings
+            os_log("IPv4 addresses from JSON (raw): %{public}@", log: logger, type: .debug, ipv4Addresses.joined(separator: ", "))
             let subnetMasks = json.ipv4SubnetMasks ?? Array(repeating: "255.255.255.0", count: ipv4Addresses.count)
+            os_log("IPv4 subnet masks (raw): %{public}@", log: logger, type: .debug, subnetMasks.joined(separator: ", "))
             let ipv4Settings = NEIPv4Settings(addresses: ipv4Addresses, subnetMasks: subnetMasks)
             
             // Convert routes
@@ -508,6 +510,10 @@ public class TunnelAdapter {
                 }
             }
             ipv4Settings.excludedRoutes = excludedRoutes
+            
+            // Log values after creating settings object
+            os_log("IPv4 addresses in settings object (after): %{public}@", log: logger, type: .debug, ipv4Settings.addresses.joined(separator: ", "))
+            os_log("IPv4 subnet masks in settings object (after): %{public}@", log: logger, type: .debug, ipv4Settings.subnetMasks.joined(separator: ", "))
             
             settings.ipv4Settings = ipv4Settings
         }

@@ -111,6 +111,12 @@
 				iOS/Info.plist,
 				iOS/PangolinApp.swift,
 				iOS/UI/LoginView.swift,
+				iOS/UI/MainView.swift,
+				iOS/UI/Settings/AboutView.swift,
+				iOS/UI/Settings/DNSServerModalView.swift,
+				iOS/UI/Settings/PreferencesView.swift,
+				iOS/UI/Settings/StatusView.swift,
+				iOS/UI/SettingsView.swift,
 			);
 			target = 90BC22B32EBC6C1D0072B44A /* Pangolin */;
 		};
@@ -120,18 +126,24 @@
 				Assets.xcassets,
 				iOS/PangolinApp.swift,
 				iOS/UI/LoginView.swift,
+				iOS/UI/MainView.swift,
+				iOS/UI/Settings/AboutView.swift,
+				iOS/UI/Settings/DNSServerModalView.swift,
+				iOS/UI/Settings/PreferencesView.swift,
+				iOS/UI/Settings/StatusView.swift,
+				iOS/UI/SettingsView.swift,
 				"pangolin-app-icon.icon",
 				Shared/AccountManager.swift,
 				Shared/AlertManager.swift,
 				Shared/APIClient.swift,
 				Shared/AuthManager.swift,
-				Shared/CheckForUpdatesViewModel.swift,
 				Shared/ConfigManager.swift,
 				Shared/DeviceInfo.swift,
 				Shared/Model/Models.swift,
 				Shared/OLMStatusManager.swift,
 				Shared/SecretManager.swift,
 				Shared/SocketManager.swift,
+				Shared/SocketPath.swift,
 				Shared/TunnelManager.swift,
 			);
 			target = 907A6C5D2F05ACAF0097F387 /* PangoliniOS */;
@@ -141,6 +153,7 @@
 			membershipExceptions = (
 				Shared/GoLoggerBridge.m,
 				Shared/PacketTunnelProvider.swift,
+				Shared/SocketPath.swift,
 				Shared/TunnelAdapter.swift,
 			);
 			target = 907A6C7B2F05AE620097F387 /* PacketTunneliOS */;
@@ -609,6 +622,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/Shared/PacketTunnel-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -646,6 +660,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/Shared/PacketTunnel-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

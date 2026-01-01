@@ -39,15 +39,14 @@ class SocketManager {
     private let socketPath: String
     private let timeout: TimeInterval
     
-    static let defaultSocketPath = "/var/run/olm.sock"
-    
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
         return OSLog(subsystem: subsystem, category: "SocketManager")
     }()
     
-    init(socketPath: String = defaultSocketPath, timeout: TimeInterval = 5.0) {
-        self.socketPath = socketPath
+    init(socketPath: String? = nil, timeout: TimeInterval = 5.0) {
+        // Use provided path or get the platform-appropriate default
+        self.socketPath = socketPath ?? getSocketPath()
         self.timeout = timeout
     }
     
