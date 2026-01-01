@@ -5,10 +5,14 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
-#if os(macOS)
 import Foundation
-import AppKit
 import Combine
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @MainActor
 class AlertManager: ObservableObject {
@@ -40,12 +44,23 @@ class AlertManager: ObservableObject {
     }
     
     func showAlertDialog(title: String, message: String) {
+        #if os(iOS)
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            return
+        }
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        rootViewController.present(alert, animated: true)
+        #elseif os(macOS)
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+        #endif
     }
     
     func showErrorDialog(_ error: Error) {
@@ -61,5 +76,4 @@ class AlertManager: ObservableObject {
         showAlertDialog(title: title, message: message)
     }
 }
-#endif
 

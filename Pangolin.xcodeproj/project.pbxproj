@@ -110,8 +110,7 @@
 			membershipExceptions = (
 				iOS/Info.plist,
 				iOS/PangolinApp.swift,
-				iOS/UI/AlertManager.swift,
-				iOS/UI/View/LoginView.swift,
+				iOS/UI/LoginView.swift,
 			);
 			target = 90BC22B32EBC6C1D0072B44A /* Pangolin */;
 		};
@@ -120,20 +119,20 @@
 			membershipExceptions = (
 				Assets.xcassets,
 				iOS/PangolinApp.swift,
-				iOS/UI/AlertManager.swift,
-				iOS/UI/View/LoginView.swift,
+				iOS/UI/LoginView.swift,
 				"pangolin-app-icon.icon",
-				Shared/Managers/AccountManager.swift,
-				Shared/Managers/APIClient.swift,
-				Shared/Managers/AuthManager.swift,
-				Shared/Managers/CheckForUpdatesViewModel.swift,
-				Shared/Managers/ConfigManager.swift,
-				Shared/Managers/DeviceInfo.swift,
-				Shared/Managers/OLMStatusManager.swift,
-				Shared/Managers/SecretManager.swift,
-				Shared/Managers/SocketManager.swift,
-				Shared/Managers/TunnelManager.swift,
+				Shared/AccountManager.swift,
+				Shared/AlertManager.swift,
+				Shared/APIClient.swift,
+				Shared/AuthManager.swift,
+				Shared/CheckForUpdatesViewModel.swift,
+				Shared/ConfigManager.swift,
+				Shared/DeviceInfo.swift,
 				Shared/Model/Models.swift,
+				Shared/OLMStatusManager.swift,
+				Shared/SecretManager.swift,
+				Shared/SocketManager.swift,
+				Shared/TunnelManager.swift,
 			);
 			target = 907A6C5D2F05ACAF0097F387 /* PangoliniOS */;
 		};
