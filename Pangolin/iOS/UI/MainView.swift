@@ -13,9 +13,63 @@ struct MainView: View {
     @ObservedObject var authManager: AuthManager
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var tunnelManager: TunnelManager
-    @State private var showSettings = false
     @State private var showAccountPicker = false
     @State private var showOrganizationPicker = false
+    
+    var body: some View {
+        TabView {
+            HomeTabView(
+                configManager: configManager,
+                authManager: authManager,
+                accountManager: accountManager,
+                tunnelManager: tunnelManager,
+                showAccountPicker: $showAccountPicker,
+                showOrganizationPicker: $showOrganizationPicker
+            )
+            .tabItem {
+                Label("Home", systemImage: "house.fill")
+            }
+            
+            StatusView(olmStatusManager: tunnelManager.olmStatusManager)
+                .tabItem {
+                    Label("Status", systemImage: "chart.bar.doc.horizontal")
+                }
+            
+            PreferencesView(configManager: configManager)
+                .tabItem {
+                    Label("Preferences", systemImage: "gear")
+                }
+            
+            AboutView()
+                .tabItem {
+                    Label("About", systemImage: "info.circle")
+                }
+        }
+        .sheet(isPresented: $showAccountPicker) {
+            AccountPickerView(
+                accountManager: accountManager,
+                authManager: authManager,
+                tunnelManager: tunnelManager
+            )
+        }
+        .sheet(isPresented: $showOrganizationPicker) {
+            OrganizationPickerView(
+                authManager: authManager,
+                tunnelManager: tunnelManager
+            )
+        }
+    }
+}
+
+// MARK: - Home Tab View
+
+struct HomeTabView: View {
+    @ObservedObject var configManager: ConfigManager
+    @ObservedObject var authManager: AuthManager
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var tunnelManager: TunnelManager
+    @Binding var showAccountPicker: Bool
+    @Binding var showOrganizationPicker: Bool
     
     private var tunnelStatus: TunnelStatus {
         tunnelManager.status
@@ -147,36 +201,7 @@ struct MainView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Pangolin")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                    }
-                }
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView(
-                    configManager: configManager,
-                    tunnelManager: tunnelManager,
-                    authManager: authManager
-                )
-            }
-            .sheet(isPresented: $showAccountPicker) {
-                AccountPickerView(
-                    accountManager: accountManager,
-                    authManager: authManager,
-                    tunnelManager: tunnelManager
-                )
-            }
-            .sheet(isPresented: $showOrganizationPicker) {
-                OrganizationPickerView(
-                    authManager: authManager,
-                    tunnelManager: tunnelManager
-                )
-            }
+            .navigationTitle("Home")
         }
     }
 }

@@ -36,8 +36,9 @@ struct PreferencesView: View {
     }
     
     var body: some View {
-        Form {
-            Section(header: Text("DNS Settings")) {
+        NavigationStack {
+            Form {
+                Section(header: Text("DNS Settings")) {
                 Toggle(isOn: Binding(
                     get: { dnsOverrideEnabled },
                     set: { newValue in
@@ -93,11 +94,11 @@ struct PreferencesView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
+                }
             }
-        }
-        .navigationTitle("Preferences")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showPrimaryDNSModal) {
+            .navigationTitle("Preferences")
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showPrimaryDNSModal) {
             DNSServerModalView(
                 title: "Primary Upstream DNS Server:",
                 dnsServer: $editingPrimaryDNS,
@@ -116,6 +117,7 @@ struct PreferencesView: View {
                     _ = configManager.setSecondaryDNSServer(newValue)
                 }
             )
+            }
         }
     }
 }

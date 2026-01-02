@@ -33,32 +33,34 @@ struct StatusView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Mode selector
-            Picker("", selection: $displayMode) {
-                ForEach(DisplayMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Mode selector
+                Picker("", selection: $displayMode) {
+                    ForEach(DisplayMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding()
+                
+                // Content based on mode
+                if displayMode == .json {
+                    jsonView
+                } else {
+                    formattedView
                 }
             }
-            .pickerStyle(.segmented)
-            .padding()
-            
-            // Content based on mode
-            if displayMode == .json {
-                jsonView
-            } else {
-                formattedView
+            .navigationTitle("Status")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                // Start separate polling for live updates when view appears
+                olmStatusManager.startPolling()
             }
-        }
-        .navigationTitle("Status")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            // Start separate polling for live updates when view appears
-            olmStatusManager.startPolling()
-        }
-        .onDisappear {
-            // Stop polling when view disappears to avoid unnecessary work
-            olmStatusManager.stopPolling()
+            .onDisappear {
+                // Stop polling when view disappears to avoid unnecessary work
+                olmStatusManager.stopPolling()
+            }
         }
     }
     

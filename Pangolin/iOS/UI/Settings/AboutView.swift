@@ -27,8 +27,9 @@ struct AboutView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
                 // App icon and name header
                 VStack(spacing: 12) {
                     Image("PangolinLogo")
@@ -110,10 +111,11 @@ struct AboutView: View {
                         Text("Legal")
                     }
                 }
+                }
             }
+            .navigationTitle("About")
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .navigationTitle("About")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 #endif
