@@ -5,7 +5,6 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
-#if os(iOS)
 import SwiftUI
 
 struct AboutView: View {
@@ -96,5 +95,3 @@ struct AboutView: View {
         }
     }
 }
-#endif
-

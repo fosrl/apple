@@ -110,13 +110,12 @@
 			membershipExceptions = (
 				iOS/Info.plist,
 				iOS/PangolinApp.swift,
+				iOS/UI/AboutView.swift,
 				iOS/UI/LoginView.swift,
 				iOS/UI/MainView.swift,
-				iOS/UI/Settings/AboutView.swift,
-				iOS/UI/Settings/DNSServerModalView.swift,
-				iOS/UI/Settings/PreferencesView.swift,
-				iOS/UI/Settings/StatusView.swift,
-				iOS/UI/SettingsView.swift,
+				iOS/UI/Preferences/DNSServerModalView.swift,
+				iOS/UI/Preferences/PreferencesView.swift,
+				iOS/UI/StatusView.swift,
 			);
 			target = 90BC22B32EBC6C1D0072B44A /* Pangolin */;
 		};
@@ -125,13 +124,12 @@
 			membershipExceptions = (
 				Assets.xcassets,
 				iOS/PangolinApp.swift,
+				iOS/UI/AboutView.swift,
 				iOS/UI/LoginView.swift,
 				iOS/UI/MainView.swift,
-				iOS/UI/Settings/AboutView.swift,
-				iOS/UI/Settings/DNSServerModalView.swift,
-				iOS/UI/Settings/PreferencesView.swift,
-				iOS/UI/Settings/StatusView.swift,
-				iOS/UI/SettingsView.swift,
+				iOS/UI/Preferences/DNSServerModalView.swift,
+				iOS/UI/Preferences/PreferencesView.swift,
+				iOS/UI/StatusView.swift,
 				"pangolin-app-icon.icon",
 				Shared/AccountManager.swift,
 				Shared/AlertManager.swift,
@@ -540,6 +538,10 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -581,6 +583,10 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;

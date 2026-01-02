@@ -8,7 +8,6 @@
 import SwiftUI
 import os.log
 
-#if os(iOS)
 @main
 struct PangolinApp: App {
     @StateObject private var configManager = ConfigManager()
@@ -94,5 +93,3 @@ struct PangolinApp: App {
         }
     }
 }
-#endif
-

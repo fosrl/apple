@@ -5,7 +5,6 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
-#if os(iOS)
 import SwiftUI
 
 struct MainView: View {
@@ -154,7 +153,7 @@ struct HomeTabView: View {
                     }
                     .padding()
                     .background(Color(.systemGray6))
-                    .cornerRadius(16)
+                    .cornerRadius(24)
                     
                     // Account and Organization Section
                     if let user = authManager.currentUser {
@@ -229,7 +228,7 @@ struct HomeTabView: View {
                         }
                         .padding()
                         .background(Color(.systemGray6))
-                        .cornerRadius(16)
+                        .cornerRadius(24)
                     }
                 }
                 .padding()
@@ -415,5 +414,3 @@ struct OrganizationPickerView: View {
         }
     }
 }
-#endif
-

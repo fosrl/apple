@@ -5,7 +5,6 @@
 //  Created by Milo Schwartz on 11/5/25.
 //
 
-#if os(iOS)
 import SwiftUI
 
 struct DNSServerModalView: View {
@@ -76,5 +75,3 @@ struct DNSServerModalView: View {
         }
     }
 }
-#endif
-
