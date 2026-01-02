@@ -45,6 +45,7 @@ struct StatusView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding()
+                .background(Color(.systemGroupedBackground))
                 
                 // Content based on mode
                 if displayMode == .json {
