@@ -21,6 +21,7 @@ struct LoginView: View {
     @State private var showSuccess = false
     @State private var hasAutoOpenedBrowser = false
     @State private var loginTask: Task<Void, Never>?
+    @Environment(\.dismiss) private var dismiss
 
     @ObservedObject var authManager: AuthManager
     @ObservedObject var accountManager: AccountManager
@@ -184,15 +185,23 @@ struct LoginView: View {
         VStack(spacing: 20) {
             if hostingOption == .selfHosted {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Server URL")
-                        .font(.headline)
-                    
-                    TextField("https://your-server.com", text: $selfHostedURL)
-                        .textFieldStyle(.roundedBorder)
+                    TextField("Server URL", text: $selfHostedURL)
                         .autocorrectionDisabled()
                         .autocapitalization(.none)
                         .keyboardType(.URL)
                         .textContentType(.URL)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color(.secondarySystemGroupedBackground))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color(.separator), lineWidth: 1)
+                        )
+                    
+                    Text("Enter your server URL (e.g., https://your-server.com)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 4)
                 }
             } else {
                 VStack(spacing: 8) {
@@ -213,11 +222,9 @@ struct LoginView: View {
                     Text(isLoggingIn ? "Logging in..." : "Continue")
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(isLoggingIn || !isReadyToLogin ? Color.gray : Color.accentColor)
-                .foregroundColor(.white)
-                .cornerRadius(10)
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .disabled(isLoggingIn || !isReadyToLogin)
         }
     }
@@ -264,26 +271,21 @@ struct LoginView: View {
                     Button(action: {
                         copyToClipboard(deviceCode)
                     }) {
-                        Label("Copy Code", systemImage: "doc.on.doc")
+                        Text("Copy Code")
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(10)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
 
                     if let loginURL = authManager.deviceAuthLoginURL {
                         Button(action: {
                             openBrowser(url: loginURL)
                         }) {
-                            Label("Open Login Page", systemImage: "safari")
+                            Text("Open Login Page")
                                 .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.accentColor)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                     }
                 }
             }
@@ -370,6 +372,8 @@ struct LoginView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         // Reset state after showing success
                         resetLoginState()
+                        // Dismiss the sheet if presented as one
+                        dismiss()
                     }
                 }
             } catch {
