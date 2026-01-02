@@ -73,7 +73,8 @@ struct PangolinApp: App {
                         configManager: configManager,
                         authManager: authManager,
                         accountManager: accountManager,
-                        tunnelManager: tunnelManager
+                        tunnelManager: tunnelManager,
+                        apiClient: apiClient
                     )
                 } else {
                     // Show login view when not authenticated

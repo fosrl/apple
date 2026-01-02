@@ -13,8 +13,10 @@ struct MainView: View {
     @ObservedObject var authManager: AuthManager
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var apiClient: APIClient
     @State private var showAccountPicker = false
     @State private var showOrganizationPicker = false
+    @State private var showLoginView = false
     
     var body: some View {
         TabView {
@@ -46,16 +48,26 @@ struct MainView: View {
                 }
         }
         .sheet(isPresented: $showAccountPicker) {
-            AccountPickerView(
+            AccountManagementView(
                 accountManager: accountManager,
                 authManager: authManager,
-                tunnelManager: tunnelManager
+                tunnelManager: tunnelManager,
+                apiClient: apiClient,
+                showLoginView: $showLoginView
             )
         }
         .sheet(isPresented: $showOrganizationPicker) {
             OrganizationPickerView(
                 authManager: authManager,
                 tunnelManager: tunnelManager
+            )
+        }
+        .sheet(isPresented: $showLoginView) {
+            LoginView(
+                authManager: authManager,
+                accountManager: accountManager,
+                configManager: configManager,
+                apiClient: apiClient
             )
         }
     }
@@ -144,62 +156,75 @@ struct HomeTabView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(16)
                     
-                    // User Info Card
+                    // Account and Organization Section
                     if let user = authManager.currentUser {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "person.circle.fill")
-                                    .font(.title)
-                                    .foregroundColor(.accentColor)
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Account section
+                            VStack(alignment: .leading, spacing: 12) {
+                                // Account section header
+                                Text("Account")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
                                 
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(user.email)
-                                        .font(.headline)
-                                    
-                                    if let org = authManager.currentOrg {
-                                        Text(org.name)
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                
-                                Spacer()
-                            }
-                            
-                            Divider()
-                            
-                            // Account switching
-                            if accountManager.accounts.count > 1 {
+                                // Account button
                                 Button(action: {
                                     showAccountPicker = true
                                 }) {
                                     HStack {
-                                        Text("Switch Account")
-                                            .foregroundColor(.primary)
+                                        Image(systemName: "person.circle.fill")
+                                            .font(.title)
+                                            .foregroundColor(.accentColor)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(user.email)
+                                                .font(.headline)
+                                        }
+                                        
                                         Spacer()
+                                        
                                         Image(systemName: "chevron.right")
                                             .foregroundColor(.secondary)
                                             .font(.caption)
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                             }
                             
-                            // Organization switching
-                            if authManager.organizations.count > 1 {
-                                Button(action: {
-                                    showOrganizationPicker = true
-                                }) {
-                                    HStack {
-                                        Text("Switch Organization")
-                                            .foregroundColor(.primary)
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.secondary)
-                                            .font(.caption)
+                            // Organization section
+                            if let org = authManager.currentOrg {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    // Organization section header
+                                    Text("Organization")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.secondary)
+                                    
+                                    // Organization button
+                                    Button(action: {
+                                        showOrganizationPicker = true
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "building.2.fill")
+                                                .font(.title)
+                                                .foregroundColor(.accentColor)
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(org.name)
+                                                    .font(.headline)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.secondary)
+                                                .font(.caption)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
                                     }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                         .padding()
@@ -213,12 +238,14 @@ struct HomeTabView: View {
     }
 }
 
-// MARK: - Account Picker
+// MARK: - Account Management
 
-struct AccountPickerView: View {
+struct AccountManagementView: View {
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var apiClient: APIClient
+    @Binding var showLoginView: Bool
     @Environment(\.dismiss) private var dismiss
     
     private var accounts: [Account] {
@@ -256,50 +283,61 @@ struct AccountPickerView: View {
     var body: some View {
         NavigationStack {
             List {
+                if !accounts.isEmpty {
+                    Section {
+                        ForEach(accounts, id: \.userId) { account in
+                            let accountLabelText = formatEmailHostname(account: account)
+                            
+                            Button(action: {
+                                Task {
+                                    await authManager.switchAccount(userId: account.userId)
+                                    dismiss()
+                                }
+                            }) {
+                                HStack {
+                                    Text(accountLabelText)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    if currentAccountUserId == account.userId {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.accentColor)
+                                    }
+                                }
+                            }
+                            .disabled(shouldDisableAccountButton || currentAccountUserId == account.userId)
+                        }
+                    } header: {
+                        Text("Available Accounts")
+                    }
+                }
+                
                 Section {
-                    ForEach(accounts, id: \.userId) { account in
-                        let accountLabelText = formatEmailHostname(account: account)
-                        
-                        Button(action: {
+                    Button(action: {
+                        dismiss()
+                        showLoginView = true
+                    }) {
+                        HStack {
+                            Text("Add Account")
+                        }
+                    }
+                    
+                    if accountManager.activeAccount != nil {
+                        Button(role: .destructive, action: {
                             Task {
-                                await authManager.switchAccount(userId: account.userId)
+                                await authManager.logout()
                                 dismiss()
                             }
                         }) {
                             HStack {
-                                Text(accountLabelText)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                if currentAccountUserId == account.userId {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.accentColor)
-                                }
+                                Text("Logout")
                             }
-                        }
-                        .disabled(shouldDisableAccountButton || currentAccountUserId == account.userId)
-                    }
-                } header: {
-                    Text("Available Accounts")
-                }
-                
-                Section {
-                    Button(role: .destructive, action: {
-                        Task {
-                            await authManager.logout()
-                            dismiss()
-                        }
-                    }) {
-                        HStack {
-                            Spacer()
-                            Text("Logout")
-                            Spacer()
                         }
                     }
                 }
             }
-            .navigationTitle("Accounts")
+            .navigationTitle("Account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
