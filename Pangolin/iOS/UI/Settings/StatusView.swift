@@ -67,15 +67,17 @@ struct StatusView: View {
     // MARK: - JSON View
     
     private var jsonView: some View {
-        ScrollView {
+        Group {
             if let json = statusJSON {
-                VStack(alignment: .leading, spacing: 12) {
+                ScrollView {
                     Text(json)
-                        .font(.system(.body, design: .monospaced))
+                        .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
                 }
+                .scrollContentBackground(.hidden)
+                .background(Color(.systemGroupedBackground))
             } else {
                 Form {
                     Section {
@@ -101,7 +103,7 @@ struct StatusView: View {
     // MARK: - Formatted View
     
     private var formattedView: some View {
-        ScrollView {
+        Group {
             if let status = olmStatusManager.socketStatus {
                 Form {
                     // Overall Status Section
@@ -225,12 +227,11 @@ struct PeerRowView: View {
             // Status indicators
             HStack(spacing: 12) {
                 // Connected status
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Circle()
                         .fill((peer.connected ?? false) ? Color.green : Color.gray)
                         .frame(width: 8, height: 8)
                     Text(formatStatus(peer.connected ?? false))
-                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
