@@ -124,8 +124,8 @@ struct LoginView: View {
                         .font(.caption)
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
+                .background(Color(.systemGray5))
+                .cornerRadius(24)
             }
             .buttonStyle(.plain)
 
@@ -152,8 +152,8 @@ struct LoginView: View {
                         .font(.caption)
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
+                .background(Color(.systemGray5))
+                .cornerRadius(24)
             }
             .buttonStyle(.plain)
 
@@ -170,7 +170,7 @@ struct LoginView: View {
                 Text("and")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Button("Privacy Policy") {
+                Button("Privacy Policy.") {
                     openBrowser(url: "https://pangolin.net/privacy-policy.html")
                 }
                 .font(.caption)
