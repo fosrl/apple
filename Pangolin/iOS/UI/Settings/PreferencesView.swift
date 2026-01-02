@@ -69,54 +69,60 @@ struct PreferencesView: View {
                     }
                 }
                 
-                HStack {
-                    Text("Primary Upstream DNS Server")
-                    Spacer()
-                    Text(primaryDNSServer)
-                        .foregroundColor(.secondary)
-                    Button("Set...") {
-                        editingPrimaryDNS = primaryDNSServer
-                        showPrimaryDNSModal = true
+                Button(action: {
+                    editingPrimaryDNS = primaryDNSServer
+                    showPrimaryDNSModal = true
+                }) {
+                    HStack {
+                        Text("Primary Upstream DNS Server")
+                        Spacer()
+                        Text(primaryDNSServer)
+                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
+                .buttonStyle(.plain)
                 
-                HStack {
-                    Text("Secondary Upstream DNS Server")
-                    Spacer()
-                    Text(displaySecondaryDNS)
-                        .foregroundColor(.secondary)
-                    Button("Set...") {
-                        editingSecondaryDNS = secondaryDNSServer
-                        showSecondaryDNSModal = true
+                Button(action: {
+                    editingSecondaryDNS = secondaryDNSServer
+                    showSecondaryDNSModal = true
+                }) {
+                    HStack {
+                        Text("Secondary Upstream DNS Server")
+                        Spacer()
+                        Text(displaySecondaryDNS)
+                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
+                .buttonStyle(.plain)
                 }
             }
             .navigationTitle("Preferences")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPrimaryDNSModal) {
-            DNSServerModalView(
-                title: "Primary Upstream DNS Server:",
-                dnsServer: $editingPrimaryDNS,
-                isPresented: $showPrimaryDNSModal,
-                onSave: { newValue in
-                    _ = configManager.setPrimaryDNSServer(newValue)
-                }
-            )
-        }
-        .sheet(isPresented: $showSecondaryDNSModal) {
-            DNSServerModalView(
-                title: "Secondary Upstream DNS Server:",
-                dnsServer: $editingSecondaryDNS,
-                isPresented: $showSecondaryDNSModal,
-                onSave: { newValue in
-                    _ = configManager.setSecondaryDNSServer(newValue)
-                }
-            )
+                DNSServerModalView(
+                    title: "Primary Upstream DNS Server",
+                    dnsServer: $editingPrimaryDNS,
+                    isPresented: $showPrimaryDNSModal,
+                    onSave: { newValue in
+                        _ = configManager.setPrimaryDNSServer(newValue)
+                    }
+                )
+            }
+            .sheet(isPresented: $showSecondaryDNSModal) {
+                DNSServerModalView(
+                    title: "Secondary Upstream DNS Server",
+                    dnsServer: $editingSecondaryDNS,
+                    isPresented: $showSecondaryDNSModal,
+                    onSave: { newValue in
+                        _ = configManager.setSecondaryDNSServer(newValue)
+                    }
+                )
             }
         }
     }

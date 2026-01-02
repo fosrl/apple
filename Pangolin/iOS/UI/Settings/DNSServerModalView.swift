@@ -26,21 +26,29 @@ struct DNSServerModalView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(title)
-                        .font(.headline)
-                    
-                    TextField("", text: $editedValue)
-                        .textFieldStyle(.roundedBorder)
+            Form {
+                Section {
+                    TextField("DNS Server", text: $editedValue)
                         .autocorrectionDisabled()
                         .autocapitalization(.none)
                         .keyboardType(.numbersAndPunctuation)
                         .focused($isTextFieldFocused)
+                } footer: {
+                    Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
+                        .font(.caption)
                 }
-                .padding()
                 
-                Spacer()
+                Section {
+                    Button(action: {
+                        editedValue = "1.1.1.1"
+                    }) {
+                        HStack {
+                            Spacer()
+                            Text("Use Default")
+                            Spacer()
+                        }
+                    }
+                }
             }
             .navigationTitle("DNS Server")
             .navigationBarTitleDisplayMode(.inline)
@@ -48,12 +56,6 @@ struct DNSServerModalView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         isPresented = false
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Default") {
-                        editedValue = "1.1.1.1"
                     }
                 }
                 
@@ -72,7 +74,6 @@ struct DNSServerModalView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
     }
 }
 #endif
