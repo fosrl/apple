@@ -469,9 +469,7 @@ public class TunnelAdapter {
         // Set IPv4 settings
         if let ipv4Addresses = json.ipv4Addresses, !ipv4Addresses.isEmpty {
             // Log raw values from JSON before creating settings
-            os_log("IPv4 addresses from JSON (raw): %{public}@", log: logger, type: .debug, ipv4Addresses.joined(separator: ", "))
             let subnetMasks = json.ipv4SubnetMasks ?? Array(repeating: "255.255.255.0", count: ipv4Addresses.count)
-            os_log("IPv4 subnet masks (raw): %{public}@", log: logger, type: .debug, subnetMasks.joined(separator: ", "))
             let ipv4Settings = NEIPv4Settings(addresses: ipv4Addresses, subnetMasks: subnetMasks)
             
             // Convert routes
@@ -510,11 +508,7 @@ public class TunnelAdapter {
                 }
             }
             ipv4Settings.excludedRoutes = excludedRoutes
-            
-            // Log values after creating settings object
-            os_log("IPv4 addresses in settings object (after): %{public}@", log: logger, type: .debug, ipv4Settings.addresses.joined(separator: ", "))
-            os_log("IPv4 subnet masks in settings object (after): %{public}@", log: logger, type: .debug, ipv4Settings.subnetMasks.joined(separator: ", "))
-            
+                        
             settings.ipv4Settings = ipv4Settings
         }
         
