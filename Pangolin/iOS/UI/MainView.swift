@@ -103,6 +103,14 @@ struct HomeTabView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    // Logo
+                    Image("PangolinLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 60)
+                        .padding(.top, 20)
+                        .padding(.bottom, 15)
+                    
                     // Tunnel Status Card
                     VStack(spacing: 16) {
                         // Status indicator with toggle
@@ -201,7 +209,6 @@ struct HomeTabView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Home")
         }
     }
 }
