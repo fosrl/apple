@@ -88,6 +88,7 @@ public class TunnelAdapter {
     private var lastSeenVersion: Int = -1
     private var settingsPollTimer: DispatchSourceTimer?
     private let pollInterval: TimeInterval = 0.5 // 500ms
+    private var overrideDNS: Bool = false
     
     public init(with packetTunnelProvider: NEPacketTunnelProvider) {
         self.packetTunnelProvider = packetTunnelProvider
@@ -240,7 +241,7 @@ public class TunnelAdapter {
               let userToken: String = options["userToken"] as? String,
               let orgId = options["orgId"] as? String,
               let upstreamDNS = options["upstreamDNS"] as? [String],
-              let overrideDNS = (options["overrideDNS"] as? NSNumber)?.boolValue,
+              let overrideDNSValue = (options["overrideDNS"] as? NSNumber)?.boolValue,
               let tunnelDNS = (options["tunnelDNS"] as? NSNumber)?.boolValue,
               let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue else {
             let error = NSError(domain: "TunnelAdapter", code: -1, userInfo: [NSLocalizedDescriptionKey: "Required tunnel configuration options are missing"])
@@ -262,9 +263,12 @@ public class TunnelAdapter {
             "userToken": userToken,
             "orgId": orgId,
             "upstreamDNS": upstreamDNS,
-            "overrideDNS": overrideDNS,
+            "overrideDNS": overrideDNSValue,
            	"tunnelDNS": tunnelDNS 
         ]
+        
+        // Store overrideDNS for later use in network settings
+        self.overrideDNS = overrideDNSValue
         
         // Convert config to JSON string
         guard let jsonData = try? JSONSerialization.data(withJSONObject: config),
@@ -458,11 +462,16 @@ public class TunnelAdapter {
         // Set DNS settings (use JSON value if provided, otherwise preserve existing)
         if let dnsServers = json.dnsServers, !dnsServers.isEmpty {
             let dnsSettings = NEDNSSettings(servers: dnsServers)
-            // Set search domains to empty array to match all domains
-            dnsSettings.matchDomains = [""]
+            // Set search domains to empty array to match all domains only if overrideDNS is enabled
+            if overrideDNS {
+                dnsSettings.matchDomains = [""]
+            }
             settings.dnsSettings = dnsSettings
         } else if let existingDNS = existing?.dnsSettings {
-            existingDNS.matchDomains = [""]
+            // Only modify matchDomains if overrideDNS is enabled
+            if overrideDNS {
+                existingDNS.matchDomains = [""]
+            }
             settings.dnsSettings = existingDNS
         }
         
