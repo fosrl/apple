@@ -81,6 +81,7 @@ struct HomeTabView: View {
     @ObservedObject var tunnelManager: TunnelManager
     @Binding var showAccountPicker: Bool
     @Binding var showOrganizationPicker: Bool
+    @State private var optimisticToggleState: Bool = false
     
     private var tunnelStatus: TunnelStatus {
         tunnelManager.status
@@ -137,8 +138,10 @@ struct HomeTabView: View {
                             Spacer()
                             
                             Toggle("", isOn: Binding(
-                                get: { tunnelManager.isNEConnected },
+                                get: { optimisticToggleState },
                                 set: { isOn in
+                                    // Optimistically update the toggle state immediately
+                                    optimisticToggleState = isOn
                                     Task {
                                         if isOn {
                                             await tunnelManager.connect()
@@ -149,6 +152,14 @@ struct HomeTabView: View {
                                 }
                             ))
                             .disabled(isInIntermediateState)
+                            .onChange(of: tunnelManager.isNEConnected) { newValue in
+                                // Sync optimistic state with actual state when it changes
+                                optimisticToggleState = newValue
+                            }
+                            .onAppear {
+                                // Initialize optimistic state from actual state
+                                optimisticToggleState = tunnelManager.isNEConnected
+                            }
                         }
                     }
                     .padding()
