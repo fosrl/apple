@@ -60,7 +60,10 @@ struct LoginView: View {
                 if hostingOption != nil && !showSuccess {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Back") {
-                            if authManager.deviceAuthCode != nil {
+                            // If login is in progress, cancel it
+                            if isLoggingIn {
+                                resetLoginState()
+                            } else if authManager.deviceAuthCode != nil {
                                 // Cancel the auth flow
                                 authManager.deviceAuthCode = nil
                                 authManager.deviceAuthLoginURL = nil
@@ -69,7 +72,6 @@ struct LoginView: View {
                                 selfHostedURL = ""
                             }
                         }
-                        .disabled(isLoggingIn)
                     }
                 }
             }
@@ -193,14 +195,9 @@ struct LoginView: View {
                         .frame(maxWidth: .infinity)
                         .background(Color(.secondarySystemGroupedBackground))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 24)
                                 .stroke(Color(.separator), lineWidth: 1)
                         )
-                    
-                    Text("Enter your server URL (e.g., https://your-server.com)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 4)
                 }
             } else {
                 VStack(spacing: 8) {
@@ -254,12 +251,12 @@ struct LoginView: View {
             // For 8 characters: ~32pt width each + 4pt spacing = ~284pt total, fits on all iPhones
             if let deviceCode = authManager.deviceAuthCode {
                 HStack(spacing: 4) {
-                    ForEach(Array(deviceCode), id: \.self) { digit in
+                    ForEach(Array(deviceCode.enumerated()), id: \.offset) { index, digit in
                         Text(String(digit))
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
                             .frame(width: 32, height: 44)
-                            .background(Color(.systemGray5))
-                            .cornerRadius(8)
+                            .background(index == 4 ? Color.clear : Color(.systemGray5))
+                            .cornerRadius(index == 4 ? 0 : 8)
                     }
                 }
             }
