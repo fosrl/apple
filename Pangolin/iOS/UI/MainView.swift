@@ -51,7 +51,7 @@ struct MainView: View {
                 VStack(spacing: 24) {
                     // Tunnel Status Card
                     VStack(spacing: 16) {
-                        // Status indicator
+                        // Status indicator with toggle
                         HStack(spacing: 12) {
                             Circle()
                                 .fill(statusColor)
@@ -62,33 +62,21 @@ struct MainView: View {
                                 .foregroundColor(.primary)
                             
                             Spacer()
-                        }
-                        
-                        // Connect/Disconnect Button
-                        Button(action: {
-                            Task {
-                                if !tunnelManager.isNEConnected {
-                                    await tunnelManager.connect()
-                                } else {
-                                    await tunnelManager.disconnect()
+                            
+                            Toggle("", isOn: Binding(
+                                get: { tunnelManager.isNEConnected },
+                                set: { isOn in
+                                    Task {
+                                        if isOn {
+                                            await tunnelManager.connect()
+                                        } else {
+                                            await tunnelManager.disconnect()
+                                        }
+                                    }
                                 }
-                            }
-                        }) {
-                            HStack {
-                                if isInIntermediateState {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                }
-                                Text(tunnelManager.isNEConnected ? "Disconnect" : "Connect")
-                                    .font(.headline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(tunnelManager.isNEConnected ? Color.red : Color.accentColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                            ))
+                            .disabled(isInIntermediateState)
                         }
-                        .disabled(tunnelManager.isRegistering || isInIntermediateState)
                     }
                     .padding()
                     .background(Color(.systemGray6))

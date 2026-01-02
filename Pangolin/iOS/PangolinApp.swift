@@ -85,6 +85,7 @@ struct PangolinApp: App {
                     )
                 }
             }
+            .tint(.orange)
             .onAppear {
                 Task {
                     await authManager.initialize()
