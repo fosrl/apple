@@ -7,6 +7,7 @@
 
 #if os(iOS)
 import SwiftUI
+import UIKit
 
 enum DisplayMode: String, CaseIterable {
     case formatted = "Formatted"
@@ -16,6 +17,7 @@ enum DisplayMode: String, CaseIterable {
 struct StatusView: View {
     @ObservedObject var olmStatusManager: OLMStatusManager
     @State private var displayMode: DisplayMode = .formatted
+    @State private var showCopyConfirmation = false
     
     // Computed property to format socket status as JSON
     private var statusJSON: String? {
@@ -53,6 +55,28 @@ struct StatusView: View {
             }
             .navigationTitle("Status")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if displayMode == .json && statusJSON != nil {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            if let json = statusJSON {
+                                UIPasteboard.general.string = json
+                                showCopyConfirmation = true
+                                // Hide confirmation after 2 seconds
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    showCopyConfirmation = false
+                                }
+                            }
+                        }) {
+                            if showCopyConfirmation {
+                                Label("Copied", systemImage: "checkmark")
+                            } else {
+                                Label("Copy", systemImage: "doc.on.doc")
+                            }
+                        }
+                    }
+                }
+            }
             .onAppear {
                 // Start separate polling for live updates when view appears
                 olmStatusManager.startPolling()
