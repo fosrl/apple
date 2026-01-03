@@ -10,7 +10,15 @@ import Foundation
 import Security
 
 class SecretManager: ObservableObject {
-    private let service = "Pangolin: pangolin-macOS"
+    private let service: String = {
+        #if os(iOS)
+        return "Pangolin: pangolin-iOS"
+        #elseif os(macOS)
+        return "Pangolin: pangolin-macOS"
+        #else
+        return "Pangolin"
+        #endif
+    }()
 
     private func saveSecret(key: String, value: String) -> Bool {
         guard let data = value.data(using: .utf8) else {
