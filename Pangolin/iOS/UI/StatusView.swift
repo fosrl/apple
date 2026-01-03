@@ -181,14 +181,14 @@ struct StatusView: View {
                                 }
                             }
                         } header: {
-                            Text("Peers")
+                            Text("Sites")
                         }
                     } else {
                         Section {
-                            Text("No peers connected")
+                            Text("No sites connected")
                                 .foregroundColor(.secondary)
                         } header: {
-                            Text("Peers")
+                            Text("Sites")
                         }
                     }
                 }

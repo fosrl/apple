@@ -7,6 +7,13 @@
 
 import SwiftUI
 
+enum TabSelection: Int {
+    case home = 0
+    case status = 1
+    case preferences = 2
+    case about = 3
+}
+
 struct MainView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var authManager: AuthManager
@@ -16,35 +23,41 @@ struct MainView: View {
     @State private var showAccountPicker = false
     @State private var showOrganizationPicker = false
     @State private var showLoginView = false
+    @State private var selectedTab: TabSelection = .home
     
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             HomeTabView(
                 configManager: configManager,
                 authManager: authManager,
                 accountManager: accountManager,
                 tunnelManager: tunnelManager,
                 showAccountPicker: $showAccountPicker,
-                showOrganizationPicker: $showOrganizationPicker
+                showOrganizationPicker: $showOrganizationPicker,
+                selectedTab: $selectedTab
             )
             .tabItem {
                 Label("Home", systemImage: "house.fill")
             }
+            .tag(TabSelection.home)
             
             StatusView(olmStatusManager: tunnelManager.olmStatusManager)
                 .tabItem {
-                    Label("Status", systemImage: "chart.bar.doc.horizontal")
+                    Label("Status", systemImage: "app.connected.to.app.below.fill")
                 }
+            .tag(TabSelection.status)
             
             PreferencesView(configManager: configManager)
                 .tabItem {
-                    Label("Preferences", systemImage: "gear")
+                    Label("Preferences", systemImage: "gearshape.fill")
                 }
+            .tag(TabSelection.preferences)
             
             AboutView()
                 .tabItem {
                     Label("About", systemImage: "info.circle")
                 }
+            .tag(TabSelection.about)
         }
         .sheet(isPresented: $showAccountPicker) {
             AccountManagementView(
@@ -81,6 +94,7 @@ struct HomeTabView: View {
     @ObservedObject var tunnelManager: TunnelManager
     @Binding var showAccountPicker: Bool
     @Binding var showOrganizationPicker: Bool
+    @Binding var selectedTab: TabSelection
     @State private var optimisticToggleState: Bool = false
     
     private var tunnelStatus: TunnelStatus {
@@ -124,47 +138,79 @@ struct HomeTabView: View {
                         .padding(.bottom, 15)
                     
                     // Tunnel Status Card
-                    VStack(spacing: 16) {
-                        // Status indicator with toggle
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(statusColor)
-                                .frame(width: 12, height: 12)
-                            
-                            Text(tunnelStatus.displayText)
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            Toggle("", isOn: Binding(
-                                get: { optimisticToggleState },
-                                set: { isOn in
-                                    // Optimistically update the toggle state immediately
-                                    optimisticToggleState = isOn
-                                    Task {
-                                        if isOn {
-                                            await tunnelManager.connect()
-                                        } else {
-                                            await tunnelManager.disconnect()
+                    VStack(spacing: 0) {
+                        VStack(spacing: 16) {
+                            // Status indicator with toggle
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(statusColor)
+                                    .frame(width: 12, height: 12)
+                                
+                                Text(tunnelStatus.displayText)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Toggle("", isOn: Binding(
+                                    get: { optimisticToggleState },
+                                    set: { isOn in
+                                        // Optimistically update the toggle state immediately
+                                        optimisticToggleState = isOn
+                                        Task {
+                                            if isOn {
+                                                await tunnelManager.connect()
+                                            } else {
+                                                await tunnelManager.disconnect()
+                                            }
                                         }
                                     }
+                                ))
+                                .disabled(isInIntermediateState)
+                                .onChange(of: tunnelManager.isNEConnected) { newValue in
+                                    // Sync optimistic state with actual state when it changes
+                                    optimisticToggleState = newValue
                                 }
-                            ))
-                            .disabled(isInIntermediateState)
-                            .onChange(of: tunnelManager.isNEConnected) { newValue in
-                                // Sync optimistic state with actual state when it changes
-                                optimisticToggleState = newValue
-                            }
-                            .onAppear {
-                                // Initialize optimistic state from actual state
-                                optimisticToggleState = tunnelManager.isNEConnected
+                                .onAppear {
+                                    // Initialize optimistic state from actual state
+                                    optimisticToggleState = tunnelManager.isNEConnected
+                                }
                             }
                         }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(24)
+                        
+                        // Status page dropdown button (only when connected)
+                        if tunnelStatus == .connected {
+                            Button(action: {
+                                selectedTab = .status
+                            }) {
+                                HStack {
+                                    Image(systemName: "app.connected.to.app.below.fill")
+                                        .font(.system(size: 14))
+                                    
+                                    Text("View Status Details")
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(24)
+                                .padding(.top, 8)
+                            }
+                            .buttonStyle(.plain)
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .move(edge: .top)).combined(with: .scale(scale: 0.95)),
+                                removal: .opacity.combined(with: .move(edge: .top))
+                            ))
+                        }
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(24)
+                    .animation(.easeInOut(duration: 0.3), value: tunnelStatus == .connected)
                     
                     // Account and Organization Section
                     if let user = authManager.currentUser {
@@ -241,6 +287,66 @@ struct HomeTabView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(24)
                     }
+                    
+                    // Links Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Links section header
+                        Text("Links")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                        
+                        // Visit Dashboard button
+                        if let hostname = accountManager.activeAccount?.hostname,
+                           let dashboardURL = URL(string: hostname) {
+                            Link(destination: dashboardURL) {
+                                HStack {
+                                    Image(systemName: "rectangle.grid.3x1.fill")
+                                        .font(.title)
+                                        .foregroundColor(.accentColor)
+                                    
+                                    Text(" Visit Dashboard")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "arrow.up.forward")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        // Documentation button
+                        if let docsURL = URL(string: "https://docs.pangolin.net") {
+                            Link(destination: docsURL) {
+                                HStack {
+                                    Image(systemName: "book.fill")
+                                        .font(.title)
+                                        .foregroundColor(.accentColor)
+                                    
+                                    Text("Documentation")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "arrow.up.forward")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(24)
                 }
                 .padding()
             }

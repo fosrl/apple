@@ -47,7 +47,7 @@ struct AboutView: View {
                         HStack {
                             Text("Documentation")
                             Spacer()
-                            Image(systemName: "arrow.up.right.square")
+                            Image(systemName: "arrow.up.forward")
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
@@ -57,7 +57,7 @@ struct AboutView: View {
                         HStack {
                             Text("How Pangolin Works")
                             Spacer()
-                            Image(systemName: "arrow.up.right.square")
+                            Image(systemName: "arrow.up.forward")
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
@@ -71,7 +71,7 @@ struct AboutView: View {
                         HStack {
                             Text("Terms of Service")
                             Spacer()
-                            Image(systemName: "arrow.up.right.square")
+                            Image(systemName: "arrow.up.forward")
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
@@ -81,7 +81,7 @@ struct AboutView: View {
                         HStack {
                             Text("Privacy Policy")
                             Spacer()
-                            Image(systemName: "arrow.up.right.square")
+                            Image(systemName: "arrow.up.forward")
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
