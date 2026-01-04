@@ -139,47 +139,52 @@ struct HomeTabView: View {
                     
                     // Tunnel Status Card
                     VStack(spacing: 0) {
-                        VStack(spacing: 16) {
-                            // Status indicator with toggle
-                            HStack(spacing: 12) {
-                                Circle()
-                                    .fill(statusColor)
-                                    .frame(width: 12, height: 12)
-                                
-                                Text(tunnelStatus.displayText)
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                Toggle("", isOn: Binding(
-                                    get: { optimisticToggleState },
-                                    set: { isOn in
-                                        // Optimistically update the toggle state immediately
-                                        optimisticToggleState = isOn
-                                        Task {
-                                            if isOn {
-                                                await tunnelManager.connect()
-                                            } else {
-                                                await tunnelManager.disconnect()
-                                            }
-                                        }
-                                    }
-                                ))
-                                .disabled(isInIntermediateState)
-                                .onChange(of: tunnelManager.isNEConnected) { newValue in
-                                    // Sync optimistic state with actual state when it changes
-                                    optimisticToggleState = newValue
-                                }
-                                .onAppear {
-                                    // Initialize optimistic state from actual state
-                                    optimisticToggleState = tunnelManager.isNEConnected
+                        Button(action: {
+                            guard !isInIntermediateState else { return }
+                            
+                            // Optimistically update the toggle state immediately
+                            optimisticToggleState.toggle()
+                            Task {
+                                if optimisticToggleState {
+                                    await tunnelManager.connect()
+                                } else {
+                                    await tunnelManager.disconnect()
                                 }
                             }
+                        }) {
+                            VStack(spacing: 16) {
+                                // Status indicator with toggle
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(statusColor)
+                                        .frame(width: 12, height: 12)
+                                    
+                                    Text(tunnelStatus.displayText)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Toggle("", isOn: $optimisticToggleState)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
-                        .padding()
+                        .disabled(isInIntermediateState)
+                        .buttonStyle(.plain)
                         .background(Color(.systemGray6))
                         .cornerRadius(24)
+                        .onChange(of: tunnelManager.isNEConnected) { newValue in
+                            // Sync optimistic state with actual state when it changes
+                            optimisticToggleState = newValue
+                        }
+                        .onAppear {
+                            // Initialize optimistic state from actual state
+                            optimisticToggleState = tunnelManager.isNEConnected
+                        }
                         
                         // Status page dropdown button (only when connected)
                         if tunnelStatus == .connected {
@@ -187,15 +192,13 @@ struct HomeTabView: View {
                                 selectedTab = .status
                             }) {
                                 HStack {
-                                    Image(systemName: "app.connected.to.app.below.fill")
-                                        .font(.system(size: 14))
-                                    
                                     Text("View Status Details")
                                     
                                     Spacer()
                                     
                                     Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -228,7 +231,6 @@ struct HomeTabView: View {
                                 }) {
                                     HStack {
                                         Image(systemName: "person.circle.fill")
-                                            .font(.title)
                                             .foregroundColor(.accentColor)
                                         
                                         VStack(alignment: .leading, spacing: 4) {
@@ -262,7 +264,6 @@ struct HomeTabView: View {
                                     }) {
                                         HStack {
                                             Image(systemName: "building.2.fill")
-                                                .font(.title)
                                                 .foregroundColor(.accentColor)
                                             
                                             VStack(alignment: .leading, spacing: 4) {
@@ -300,12 +301,7 @@ struct HomeTabView: View {
                            let dashboardURL = URL(string: hostname) {
                             Link(destination: dashboardURL) {
                                 HStack {
-                                    Image(systemName: "rectangle.grid.3x1.fill")
-                                        .font(.title)
-                                        .foregroundColor(.accentColor)
-                                    
-                                    Text(" Visit Dashboard")
-                                        .font(.headline)
+                                    Text("Visit Dashboard")
                                         .foregroundColor(.primary)
                                     
                                     Spacer()
@@ -320,16 +316,28 @@ struct HomeTabView: View {
                             .buttonStyle(.plain)
                         }
                         
-                        // Documentation button
+                        if let docsURL = URL(string: "https://docs.pangolin.net/about/how-pangolin-works") {
+                            Link(destination: docsURL) {
+                                HStack {
+                                    Text("How Pangolin Works")
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "arrow.up.forward")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
                         if let docsURL = URL(string: "https://docs.pangolin.net") {
                             Link(destination: docsURL) {
                                 HStack {
-                                    Image(systemName: "book.fill")
-                                        .font(.title)
-                                        .foregroundColor(.accentColor)
-                                    
                                     Text("Documentation")
-                                        .font(.headline)
                                         .foregroundColor(.primary)
                                     
                                     Spacer()
