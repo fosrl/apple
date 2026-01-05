@@ -121,7 +121,7 @@ struct MenuBarView: View {
 
                 // Version information
                 Text(
-                    "Version: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")"
+                    "Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")"
                 )
                 .foregroundColor(.secondary)
 

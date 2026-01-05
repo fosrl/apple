@@ -100,7 +100,7 @@ public class TunnelAdapter {
         PangolinGo.setLogLevel(Int32(LogLevel.debug.rawValue))
         
         // Get app version from bundle (semver)
-        let appVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1.0.0"
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
         #if os(iOS)
         let agent: String
         if UIDevice.current.userInterfaceIdiom == .pad {

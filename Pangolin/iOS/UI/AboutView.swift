@@ -28,7 +28,7 @@ struct AboutView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("\(appVersion)")
+                        Text("\(appVersion) (\(buildNumber))")
                             .foregroundColor(.secondary)
                     }
                     

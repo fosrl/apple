@@ -31,7 +31,7 @@ struct AboutContentView: View {
                             Text("Version")
                                 .font(.system(size: 13))
                             Spacer()
-                            Text("\(appVersion)")
+                            Text("\(appVersion) (\(buildNumber))")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }
