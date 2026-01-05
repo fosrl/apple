@@ -239,10 +239,13 @@ class AuthManager: ObservableObject {
         apiClient.updateSessionToken(token)
         apiClient.updateBaseURL(hostname)
 
-        // Disconnect tunnel on successful login to ensure clean state
+        // Disconnect tunnel on successful login to ensure clean state (macOS only)
+        // On iOS, we want to preserve the existing connection state and just reflect it
+        #if os(macOS)
         if let tunnelManager = tunnelManager {
             await tunnelManager.disconnect()
         }
+        #endif
 
         currentUser = user
 
