@@ -598,7 +598,6 @@ class AuthManager: ObservableObject {
 
         // Clear local data
         _ = secretManager.deleteSessionToken(userId: userId)
-        _ = secretManager.deleteOlmCredentials(userId: userId)
 
         accountManager.removeAccount(userId: userId)
 
