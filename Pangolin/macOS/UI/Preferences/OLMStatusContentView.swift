@@ -166,15 +166,15 @@ struct OLMStatusContentView: View {
                                 }
                             }
                         } header: {
-                            Text("Peers")
+                            Text("Sites")
                         }
                     } else {
                         Section {
-                            Text("No peers connected")
+                            Text("No sites connected")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         } header: {
-                            Text("Peers")
+                            Text("Sites")
                         }
                     }
                 }

@@ -9,10 +9,6 @@ import SwiftUI
 import AppKit
 
 struct AboutContentView: View {
-    private var appName: String {
-        Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "Pangolin"
-    }
-    
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
@@ -26,36 +22,16 @@ struct AboutContentView: View {
         return "© \(year) Fossorial, Inc."
     }
     
-    private var appIcon: NSImage? {
-        NSImage(named: NSImage.applicationIconName)
-    }
-    
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                // App icon and name header
-                VStack(spacing: 12) {
-                    if let icon = appIcon {
-                        Image(nsImage: icon)
-                            .resizable()
-                            .frame(width: 64, height: 64)
-                            .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-                    }
-                    
-                    Text(appName)
-                        .font(.system(size: 22, weight: .medium))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
-                
                 Form {
                     Section {
                         HStack {
                             Text("Version")
                                 .font(.system(size: 13))
                             Spacer()
-                            Text("\(appVersion) (\(buildNumber))")
+                            Text("\(appVersion)")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }
@@ -78,7 +54,7 @@ struct AboutContentView: View {
                                 Text("Documentation")
                                     .font(.system(size: 13))
                                 Spacer()
-                                Image(systemName: "arrow.up.right.square")
+                                Image(systemName: "arrow.up.forward")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
@@ -89,7 +65,7 @@ struct AboutContentView: View {
                                 Text("How Pangolin Works")
                                     .font(.system(size: 13))
                                 Spacer()
-                                Image(systemName: "arrow.up.right.square")
+                                Image(systemName: "arrow.up.forward")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
@@ -104,7 +80,7 @@ struct AboutContentView: View {
                                 Text("Terms of Service")
                                     .font(.system(size: 13))
                                 Spacer()
-                                Image(systemName: "arrow.up.right.square")
+                                Image(systemName: "arrow.up.forward")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
@@ -115,7 +91,7 @@ struct AboutContentView: View {
                                 Text("Privacy Policy")
                                     .font(.system(size: 13))
                                 Spacer()
-                                Image(systemName: "arrow.up.right.square")
+                                Image(systemName: "arrow.up.forward")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }

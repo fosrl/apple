@@ -17,11 +17,11 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .preferences:
-            return "gear"
+            return "gearshape.fill"
         case .olmStatus:
-            return "chart.bar.doc.horizontal"
+            return "app.connected.to.app.below.fill"
         case .about:
-            return "info.circle"
+            return "info.circle.fill"
         }
     }
 }
