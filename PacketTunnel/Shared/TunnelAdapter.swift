@@ -11,6 +11,10 @@ import PangolinGo
 import os.log
 import Darwin
 
+#if os(iOS)
+import UIKit
+#endif
+
 // Centralized log level configuration
 enum LogLevel: Int {
     case debug = 0
@@ -98,7 +102,12 @@ public class TunnelAdapter {
         // Get app version from bundle (semver)
         let appVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1.0.0"
         #if os(iOS)
-        let agent = "Pangolin iOS"
+        let agent: String
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            agent = "Pangolin iPadOS"
+        } else {
+            agent = "Pangolin iOS"
+        }
         #else
         let agent = "Pangolin macOS"
         #endif

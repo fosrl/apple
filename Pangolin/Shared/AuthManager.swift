@@ -10,6 +10,10 @@ import Foundation
 import UserNotifications
 import os.log
 
+#if os(iOS)
+import UIKit
+#endif
+
 @MainActor
 class AuthManager: ObservableObject {
     @Published var isAuthenticated = false
@@ -93,7 +97,12 @@ class AuthManager: ObservableObject {
                 let hostname = loginApiClient.currentBaseURL
 
                 #if os(iOS)
-                let applicationName = "Pangolin iOS Client"
+                let applicationName: String
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    applicationName = "Pangolin iPadOS Client"
+                } else {
+                    applicationName = "Pangolin iOS Client"
+                }
                 #elseif os(macOS)
                 let applicationName = "Pangolin macOS Client"
                 #else

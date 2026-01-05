@@ -28,7 +28,7 @@ struct LoginView: View {
     @ObservedObject var apiClient: APIClient
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 32) {
                     // Logo
@@ -53,6 +53,8 @@ struct LoginView: View {
                     }
                 }
                 .padding()
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle("Sign In")
             .navigationBarTitleDisplayMode(.inline)

@@ -59,6 +59,7 @@ struct MainView: View {
                 }
             .tag(TabSelection.about)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showAccountPicker) {
             AccountManagementView(
                 accountManager: accountManager,
@@ -357,6 +358,8 @@ struct HomeTabView: View {
                     .cornerRadius(24)
                 }
                 .padding()
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
             }
         }
     }

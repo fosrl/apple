@@ -85,6 +85,7 @@ struct PangolinApp: App {
                     )
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear {
                 Task {
                     await authManager.initialize()
