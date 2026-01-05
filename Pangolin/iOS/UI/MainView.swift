@@ -167,6 +167,7 @@ struct HomeTabView: View {
                                     Spacer()
                                     
                                     Toggle("", isOn: $optimisticToggleState)
+                                        .tint(.accentColor)
                                         .allowsHitTesting(false)
                                 }
                             }

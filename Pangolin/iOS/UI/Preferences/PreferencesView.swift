@@ -52,6 +52,7 @@ struct PreferencesView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+                .tint(.accentColor)
                 
                 Toggle(isOn: Binding(
                     get: { dnsTunnelEnabled },
@@ -67,6 +68,7 @@ struct PreferencesView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+                .tint(.accentColor)
                 
                 Button(action: {
                     editingPrimaryDNS = primaryDNSServer
