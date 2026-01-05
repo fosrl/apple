@@ -120,7 +120,7 @@ class AccountManager: ObservableObject {
         store.accounts.removeValue(forKey: userId)
 
         if store.activeUserId == userId {
-            store.activeUserId = "'"
+            store.activeUserId = ""
         }
 
         _ = save()

@@ -596,6 +596,10 @@ class AuthManager: ObservableObject {
 
         let userId = activeAccount.userId
 
+        // Check if there are other accounts before removing this one
+        let remainingAccounts = accountManager.accounts.filter { $0.key != userId }
+        let hasOtherAccounts = !remainingAccounts.isEmpty
+
         // Disconnect tunnel before logging out
         if let tunnelManager = tunnelManager {
             await tunnelManager.disconnect()
@@ -613,14 +617,21 @@ class AuthManager: ObservableObject {
 
         accountManager.removeAccount(userId: userId)
 
-        apiClient.updateSessionToken(nil)
+        // If there are other accounts, switch to one of them
+        if hasOtherAccounts, let nextAccount = remainingAccounts.values.first {
+            // Switch to the first available account
+            await switchAccount(userId: nextAccount.userId)
+        } else {
+            // No other accounts, fully log out
+            apiClient.updateSessionToken(nil)
 
-        isAuthenticated = false
-        currentOrg = nil
-        organizations = []
-        errorMessage = nil
-        deviceAuthCode = nil
-        deviceAuthLoginURL = nil
+            isAuthenticated = false
+            currentOrg = nil
+            organizations = []
+            errorMessage = nil
+            deviceAuthCode = nil
+            deviceAuthLoginURL = nil
+        }
     }
 }
 
