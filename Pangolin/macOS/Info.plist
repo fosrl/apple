@@ -35,5 +35,14 @@
 	<string>https://static.pangolin.net/mac-client/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>it0RcWHf76QE8eC1HVDTy2nP3xi7NrcyZRaW7F7jQtE=</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+    	<dict>
+        	<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pangolin</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -346,11 +346,6 @@ class AuthManager: ObservableObject {
     }
 
     func switchAccount(userId: String) async {
-        isAuthenticated = false
-        defer {
-            isAuthenticated = true
-        }
-
         guard let accountToSwitchTo = accountManager.accounts[userId] else {
             os_log(
                 "Account with userId %{public}@ does not exist", log: logger, type: .error, userId)
