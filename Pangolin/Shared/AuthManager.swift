@@ -279,7 +279,7 @@ class AuthManager: ObservableObject {
         errorMessage = nil
     }
 
-    private func ensureOrgIsSelected() async throws -> String {
+    private func ensureOrgIsSelected(preferredOrgId: String? = nil) async throws -> String {
         guard let userId = currentUser?.userId else {
             return ""
         }
@@ -288,6 +288,15 @@ class AuthManager: ObservableObject {
             let orgsResponse = try await apiClient.listUserOrgs(userId: userId)
             organizations = orgsResponse.orgs
 
+            // First, try to use the preferred org ID if provided and it still exists
+            if let preferredOrgId = preferredOrgId, !preferredOrgId.isEmpty {
+                if let selected = organizations.first(where: { $0.orgId == preferredOrgId }) {
+                    currentOrg = selected
+                    return selected.orgId
+                }
+            }
+
+            // Fall back to active account's org ID if no preferred org was provided or it doesn't exist
             if let activeAccount = accountManager.activeAccount {
                 if let selected = organizations.first(where: { $0.orgId == activeAccount.orgId }) {
                     currentOrg = selected
@@ -295,6 +304,7 @@ class AuthManager: ObservableObject {
                 }
             }
 
+            // If no valid org found, auto-select the first one
             if !organizations.isEmpty {
                 let autoSelectedOrg = organizations[0]
                 currentOrg = autoSelectedOrg
@@ -390,7 +400,8 @@ class AuthManager: ObservableObject {
 
         let selectedOrgId: String
         do {
-            selectedOrgId = try await ensureOrgIsSelected()
+            // Use the account's stored org ID as preferred when switching accounts
+            selectedOrgId = try await ensureOrgIsSelected(preferredOrgId: accountToSwitchTo.orgId)
         } catch {
             // Failure to select an organization is non-fatal,
             // so let's just indicate the failure through the logs
