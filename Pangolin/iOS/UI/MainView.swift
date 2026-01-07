@@ -96,10 +96,25 @@ struct HomeTabView: View {
     @Binding var showAccountPicker: Bool
     @Binding var showOrganizationPicker: Bool
     @Binding var selectedTab: TabSelection
-    @State private var optimisticToggleState: Bool = false
     
     private var tunnelStatus: TunnelStatus {
         tunnelManager.status
+    }
+    
+    private var toggleBinding: Binding<Bool> {
+        Binding(
+            get: { tunnelManager.isNEConnected },
+            set: { newValue in
+                guard !isInIntermediateState else { return }
+                Task {
+                    if newValue {
+                        await tunnelManager.connect()
+                    } else {
+                        await tunnelManager.disconnect()
+                    }
+                }
+            }
+        )
     }
     
     private var isInIntermediateState: Bool {
@@ -142,14 +157,11 @@ struct HomeTabView: View {
                     VStack(spacing: 0) {
                         Button(action: {
                             guard !isInIntermediateState else { return }
-                            
-                            // Optimistically update the toggle state immediately
-                            optimisticToggleState.toggle()
                             Task {
-                                if optimisticToggleState {
-                                    await tunnelManager.connect()
-                                } else {
+                                if tunnelManager.isNEConnected {
                                     await tunnelManager.disconnect()
+                                } else {
+                                    await tunnelManager.connect()
                                 }
                             }
                         }) {
@@ -166,7 +178,7 @@ struct HomeTabView: View {
                                     
                                     Spacer()
                                     
-                                    Toggle("", isOn: $optimisticToggleState)
+                                    Toggle("", isOn: toggleBinding)
                                         .tint(.accentColor)
                                         .allowsHitTesting(false)
                                 }
@@ -179,14 +191,6 @@ struct HomeTabView: View {
                         .buttonStyle(.plain)
                         .background(Color(.systemGray6))
                         .cornerRadius(24)
-                        .onChange(of: tunnelManager.isNEConnected) { newValue in
-                            // Sync optimistic state with actual state when it changes
-                            optimisticToggleState = newValue
-                        }
-                        .onAppear {
-                            // Initialize optimistic state from actual state
-                            optimisticToggleState = tunnelManager.isNEConnected
-                        }
                         
                         // Status page dropdown button (only when connected)
                         if tunnelStatus == .connected {
