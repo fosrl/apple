@@ -514,7 +514,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Pangolin/iOS/Pangolin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 4668XHFAHF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -533,7 +533,8 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_simulator.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -559,7 +560,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Pangolin/iOS/Pangolin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 4668XHFAHF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -578,7 +579,8 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_simulator.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -602,7 +604,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/iOS/PacketTunnel.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 4668XHFAHF;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PacketTunnel/iOS/Info.plist;
@@ -620,7 +622,8 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_simulator.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -644,7 +647,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/iOS/PacketTunnel.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 4668XHFAHF;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PacketTunnel/iOS/Info.plist;
@@ -662,7 +665,8 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_simulator.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
