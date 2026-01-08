@@ -172,9 +172,16 @@ struct HomeTabView: View {
                                         .fill(statusColor)
                                         .frame(width: 12, height: 12)
                                     
-                                    Text(tunnelStatus.displayText)
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
+                                    HStack(spacing: 8) {
+                                        Text(tunnelStatus.displayText)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                        
+                                        if isInIntermediateState {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                        }
+                                    }
                                     
                                     Spacer()
                                     

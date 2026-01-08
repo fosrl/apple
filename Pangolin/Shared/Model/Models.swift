@@ -201,7 +201,19 @@ enum TunnelStatus: String, CaseIterable {
     case error = "Error"
 
     var displayText: String {
-        return self.rawValue
+        // Remove ellipsis from loading states for cleaner display
+        switch self {
+        case .connecting:
+            return "Connecting"
+        case .registering:
+            return "Registering"
+        case .reconnecting:
+            return "Reconnecting"
+        case .disconnecting:
+            return "Disconnecting"
+        default:
+            return self.rawValue
+        }
     }
 }
 
