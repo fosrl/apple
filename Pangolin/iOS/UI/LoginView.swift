@@ -195,11 +195,8 @@ struct LoginView: View {
                         .textContentType(.URL)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24)
-                                .stroke(Color(.separator), lineWidth: 1)
-                        )
+                        .background(Color(.systemGray5))
+                        .cornerRadius(24)
                 }
             } else {
                 VStack(spacing: 8) {
