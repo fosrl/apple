@@ -143,7 +143,7 @@ class AuthManager: ObservableObject {
                     // Check for cancellation
                     try Task.checkCancellation()
 
-                    try await Task.sleep(nanoseconds: 3_000_000_000)  // 3 seconds
+                    try await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second
 
                     // Check for cancellation again after sleep
                     try Task.checkCancellation()

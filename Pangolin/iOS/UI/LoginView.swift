@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import AuthenticationServices
 
 enum HostingOption {
     case cloud
@@ -20,6 +21,8 @@ struct LoginView: View {
     @State private var showSuccess = false
     @State private var hasAutoOpenedBrowser = false
     @State private var loginTask: Task<Void, Never>?
+    @State private var webAuthSession: ASWebAuthenticationSession?
+    @State private var presentationContextProvider: WebAuthPresentationContextProvider?
     @Environment(\.dismiss) private var dismiss
 
     @ObservedObject var authManager: AuthManager
@@ -274,7 +277,7 @@ struct LoginView: View {
 
                     if let loginURL = authManager.deviceAuthLoginURL {
                         Button(action: {
-                            openBrowser(url: loginURL)
+                            openExternalBrowser(url: loginURL)
                         }) {
                             Text("Open Login Page")
                                 .frame(maxWidth: .infinity)
@@ -364,7 +367,7 @@ struct LoginView: View {
                     isLoggingIn = false
 
                     // Dismiss after 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         // Reset state after showing success
                         resetLoginState()
                         // Dismiss the sheet if presented as one
@@ -388,6 +391,52 @@ struct LoginView: View {
     }
 
     private func openBrowser(url: String) {
+        guard let url = URL(string: url) else {
+            return
+        }
+        
+        // Use ASWebAuthenticationSession for secure in-app browser
+        // This uses Safari's secure browser and complies with Google's policies
+        let provider = WebAuthPresentationContextProvider()
+        presentationContextProvider = provider
+        
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: "pangolin"
+        ) { callbackURL, error in
+            // Handle callback if needed (for OAuth flows)
+            // For device auth, we just need to show the page, not handle redirects
+            if let error = error {
+                // User cancelled or error occurred
+                let nsError = error as NSError
+                if nsError.domain == ASWebAuthenticationSessionErrorDomain && nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                    // User cancelled - this is expected, don't log as error
+                    print("User cancelled web auth session")
+                } else {
+                    print("Web auth session error: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        // Set presentation context and start session
+        session.presentationContextProvider = provider
+        session.prefersEphemeralWebBrowserSession = false
+        
+        // Start on main thread
+        DispatchQueue.main.async {
+            let started = session.start()
+            if !started {
+                print("Failed to start ASWebAuthenticationSession")
+                // Fallback to external browser
+                UIApplication.shared.open(url)
+            } else {
+                webAuthSession = session
+            }
+        }
+    }
+    
+    private func openExternalBrowser(url: String) {
+        // Always open in external browser (Safari)
         if let url = URL(string: url) {
             UIApplication.shared.open(url)
         }
@@ -407,5 +456,36 @@ struct LoginView: View {
         selfHostedURL = ""
         showSuccess = false
         hasAutoOpenedBrowser = false
+        webAuthSession?.cancel()
+        webAuthSession = nil
+        presentationContextProvider = nil
+    }
+}
+
+// Presentation context provider for ASWebAuthenticationSession
+class WebAuthPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        // Get the key window from all connected scenes
+        for scene in UIApplication.shared.connectedScenes {
+            if let windowScene = scene as? UIWindowScene {
+                // Try to get the key window first
+                if let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                    return keyWindow
+                }
+                // Fallback to first window
+                if let window = windowScene.windows.first {
+                    return window
+                }
+            }
+        }
+        
+        // Last resort: try to get any window
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            return window
+        }
+        
+        // This should never happen in normal usage
+        fatalError("No window available for ASWebAuthenticationSession")
     }
 }
