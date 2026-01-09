@@ -189,6 +189,26 @@ struct CreateOlmResponse: Codable {
     let secret: String
 }
 
+// MARK: - Fingerprint/Posture Checks
+
+struct Fingerprint: Codable {
+    let username: String
+    let hostname: String
+    let platform: String
+    let osVersion: String
+    let kernelVersion: String
+    let arch: String
+    let deviceModel: String
+    let serialNumber: String
+}
+
+struct Postures: Codable {
+    let firewallEnabled: Bool
+    let diskEncrypted: Bool
+    let sipEnabled: Bool
+    let autoUpdatesEnabled: Bool
+}
+
 // MARK: - Tunnel Status
 
 enum TunnelStatus: String, CaseIterable {
@@ -308,5 +328,9 @@ struct SocketSwitchOrgRequest: Codable {
 }
 
 struct SocketSwitchOrgResponse: Codable {
+    let status: String
+}
+
+struct UpdateMetadataResponse: Codable {
     let status: String
 }

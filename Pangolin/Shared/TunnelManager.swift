@@ -42,6 +42,9 @@ class TunnelManager: NSObject, ObservableObject {
     // Separate manager for OLM status to avoid menu bar re-renders
     let olmStatusManager: OLMStatusManager
 
+    // Fingerprint/posture checking poller
+    let fingerprintManager: FingerprintManager
+
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
         return OSLog(subsystem: subsystem, category: "TunnelManager")
@@ -67,7 +70,8 @@ class TunnelManager: NSObject, ObservableObject {
         self.secretManager = secretManager
         self.authManager = authManager
         self.socketManager = SocketManager()
-        self.olmStatusManager = OLMStatusManager(socketManager: SocketManager())
+        self.olmStatusManager = OLMStatusManager(socketManager: self.socketManager)
+        self.fingerprintManager = FingerprintManager(socketManager: self.socketManager)
         super.init()
 
         // Observe VPN status changes
@@ -516,8 +520,11 @@ class TunnelManager: NSObject, ObservableObject {
             // Start with options
             try manager.connection.startVPNTunnel(
                 options: tunnelOptions.isEmpty ? nil : tunnelOptions)
+
             // Don't set isNEConnected here - let updateConnectionStatus() handle it
             await updateConnectionStatus()
+
+            self.fingerprintManager.start()
         } catch {
             os_log(
                 "Error starting tunnel: %{public}@", log: logger, type: .error,
@@ -532,6 +539,8 @@ class TunnelManager: NSObject, ObservableObject {
         guard let manager = tunnelManager else {
             return
         }
+
+        self.fingerprintManager.stop()
 
         // Stop socket polling first
         stopSocketPolling()
