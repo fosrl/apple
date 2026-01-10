@@ -50,7 +50,7 @@ class FingerprintManager: ObservableObject {
         }
     }
 
-    private func gatherFingerprintInfo() -> Fingerprint {
+    func gatherFingerprintInfo() -> Fingerprint {
         let username = NSUserName()
 
         let hostname = Host.current().localizedName ?? ""

@@ -132,8 +132,8 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		TunnelDNS:            config.TunnelDNS,
 		UpstreamDNS:          config.UpstreamDNS,
 		OrgID:                config.OrgID,
-		// InitialFingerprint:   config.Fingerprint,
-		// InitialPostures:      config.Postures,
+		InitialFingerprint:   config.Fingerprint,
+		InitialPostures:      config.Postures,
 	}
 
 	// print the config for debugging
