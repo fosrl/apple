@@ -50,6 +50,9 @@ struct LoginView: View {
                     } else if authManager.deviceAuthCode != nil {
                         // Step 3: Show code (after starting auth)
                         deviceAuthCodeView
+                    } else if isLoggingIn && authManager.deviceAuthCode == nil {
+                        // Step 2.5: Show loading spinner while generating device code
+                        deviceCodeLoadingView
                     } else if hostingOption == .selfHosted {
                         // Step 2: Ready to login (only for self-hosted)
                         readyToLoginView
@@ -240,6 +243,18 @@ struct LoginView: View {
             Text("You have been successfully logged in.")
                 .font(.body)
                 .foregroundColor(.secondary)
+        }
+    }
+
+    private var deviceCodeLoadingView: some View {
+        VStack(spacing: 24) {
+            Text("Generating login code...")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            
+            ProgressView()
+                .scaleEffect(1.2)
+                .padding(.top, 8)
         }
     }
 
