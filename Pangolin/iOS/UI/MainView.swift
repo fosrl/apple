@@ -377,6 +377,41 @@ struct HomeTabView: View {
     }
 }
 
+// MARK: - Loading Overlay
+
+struct LoadingOverlay: View {
+    let isLoading: Bool
+    let successMessage: String?
+    
+    var body: some View {
+        if isLoading || successMessage != nil {
+            ZStack {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 12) {
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                    } else if let message = successMessage {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 24))
+                        
+                        Text(message)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                    }
+                }
+                .padding(18)
+                .background {
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color(.systemBackground))
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Account Management
 
 struct AccountManagementView: View {
@@ -386,6 +421,8 @@ struct AccountManagementView: View {
     @ObservedObject var apiClient: APIClient
     @Binding var showLoginView: Bool
     @Environment(\.dismiss) private var dismiss
+    @State private var isSwitchingAccount = false
+    @State private var showSuccessMessage: String? = nil
     
     private var accounts: [Account] {
         return Array(accountManager.accounts.values)
@@ -429,7 +466,13 @@ struct AccountManagementView: View {
                             
                             Button(action: {
                                 Task {
+                                    isSwitchingAccount = true
                                     await authManager.switchAccount(userId: account.userId)
+                                    isSwitchingAccount = false
+                                    showSuccessMessage = "Switched Account"
+                                    
+                                    // Wait a moment to show success message, then dismiss
+                                    try? await Task.sleep(nanoseconds: 500_000_000)
                                     dismiss()
                                 }
                             }) {
@@ -485,6 +528,9 @@ struct AccountManagementView: View {
                     }
                 }
             }
+            .overlay {
+                LoadingOverlay(isLoading: isSwitchingAccount, successMessage: showSuccessMessage)
+            }
         }
     }
 }
@@ -495,6 +541,8 @@ struct OrganizationPickerView: View {
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
     @Environment(\.dismiss) private var dismiss
+    @State private var isSwitchingOrg = false
+    @State private var showSuccessMessage: String? = nil
     
     private var organizations: [Organization] {
         authManager.organizations
@@ -520,7 +568,13 @@ struct OrganizationPickerView: View {
                     ForEach(organizations, id: \.orgId) { org in
                         Button(action: {
                             Task {
+                                isSwitchingOrg = true
                                 await authManager.selectOrganization(org)
+                                isSwitchingOrg = false
+                                showSuccessMessage = "Switched Organization"
+                                
+                                // Wait a moment to show success message, then dismiss
+                                try? await Task.sleep(nanoseconds: 500_000_000)
                                 dismiss()
                             }
                         }) {
@@ -550,6 +604,9 @@ struct OrganizationPickerView: View {
                         dismiss()
                     }
                 }
+            }
+            .overlay {
+                LoadingOverlay(isLoading: isSwitchingOrg, successMessage: showSuccessMessage)
             }
         }
     }
