@@ -203,10 +203,15 @@ struct Fingerprint: Codable {
 }
 
 struct Postures: Codable {
-    let firewallEnabled: Bool
-    let diskEncrypted: Bool
-    let sipEnabled: Bool
     let autoUpdatesEnabled: Bool
+    let biometricsEnabled: Bool
+    let diskEncrypted: Bool
+    let firewallEnabled: Bool
+    let tpmAvailable: Bool
+
+    let macosSipEnabled: Bool
+    let macosGatekeeperEnabled: Bool
+    let macosFirewallStealthMode: Bool
 }
 
 // MARK: - Tunnel Status

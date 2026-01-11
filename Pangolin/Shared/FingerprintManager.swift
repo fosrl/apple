@@ -9,6 +9,7 @@ import Combine
 import Darwin
 import Foundation
 import IOKit
+import LocalAuthentication
 import os.log
 
 @MainActor
@@ -69,10 +70,12 @@ class FingerprintManager: ObservableObject {
 
         let serialNumber = getIORegistryProperty("IOPlatformSerialNumber") ?? "unknown"
 
+        let platform = getPlatformString()
+
         return Fingerprint(
             username: username,
             hostname: hostname,
-            platform: "macos",
+            platform: platform,
             osVersion: osVersion,
             kernelVersion: kernelVersion,
             arch: arch,
@@ -82,76 +85,140 @@ class FingerprintManager: ObservableObject {
     }
 
     func gatherPostureChecks() -> Postures {
-        let firewallEnabled = {
-            let output = runCommand([
-                "/usr/bin/defaults", "read", "/Library/Preferences/com.apple.alf", "globalstate",
-            ]).lowercased()
-            // 0 = off, 1 = on for specific services, 2 = on for essential services
-            return output != "0"
-        }()
-
-        let diskEncrypted = {
-            let output = runCommand(["fdesetup", "status"]).lowercased()
-            return output.contains("filevault is on")
-        }()
-
-        let sipEnabled = {
-            let output = runCommand(["csrutil", "status"]).lowercased()
-            return output.contains("enabled")
-        }()
-
-        // Auto updates
-        let autoUpdatesEnabled = {
-            let output = runCommand(["softwareupdate", "--schedule"]).lowercased()
-            return output.contains("on")
-        }()
-
         return Postures(
-            firewallEnabled: firewallEnabled,
-            diskEncrypted: diskEncrypted,
-            sipEnabled: sipEnabled,
-            autoUpdatesEnabled: autoUpdatesEnabled
+            autoUpdatesEnabled: queryAutoUpdatesEnabled(),
+            biometricsEnabled: queryBiometricsEnabled(),
+            diskEncrypted: queryDiskEncrypted(),
+            firewallEnabled: queryFirewallEnabled(),
+            // Secure Enclave and T2 are always available on iOS and macOS.
+            tpmAvailable: true,
+
+            macosSipEnabled: querySipEnabled(),
+            macosGatekeeperEnabled: queryGatekeeperEnabled(),
+            macosFirewallStealthMode: queryFirewallStealthMode(),
         )
     }
 
-    private func runCommand(_ args: [String]) -> String {
-        let task = Process()
-        task.launchPath = "/usr/bin/env"
-        task.arguments = args
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launch()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    private func getPlatformString() -> String {
+        #if os(macOS)
+            return "macos"
+        #elseif os(iOS)
+            return "ios"
+        #else
+            return "unknown"
+        #endif
     }
 
-    private func getIORegistryProperty(_ key: String) -> String? {
-        let service = IOServiceGetMatchingService(
-            kIOMainPortDefault,
-            IOServiceMatching("IOPlatformExpertDevice"))
+    private func queryAutoUpdatesEnabled() -> Bool {
+        #if os(macOS)
+            let output = runCommand(["softwareupdate", "--schedule"]).lowercased()
+            return output.contains("on")
+        #else
+            return false
+        #endif
+    }
 
-        if let cfProp = IORegistryEntryCreateCFProperty(
-            service,
-            key as CFString,
-            kCFAllocatorDefault,
-            0
-        )?.takeRetainedValue() {
+    private func queryBiometricsEnabled() -> Bool {
+        let context = LAContext()
+        var error: NSError?
 
-            if CFGetTypeID(cfProp) == CFDataGetTypeID(),
-                let data = cfProp as? Data,
-                let str = String(data: data, encoding: .utf8)
-            {
-                return str
-            }
+        return context.canEvaluatePolicy(
+            .deviceOwnerAuthenticationWithBiometrics,
+            error: &error
+        )
+    }
 
-            if let str = cfProp as? String {
-                return str
-            }
+    private func queryDiskEncrypted() -> Bool {
+        #if os(macOS)
+            let output = runCommand(["fdesetup", "status"]).lowercased()
+            return output.contains("filevault is on")
+        #else
+            return false
+        #endif
+    }
+
+    private func queryFirewallEnabled() -> Bool {
+        #if os(macOS)
+            let output = runCommand([
+                "/usr/bin/defaults", "read", "/Library/Preferences/com.apple.alf",
+                "globalstate",
+            ]).lowercased()
+            // 0 = off, 1 = on for specific services, 2 = on for essential services
+            return output != "0"
+        #else
+            return false
+        #endif
+    }
+
+    private func querySipEnabled() -> Bool {
+        #if os(macOS)
+            let output = runCommand(["csrutil", "status"]).lowercased()
+            return output.contains("enabled")
+        #else
+            return false
+        #endif
+    }
+
+    private func queryGatekeeperEnabled() -> Bool {
+        #if os(macOS)
+            let output = runCommand(["spctl", "--status"]).lowercased()
+            return output.contains("enabled")
+        #else
+            return false
+        #endif
+    }
+
+    private func queryFirewallStealthMode() -> Bool {
+        #if os(macOS)
+            let output = runCommand([
+                "/usr/libexec/ApplicationFirewall/socketfilterfw", "--getstealthmode",
+            ]).lowercased()
+            return output.contains("is on")
+        #else
+            return false
+        #endif
+    }
+
+    #if os(macOS)
+        private func runCommand(_ args: [String]) -> String {
+            let task = Process()
+            task.launchPath = "/usr/bin/env"
+            task.arguments = args
+
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.launch()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         }
 
-        return nil
-    }
+        private func getIORegistryProperty(_ key: String) -> String? {
+            let service = IOServiceGetMatchingService(
+                kIOMainPortDefault,
+                IOServiceMatching("IOPlatformExpertDevice"))
+
+            if let cfProp = IORegistryEntryCreateCFProperty(
+                service,
+                key as CFString,
+                kCFAllocatorDefault,
+                0
+            )?.takeRetainedValue() {
+
+                if CFGetTypeID(cfProp) == CFDataGetTypeID(),
+                    let data = cfProp as? Data,
+                    let str = String(data: data, encoding: .utf8)
+                {
+                    return str
+                }
+
+                if let str = cfProp as? String {
+                    return str
+                }
+            }
+
+            return nil
+        }
+    #endif
 }
