@@ -422,6 +422,7 @@ struct AccountManagementView: View {
     @Binding var showLoginView: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var isSwitchingAccount = false
+    @State private var isDeletingAccount = false
     @State private var showSuccessMessage: String? = nil
     
     private var accounts: [Account] {
@@ -489,6 +490,22 @@ struct AccountManagementView: View {
                                 }
                             }
                             .disabled(shouldDisableAccountButton || currentAccountUserId == account.userId)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    Task {
+                                        isDeletingAccount = true
+                                        await authManager.deleteAccount(userId: account.userId)
+                                        isDeletingAccount = false
+                                        
+                                        // If we deleted the active account and there are no more accounts, dismiss
+                                        if accountManager.activeAccount == nil {
+                                            dismiss()
+                                        }
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     } header: {
                         Text("Available Accounts")
@@ -529,7 +546,7 @@ struct AccountManagementView: View {
                 }
             }
             .overlay {
-                LoadingOverlay(isLoading: isSwitchingAccount, successMessage: showSuccessMessage)
+                LoadingOverlay(isLoading: isSwitchingAccount || isDeletingAccount, successMessage: showSuccessMessage)
             }
         }
     }

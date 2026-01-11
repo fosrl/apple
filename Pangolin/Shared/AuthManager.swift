@@ -595,6 +595,54 @@ class AuthManager: ObservableObject {
         }
     }
 
+    func deleteAccount(userId: String) async {
+        guard accountManager.accounts[userId] != nil else {
+            return
+        }
+
+        let isActiveAccount = accountManager.activeAccount?.userId == userId
+        let remainingAccounts = accountManager.accounts.filter { $0.key != userId }
+        let hasOtherAccounts = !remainingAccounts.isEmpty
+
+        // If deleting the active account, disconnect tunnel first
+        if isActiveAccount {
+            if let tunnelManager = tunnelManager {
+                await tunnelManager.disconnect()
+            }
+
+            // Try to call logout endpoint (ignore errors)
+            do {
+                try await apiClient.logout()
+            } catch {
+                // Ignore errors - still clear local data
+            }
+        }
+
+        // Clear local data
+        _ = secretManager.deleteSessionToken(userId: userId)
+        // TODO: once we support device fingerprint, we should also delete the OLM credentials
+
+        accountManager.removeAccount(userId: userId)
+
+        // If we deleted the active account, switch to another or logout
+        if isActiveAccount {
+            if hasOtherAccounts, let nextAccount = remainingAccounts.values.first {
+                // Switch to the first available account
+                await switchAccount(userId: nextAccount.userId)
+            } else {
+                // No other accounts, fully log out
+                apiClient.updateSessionToken(nil)
+
+                isAuthenticated = false
+                currentOrg = nil
+                organizations = []
+                errorMessage = nil
+                deviceAuthCode = nil
+                deviceAuthLoginURL = nil
+            }
+        }
+    }
+
     func logout() async {
         guard let activeAccount = accountManager.activeAccount else {
             return
