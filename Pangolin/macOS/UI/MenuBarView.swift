@@ -389,7 +389,7 @@ struct AccountsMenu: View {
 
     private var menuTitle: String {
         if let activeAccount = accountManager.activeAccount {
-            return formatEmailHostname(account: activeAccount)
+            return "\(activeAccount.email)"
         }
 
         return "Select Account"
