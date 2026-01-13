@@ -92,7 +92,7 @@ class AuthManager: ObservableObject {
         deviceAuthTask = Task {
             do {
                 // Get device name (user's computer/device name)
-                let deviceName = DeviceInfo.getDeviceName()
+                let deviceName = DeviceInfo.getDeviceModelName()
 
                 let hostname = loginApiClient.currentBaseURL
 
@@ -565,7 +565,7 @@ class AuthManager: ObservableObject {
         if !secretManager.hasOlmCredentials(userId: userId) {
             do {
                 // Use the actual device name (user's computer/device name) for OLM
-                let deviceName = DeviceInfo.getDeviceName()
+                let deviceName = DeviceInfo.getDeviceModelName()
                 let olmResponse = try await apiClient.createOlm(userId: userId, name: deviceName)
 
                 // Save OLM credentials

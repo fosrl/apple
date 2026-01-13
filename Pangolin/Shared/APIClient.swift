@@ -51,7 +51,18 @@ class APIClient: ObservableObject {
     private var sessionToken: String?
     private let sessionCookieName = "p_session_token"
     private let csrfToken = "x-csrf-protection"
-    private let agentName = "pangolin-macOS"
+    
+    private var agentName: String {
+        #if os(iOS)
+        let platform = "iOS"
+        #elseif os(macOS)
+        let platform = "macOS"
+        #else
+        let platform = "Unknown"
+        #endif
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        return "pangolin-\(platform)-\(version)"
+    }
     
     private let session: URLSession
     

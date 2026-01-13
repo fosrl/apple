@@ -28,23 +28,6 @@ enum DeviceInfo {
         return mapModelIdentifierToName(modelString)
     }
     
-    static func getDeviceName() -> String {
-        #if os(iOS)
-        // On iOS, use the device name set by the user (e.g., "John's iPhone")
-        return UIDevice.current.name
-        #elseif os(macOS)
-        // On macOS, use the computer name set by the user
-        if let computerName = SCDynamicStoreCopyComputerName(nil, nil) {
-            return computerName as String
-        }
-        // Fallback to hostname if computer name is not available
-        return Host.current().localizedName ?? ProcessInfo.processInfo.hostName
-        #else
-        // Fallback for other platforms
-        return ProcessInfo.processInfo.hostName
-        #endif
-    }
-    
     static func getUniqueDeviceIdentifier() -> String {
         var size = 0
         sysctlbyname("hw.uuid", nil, &size, nil, 0)
