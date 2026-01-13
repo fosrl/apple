@@ -399,13 +399,27 @@ class TunnelManager: NSObject, ObservableObject {
             os_log(
                 "Access denied for org %{public}@, aborting connection", log: logger, type: .error,
                 currentOrg.orgId)
-            await MainActor.run {
-                AlertManager.shared.showAlertDialog(
-                    title: "Access Denied",
-                    message: "You do not have access to the selected organization."
-                )
-            }
+            // Note: checkOrgAccess already shows the appropriate error dialog
             return
+        }
+
+        // Check if OLM is blocked before connecting
+        if let userId = authManager.currentUser?.userId,
+           let olmId = secretManager.getOlmId(userId: userId) {
+            do {
+                let orgId = authManager.currentOrg?.orgId
+                let olm = try await authManager.apiClient.getUserOlm(userId: userId, olmId: olmId, orgId: orgId)
+                if olm.blocked == true {
+                    os_log("Account is blocked, preventing connection", log: logger, type: .error)
+                    await MainActor.run {
+                        AlertManager.shared.showErrorDialog(APIError.blocked)
+                    }
+                    return
+                }
+            } catch {
+                // If we can't check, log but continue (might be network error)
+                os_log("Failed to check OLM blocked status: %{public}@", log: logger, type: .error, error.localizedDescription)
+            }
         }
 
         // Ensure OLM credentials exist before connecting

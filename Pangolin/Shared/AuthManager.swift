@@ -534,7 +534,8 @@ class AuthManager: ObservableObject {
             // Verify OLM exists on server by getting the OLM directly
             if let olmIdString = secretManager.getOlmId(userId: userId) {
                 do {
-                    let olm = try await apiClient.getUserOlm(userId: userId, olmId: olmIdString)
+                    let orgId = currentOrg?.orgId
+                    let olm = try await apiClient.getUserOlm(userId: userId, olmId: olmIdString, orgId: orgId)
 
                     // Verify the olmId and userId match
                     if olm.olmId == olmIdString && olm.userId == userId {

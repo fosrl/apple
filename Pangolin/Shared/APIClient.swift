@@ -15,6 +15,7 @@ enum APIError: Error, LocalizedError {
     case httpError(Int, String?)
     case networkError(Error)
     case decodingError(Error)
+    case blocked
     
     var errorDescription: String? {
         switch self {
@@ -42,6 +43,8 @@ enum APIError: Error, LocalizedError {
             return error.localizedDescription
         case .decodingError(let error):
             return "Failed to decode response: \(error.localizedDescription)"
+        case .blocked:
+            return "Your device is blocked in this organization. Contact your admin for more information."
         }
     }
 }
@@ -112,12 +115,26 @@ class APIClient: ObservableObject {
         return normalized
     }
     
-    private func apiURL(_ path: String, hostnameOverride: String? = nil) -> URL? {
+    private func apiURL(_ path: String, hostnameOverride: String? = nil, queryParams: [String: String]? = nil) -> URL? {
         let fullPath = path.hasPrefix("/") ? path : "/\(path)"
         let apiPath = "/api/v1\(fullPath)"
         let hostname = hostnameOverride ?? baseURL
         let normalizedHostname = Self.normalizeBaseURL(hostname)
-        let fullURL = normalizedHostname + apiPath
+        var fullURL = normalizedHostname + apiPath
+        
+        // Add query parameters if provided
+        if let queryParams = queryParams, !queryParams.isEmpty {
+            var queryItems: [String] = []
+            for (key, value) in queryParams {
+                if let encodedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                   let encodedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                    queryItems.append("\(encodedKey)=\(encodedValue)")
+                }
+            }
+            if !queryItems.isEmpty {
+                fullURL += "?" + queryItems.joined(separator: "&")
+            }
+        }
         
         // Validate URL construction
         guard let url = URL(string: fullURL) else {
@@ -132,9 +149,10 @@ class APIClient: ObservableObject {
         method: String,
         path: String,
         body: Data? = nil,
-        hostnameOverride: String? = nil
+        hostnameOverride: String? = nil,
+        queryParams: [String: String]? = nil
     ) async throws -> (Data, HTTPURLResponse) {
-        guard let url = apiURL(path, hostnameOverride: hostnameOverride) else {
+        guard let url = apiURL(path, hostnameOverride: hostnameOverride, queryParams: queryParams) else {
             throw APIError.invalidURL
         }
         
@@ -362,8 +380,12 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
-    func getUserOlm(userId: String, olmId: String) async throws -> Olm {
-        let (data, response) = try await makeRequest(method: "GET", path: "/user/\(userId)/olm/\(olmId)")
+    func getUserOlm(userId: String, olmId: String, orgId: String? = nil) async throws -> Olm {
+        var queryParams: [String: String]? = nil
+        if let orgId = orgId {
+            queryParams = ["orgId": orgId]
+        }
+        let (data, response) = try await makeRequest(method: "GET", path: "/user/\(userId)/olm/\(olmId)", queryParams: queryParams)
         return try parseResponse(data, response)
     }
     

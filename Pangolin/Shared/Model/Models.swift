@@ -121,14 +121,14 @@ struct ListUserOrgsResponse: Codable {
 
 struct MaxSessionLengthPolicy: Codable {
     let compliant: Bool
-    let maxSessionLengthHours: Int
-    let sessionAgeHours: Int
+    let maxSessionLengthHours: Float
+    let sessionAgeHours: Float
 }
 
 struct PasswordAgePolicy: Codable {
     let compliant: Bool
-    let maxPasswordAgeDays: Int
-    let passwordAgeDays: Int
+    let maxPasswordAgeDays: Float
+    let passwordAgeDays: Float
 }
 
 struct OrgAccessPolicies: Codable {
@@ -177,6 +177,7 @@ struct Olm: Codable {
     let userId: String
     let name: String?
     let secret: String?
+    let blocked: Bool?
 }
 
 struct CreateOlmRequest: Codable {
