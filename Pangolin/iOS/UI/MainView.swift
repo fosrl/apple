@@ -473,7 +473,7 @@ struct AccountManagementView: View {
                                     showSuccessMessage = "Switched Account"
                                     
                                     // Wait a moment to show success message, then dismiss
-                                    try? await Task.sleep(nanoseconds: 500_000_000)
+                                    try? await Task.sleep(nanoseconds: 250_000_000)
                                     dismiss()
                                 }
                             }) {
@@ -591,7 +591,7 @@ struct OrganizationPickerView: View {
                                 showSuccessMessage = "Switched Organization"
                                 
                                 // Wait a moment to show success message, then dismiss
-                                try? await Task.sleep(nanoseconds: 500_000_000)
+                                try? await Task.sleep(nanoseconds: 250_000_000)
                                 dismiss()
                             }
                         }) {

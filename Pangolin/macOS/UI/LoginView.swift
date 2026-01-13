@@ -434,13 +434,12 @@ struct LoginView: View {
             do {
                 try await authManager.loginWithDeviceAuth(hostnameOverride: hostname)
 
-                // Success - show success view, then close after 2 seconds
+                // Success
                 await MainActor.run {
                     showSuccess = true
                     isLoggingIn = false
-
-                    // Close window after 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         closeWindow()
                     }
                 }

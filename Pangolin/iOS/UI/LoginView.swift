@@ -380,9 +380,8 @@ struct LoginView: View {
                 await MainActor.run {
                     showSuccess = true
                     isLoggingIn = false
-
-                    // Dismiss after 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         // Reset state after showing success
                         resetLoginState()
                         // Dismiss the sheet if presented as one
