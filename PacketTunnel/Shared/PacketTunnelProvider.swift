@@ -7,6 +7,7 @@
 
 import NetworkExtension
 import os.log
+import PangolinGo
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     private var tunnelAdapter: TunnelAdapter?
@@ -74,12 +75,37 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     
     override func sleep(completionHandler: @escaping () -> Void) {
-        // Handle sleep if needed
+        os_log("Device going to sleep, setting power mode to low", log: logger, type: .info)
+        setPowerMode(mode: "low")
         completionHandler()
     }
     
     override func wake() {
-        // Handle wake if needed
+        os_log("Device waking up, setting power mode to normal", log: logger, type: .info)
+        setPowerMode(mode: "normal")
+    }
+    
+    private func setPowerMode(mode: String) {
+        let modeCString = mode.utf8CString
+        let modePtr = UnsafeMutablePointer<CChar>.allocate(capacity: modeCString.count)
+        modeCString.withUnsafeBufferPointer { buffer in
+            modePtr.initialize(from: buffer.baseAddress!, count: buffer.count)
+        }
+        defer {
+            modePtr.deallocate()
+        }
+        
+        if let result = PangolinGo.setPowerMode(modePtr) {
+            let message = String(cString: result)
+            result.deallocate()
+            os_log("setPowerMode returned: %{public}@", log: logger, type: .debug, message)
+            
+            if message.lowercased().contains("error") || message.lowercased().contains("fail") {
+                os_log("Failed to set power mode: %{public}@", log: logger, type: .error, message)
+            }
+        } else {
+            os_log("Failed to call Go setPowerMode function (returned nil)", log: logger, type: .error)
+        }
     }
 }
 

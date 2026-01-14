@@ -203,5 +203,24 @@ func getNetworkSettings() *C.char {
 	return C.CString(settingsJSON)
 }
 
+//export setPowerMode
+func setPowerMode(mode *C.char) *C.char {
+	appLogger.Debug("Setting power mode")
+
+	tunnelMutex.Lock()
+	running := tunnelRunning
+	tunnelMutex.Unlock()
+
+	if !running {
+		appLogger.Warn("Tunnel is not running")
+		return C.CString("Error: Tunnel not running")
+	}
+
+	modeStr := C.GoString(mode)
+	olmpkg.SetPowerMode(modeStr)
+	appLogger.Info("Power mode set to: %s", modeStr)
+	return C.CString(fmt.Sprintf("Power mode set to: %s", modeStr))
+}
+
 // We need an entry point; it's ok for this to be empty
 func main() {}
