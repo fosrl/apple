@@ -189,6 +189,15 @@ struct CreateOlmResponse: Codable {
     let secret: String
 }
 
+struct RecoverOlmRequest: Codable {
+    let platformFingerprint: String
+}
+
+struct RecoverOlmResponse: Codable {
+    let olmId: String
+    let secret: String
+}
+
 // MARK: - Fingerprint/Posture Checks
 
 struct Fingerprint: Codable {

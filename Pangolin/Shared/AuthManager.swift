@@ -11,7 +11,7 @@ import UserNotifications
 import os.log
 
 #if os(iOS)
-import UIKit
+    import UIKit
 #endif
 
 @MainActor
@@ -97,16 +97,16 @@ class AuthManager: ObservableObject {
                 let hostname = loginApiClient.currentBaseURL
 
                 #if os(iOS)
-                let applicationName: String
-                if UIDevice.current.userInterfaceIdiom == .pad {
-                    applicationName = "Pangolin iPadOS Client"
-                } else {
-                    applicationName = "Pangolin iOS Client"
-                }
+                    let applicationName: String
+                    if UIDevice.current.userInterfaceIdiom == .pad {
+                        applicationName = "Pangolin iPadOS Client"
+                    } else {
+                        applicationName = "Pangolin iOS Client"
+                    }
                 #elseif os(macOS)
-                let applicationName = "Pangolin macOS Client"
+                    let applicationName = "Pangolin macOS Client"
                 #else
-                let applicationName = "Pangolin Client"
+                    let applicationName = "Pangolin Client"
                 #endif
 
                 let startResponse = try await loginApiClient.startDeviceAuth(
@@ -242,9 +242,9 @@ class AuthManager: ObservableObject {
         // Disconnect tunnel on successful login to ensure clean state (macOS only)
         // On iOS, we want to preserve the existing connection state and just reflect it
         #if os(macOS)
-        if let tunnelManager = tunnelManager {
-            await tunnelManager.disconnect()
-        }
+            if let tunnelManager = tunnelManager {
+                await tunnelManager.disconnect()
+            }
         #endif
 
         currentUser = user
@@ -262,9 +262,6 @@ class AuthManager: ObservableObject {
 
         // Save session token to storage
         _ = secretManager.saveSessionToken(userId: user.userId, token: token)
-
-        // Ensure OLM credentials exist for this device-account combo
-        await ensureOlmCredentials(userId: user.userId)
 
         let newAccount = Account(
             userId: user.userId,
@@ -535,11 +532,13 @@ class AuthManager: ObservableObject {
             if let olmIdString = secretManager.getOlmId(userId: userId) {
                 do {
                     let orgId = currentOrg?.orgId
-                    let olm = try await apiClient.getUserOlm(userId: userId, olmId: olmIdString, orgId: orgId)
+                    let olm = try await apiClient.getUserOlm(
+                        userId: userId, olmId: olmIdString, orgId: orgId)
 
                     // Verify the olmId and userId match
                     if olm.olmId == olmIdString && olm.userId == userId {
                         os_log("OLM credentials verified successfully", log: logger, type: .debug)
+                        return
                     } else {
                         os_log(
                             "OLM mismatch - returned olmId: %{public}@, userId: %{public}@, stored olmId: %{public}@",
@@ -562,7 +561,25 @@ class AuthManager: ObservableObject {
             }
         }
 
-        // If credentials don't exist or were cleared, create new ones
+        // Before creating new credentials, first attempt to recover them.
+        do {
+            if let platformFingerprint = tunnelManager?.fingerprintManager
+                .getPlatformFingerprintHash()
+            {
+                let recoveredOlm = try await apiClient.recoverOlmWithFingerprint(
+                    userId: userId, platformFingerprint: platformFingerprint)
+
+                _ = secretManager.saveOlmCredentials(
+                    userId: userId, olmId: recoveredOlm.olmId, secret: recoveredOlm.secret)
+
+                return
+            }
+
+        } catch {
+
+        }
+
+        // If credentials don't exist or were cleared/not recovered, create new ones
         if !secretManager.hasOlmCredentials(userId: userId) {
             do {
                 // Use the actual device name (user's computer/device name) for OLM
