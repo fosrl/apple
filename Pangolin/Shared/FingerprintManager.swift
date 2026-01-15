@@ -6,17 +6,21 @@
 //
 
 import Combine
+import CryptoKit
 import Darwin
 import Foundation
-import IOKit
 import LocalAuthentication
 import os.log
 
-@MainActor
-class FingerprintManager: ObservableObject {
-    @Published var fingerprint: [String: String] = [:]
-    @Published var postures: [String: String] = [:]
+#if os(macOS)
+    import IOKit
+#endif
 
+#if os(iOS)
+    import UIKit
+#endif
+
+class FingerprintManager: ObservableObject {
     private let socketManager: SocketManager
     private var task: Task<Void, Never>?
 
@@ -52,36 +56,94 @@ class FingerprintManager: ObservableObject {
     }
 
     func gatherFingerprintInfo() -> Fingerprint {
-        let username = NSUserName()
+        #if os(macOS)
+            let username = NSUserName()
 
-        let hostname = Host.current().localizedName ?? ""
+            let hostname = Host.current().localizedName ?? ""
 
-        let osVersion = {
-            let os = ProcessInfo.processInfo.operatingSystemVersion
-            return "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
-        }()
+            let osVersion = {
+                let os = ProcessInfo.processInfo.operatingSystemVersion
+                return "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
+            }()
 
-        let kernelVersion = runCommand(["uname", "-r"])
+            let kernelVersion = runCommand(["uname", "-r"])
 
-        let arch = runCommand(["uname", "-m"])
+            #if arch(arm64)
+                let architecture = "arm64"
+            #elseif arch(x86_64)
+                let architecture = "x86_64"
+            #else
+                let architecture = ""
+            #endif
 
-        let deviceModel =
-            getIORegistryProperty("model")?.trimmingCharacters(in: .controlCharacters) ?? "unknown"
+            let deviceModel =
+                getIORegistryProperty("model")?.trimmingCharacters(in: .controlCharacters) ?? ""
 
-        let serialNumber = getIORegistryProperty("IOPlatformSerialNumber") ?? "unknown"
+            let serialNumber = getIORegistryProperty("IOPlatformSerialNumber") ?? ""
 
-        let platform = getPlatformString()
+            let platformUUID = getIORegistryProperty("IOPlatformUUID") ?? ""
 
-        return Fingerprint(
-            username: username,
-            hostname: hostname,
-            platform: platform,
-            osVersion: osVersion,
-            kernelVersion: kernelVersion,
-            arch: arch,
-            deviceModel: deviceModel,
-            serialNumber: serialNumber
-        )
+            let platformFingerprint = computePlatformFingerprint(
+                arch: architecture, deviceModel: deviceModel, serialNumber: serialNumber,
+                platformUUID: platformUUID)
+
+            return Fingerprint(
+                username: username,
+                hostname: hostname,
+                platform: "macos",
+                osVersion: osVersion,
+                kernelVersion: kernelVersion,
+                arch: architecture,
+                deviceModel: deviceModel,
+                serialNumber: serialNumber,
+                platformFingerprint: platformFingerprint,
+            )
+        #elseif os(iOS)
+            let osVersion = {
+                let os = ProcessInfo.processInfo.operatingSystemVersion
+                return "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
+            }()
+
+            var uts = utsname()
+            uname(&uts)
+
+            let kernelVersion = withUnsafePointer(to: &uts.release) {
+                $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+                    String(cString: $0)
+                }
+            }
+
+            #if arch(arm64)
+                let architecture = "arm64"
+            #elseif arch(x86_64)
+                let architecture = "x86_64"
+            #else
+                let architecture = ""
+            #endif
+
+            let modelIdentifier = withUnsafePointer(to: &uts.machine) {
+                $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+                    String(cString: $0)
+                }
+            }
+
+            // Treat this persistent UUID as a serial number.
+            let serialNumber = getOrCreatePersistentUUID()
+
+            let platformFingerprint = computePlatformFingerprint(persistentUUID: serialNumber)
+
+            return Fingerprint(
+                username: "",
+                hostname: UIDevice.current.name,
+                platform: "ios",
+                osVersion: UIDevice.current.systemVersion,
+                kernelVersion: kernelVersion,
+                arch: architecture,
+                deviceModel: modelIdentifier,
+                serialNumber: serialNumber,
+                platformFingerprint: platformFingerprint,
+            )
+        #endif
     }
 
     func gatherPostureChecks() -> Postures {
@@ -97,16 +159,6 @@ class FingerprintManager: ObservableObject {
             macosGatekeeperEnabled: queryGatekeeperEnabled(),
             macosFirewallStealthMode: queryFirewallStealthMode(),
         )
-    }
-
-    private func getPlatformString() -> String {
-        #if os(macOS)
-            return "macos"
-        #elseif os(iOS)
-            return "ios"
-        #else
-            return "unknown"
-        #endif
     }
 
     private func queryAutoUpdatesEnabled() -> Bool {
@@ -219,6 +271,38 @@ class FingerprintManager: ObservableObject {
             }
 
             return nil
+        }
+
+        func computePlatformFingerprint(
+            arch: String, deviceModel: String, serialNumber: String, platformUUID: String
+        ) -> String {
+            let raw = [
+                "macos", arch, deviceModel.lowercased(), serialNumber.lowercased(),
+                platformUUID.lowercased(),
+            ]
+            .joined(separator: "|")
+            let digest = SHA256.hash(data: Data(raw.utf8))
+            return digest.map { String(format: "%02x", $0) }.joined()
+        }
+    #endif
+
+    #if os(iOS)
+        private func getOrCreatePersistentUUID() -> String {
+            let key = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+
+            if let existing = KeychainHelper.shared.get(key: key) {
+                return existing
+            }
+
+            let uuid = UUID().uuidString
+            KeychainHelper.shared.set(key: key, value: uuid)
+            return uuid
+        }
+
+        func computePlatformFingerprint(persistentUUID: String) -> String {
+            let raw = ["ios", persistentUUID].joined(separator: "|")
+            let digest = SHA256.hash(data: Data(raw.utf8))
+            return digest.map { String(format: "%02x", $0) }.joined()
         }
     #endif
 }

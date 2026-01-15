@@ -200,6 +200,7 @@ struct Fingerprint: Codable {
     let arch: String
     let deviceModel: String
     let serialNumber: String
+    let platformFingerprint: String
 }
 
 struct Postures: Codable {
