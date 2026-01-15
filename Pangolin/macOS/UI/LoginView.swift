@@ -335,11 +335,11 @@ struct LoginView: View {
             // Code display - PIN style with each digit in a box
             if let deviceCode = authManager.deviceAuthCode {
                 HStack(spacing: 6) {
-                    ForEach(Array(deviceCode), id: \.self) { digit in
+                    ForEach(Array(deviceCode.enumerated()), id: \.offset) { index, digit in
                         Text(String(digit))
                             .font(.system(size: 24, weight: .bold, design: .monospaced))
                             .frame(width: 40, height: 50)
-                            .background(Color.secondary.opacity(0.1))
+                            .background(digit == "-" ? Color.clear : Color.secondary.opacity(0.1))
                             .cornerRadius(8)
                     }
                 }
