@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/fosrl/newt v1.8.0
-	github.com/fosrl/olm v0.0.0
+	github.com/fosrl/olm v1.3.1-0.20260115201336-70a7e83291cd
 )
 
 require (
@@ -31,6 +31,6 @@ require (
 	software.sslmate.com/src/go-pkcs12 v0.6.0 // indirect
 )
 
-replace github.com/fosrl/olm => ../../olm
-
-replace github.com/fosrl/newt => ../../newt
+// Uncomment when developing dependencies.
+// replace github.com/fosrl/olm => ../../olm
+// replace github.com/fosrl/newt => ../../newt

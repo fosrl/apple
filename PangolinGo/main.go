@@ -230,7 +230,7 @@ func setPowerMode(mode *C.char) *C.char {
 	}
 
 	modeStr := C.GoString(mode)
-	olm.SetPowerMode(modeStr)
+	// olm.SetPowerMode(modeStr)
 	appLogger.Info("Power mode set to: %s", modeStr)
 	return C.CString(fmt.Sprintf("Power mode set to: %s", modeStr))
 }
