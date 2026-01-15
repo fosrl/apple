@@ -26,24 +26,27 @@ type InitOlmConfig struct {
 
 // StartTunnelConfig represents the JSON configuration for startTunnel
 type StartTunnelConfig struct {
-	Endpoint            string   `json:"endpoint"`
-	ID                  string   `json:"id"`
-	Secret              string   `json:"secret"`
-	MTU                 int      `json:"mtu"`
-	DNS                 string   `json:"dns"`
-	Holepunch           bool     `json:"holepunch"`
-	PingIntervalSeconds int      `json:"pingIntervalSeconds"`
-	PingTimeoutSeconds  int      `json:"pingTimeoutSeconds"`
-	UserToken           string   `json:"userToken"`
-	OrgID               string   `json:"orgId"`
-	UpstreamDNS         []string `json:"upstreamDNS"`
-	OverrideDNS         bool     `json:"overrideDNS"`
-	TunnelDNS           bool     `json:"tunnelDNS"`
+	Endpoint            string         `json:"endpoint"`
+	ID                  string         `json:"id"`
+	Secret              string         `json:"secret"`
+	MTU                 int            `json:"mtu"`
+	DNS                 string         `json:"dns"`
+	Holepunch           bool           `json:"holepunch"`
+	PingIntervalSeconds int            `json:"pingIntervalSeconds"`
+	PingTimeoutSeconds  int            `json:"pingTimeoutSeconds"`
+	UserToken           string         `json:"userToken"`
+	OrgID               string         `json:"orgId"`
+	UpstreamDNS         []string       `json:"upstreamDNS"`
+	OverrideDNS         bool           `json:"overrideDNS"`
+	TunnelDNS           bool           `json:"tunnelDNS"`
+	Fingerprint         map[string]any `json:"fingerprint"`
+	Postures            map[string]any `json:"postures"`
 }
 
 var (
 	tunnelRunning bool
 	tunnelMutex   sync.Mutex
+	olm           *olmpkg.Olm
 	olmContext    context.Context
 )
 
@@ -66,7 +69,7 @@ func initOlm(configJSON *C.char) *C.char {
 	olmContext = context.Background()
 
 	// Create OLM GlobalConfig with values from Swift
-	olmConfig := olmpkg.GlobalConfig{
+	olmConfig := olmpkg.OlmConfig{
 		LogLevel:   GetLogLevelString(),
 		EnableAPI:  config.EnableAPI,
 		SocketPath: config.SocketPath,
@@ -75,7 +78,11 @@ func initOlm(configJSON *C.char) *C.char {
 	}
 
 	// Initialize OLM with context and GlobalConfig
-	olmpkg.Init(olmContext, olmConfig)
+	o, err := olmpkg.Init(olmContext, olmConfig)
+	if err != nil {
+		return C.CString(fmt.Sprintf("Error: Failed to initialize olm: %v", err))
+	}
+	olm = o
 
 	appLogger.Debug("Init completed successfully")
 	return C.CString("Init completed successfully")
@@ -83,6 +90,10 @@ func initOlm(configJSON *C.char) *C.char {
 
 //export startTunnel
 func startTunnel(fd C.int, configJSON *C.char) *C.char {
+	if olm == nil {
+		return C.CString("Error: olm has not been initialized yet!")
+	}
+
 	appLogger.Debug("Starting tunnel")
 
 	tunnelMutex.Lock()
@@ -106,7 +117,7 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 	}
 
 	// Create OLM Config with tunnel parameters
-	olmConfig := olmpkg.TunnelConfig{
+	tunnelConfig := olmpkg.TunnelConfig{
 		Endpoint:             config.Endpoint,
 		ID:                   config.ID,
 		Secret:               config.Secret,
@@ -121,17 +132,19 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		TunnelDNS:            config.TunnelDNS,
 		UpstreamDNS:          config.UpstreamDNS,
 		OrgID:                config.OrgID,
+		// InitialFingerprint:   config.Fingerprint,
+		// InitialPostures:      config.Postures,
 	}
 
 	// print the config for debugging
-	appLogger.Debug("Tunnel config: %+v", olmConfig)
+	appLogger.Debug("Tunnel config: %+v", tunnelConfig)
 
-	olmpkg.StartApi()
+	_ = olm.StartApi()
 
 	// Start OLM tunnel with config
 	appLogger.Info("Starting OLM tunnel...")
 	go func() {
-		olmpkg.StartTunnel(olmConfig)
+		olm.StartTunnel(tunnelConfig)
 		appLogger.Info("OLM tunnel stopped")
 
 		// Update tunnel state when OLM stops
@@ -158,8 +171,8 @@ func stopTunnel() *C.char {
 	}
 
 	// Stop OLM tunnel
-	olmpkg.StopTunnel()
-	olmpkg.StopApi()
+	_ = olm.StopTunnel()
+	_ = olm.StopApi()
 
 	tunnelRunning = false
 	appLogger.Debug("Tunnel stopped successfully")
@@ -217,7 +230,7 @@ func setPowerMode(mode *C.char) *C.char {
 	}
 
 	modeStr := C.GoString(mode)
-	olmpkg.SetPowerMode(modeStr)
+	olm.SetPowerMode(modeStr)
 	appLogger.Info("Power mode set to: %s", modeStr)
 	return C.CString(fmt.Sprintf("Power mode set to: %s", modeStr))
 }
