@@ -55,6 +55,9 @@ class TunnelManager: NSObject, ObservableObject {
     private var socketPollingTask: Task<Void, Never>?
     private let socketPollInterval: TimeInterval = 2.0  // Poll every 2 seconds
     private var isPollingSocket = false
+    
+    // Flag to prevent duplicate error alerts
+    private nonisolated(unsafe) var hasShownErrorAlert = false
 
     // Cache last known values to avoid unnecessary updates
     private nonisolated(unsafe) var lastTunnelStatus: TunnelStatus?
@@ -140,7 +143,8 @@ class TunnelManager: NSObject, ObservableObject {
             // Once VPN extension is connected, enable disconnect button immediately
             isNEConnected = true
             // Start polling socket for actual status
-            if !isPollingSocket {
+            // Don't start polling if we've already shown an error alert (error handling will disconnect)
+            if !isPollingSocket && !hasShownErrorAlert {
                 startSocketPolling()
                 // Show registering status until socket polling provides actual status
                 status = .registering
@@ -361,6 +365,9 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     func connect() async {
+        // Clear error alert flag for new connection attempt
+        hasShownErrorAlert = false
+        
         // Check if tunnel is already running by querying the socket
         if await socketManager.isRunning() {
             os_log("Tunnel is already running (socket responds)", log: logger, type: .info)
@@ -397,35 +404,6 @@ class TunnelManager: NSObject, ObservableObject {
                 )
             }
             return
-        }
-
-        // Check org access before connecting
-        let hasAccess = await authManager.checkOrgAccess(orgId: currentOrg.orgId)
-        if !hasAccess {
-            os_log(
-                "Access denied for org %{public}@, aborting connection", log: logger, type: .error,
-                currentOrg.orgId)
-            // Note: checkOrgAccess already shows the appropriate error dialog
-            return
-        }
-
-        // Check if OLM is blocked before connecting
-        if let userId = authManager.currentUser?.userId,
-           let olmId = secretManager.getOlmId(userId: userId) {
-            do {
-                let orgId = authManager.currentOrg?.orgId
-                let olm = try await authManager.apiClient.getUserOlm(userId: userId, olmId: olmId, orgId: orgId)
-                if olm.blocked == true {
-                    os_log("Account is blocked, preventing connection", log: logger, type: .error)
-                    await MainActor.run {
-                        AlertManager.shared.showErrorDialog(APIError.blocked)
-                    }
-                    return
-                }
-            } catch {
-                // If we can't check, log but continue (might be network error)
-                os_log("Failed to check OLM blocked status: %{public}@", log: logger, type: .error, error.localizedDescription)
-            }
         }
 
         // Ensure OLM credentials exist before connecting
@@ -585,6 +563,8 @@ class TunnelManager: NSObject, ObservableObject {
         guard !isPollingSocket else { return }
 
         isPollingSocket = true
+        // Clear error alert flag when starting a new connection attempt
+        hasShownErrorAlert = false
 
         socketPollingTask = Task { [weak self] in
             guard let self = self else { return }
@@ -603,12 +583,45 @@ class TunnelManager: NSObject, ObservableObject {
                         break
                     }
 
+                    // Check for errors before registration - if error exists and not yet registered, disconnect and show alert
+                    if let error = socketStatus.error, socketStatus.registered != true {
+                        // Set flag immediately to prevent duplicate alerts (check-and-set pattern)
+                        let shouldShowAlert = !hasShownErrorAlert
+                        hasShownErrorAlert = true
+                        
+                        // Stop polling immediately to prevent duplicate alerts
+                        self.stopSocketPolling()
+                        
+                        if shouldShowAlert {
+                            os_log(
+                                "Error received from socket before registration: %{public}@ - %{public}@",
+                                log: self.logger,
+                                type: .error,
+                                error.code,
+                                error.message)
+                            
+                            // Show alert before disconnecting to avoid any async issues
+                            await MainActor.run {
+                                AlertManager.shared.showAlertDialog(
+                                    title: "Connection Error",
+                                    message: error.message
+                                )
+                            }
+                        }
+                        
+                        await self.disconnect()
+                        
+                        // Immediately set status to disconnected
+                        await MainActor.run {
+                            self.status = .disconnected
+                        }
+                        break
+                    }
+
                     // Determine the new tunnel status based on socket response
                     let newStatus: TunnelStatus
-                    if socketStatus.connected {
+                    if socketStatus.connected && socketStatus.registered == true {
                         newStatus = .connected
-                    } else if socketStatus.registered == true {
-                        newStatus = .registering
                     } else {
                         newStatus = .registering
                     }

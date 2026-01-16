@@ -255,6 +255,11 @@ enum TunnelStatus: String, CaseIterable {
 
 // MARK: - Socket API
 
+struct SocketStatusError: Codable, Equatable {
+    let code: String
+    let message: String
+}
+
 struct SocketStatusResponse: Codable, Equatable {
     let status: String?
     let connected: Bool
@@ -266,6 +271,7 @@ struct SocketStatusResponse: Codable, Equatable {
     let registered: Bool?
     let orgId: String?
     let networkSettings: NetworkSettings?
+    let error: SocketStatusError?
 }
 
 struct SocketPeer: Codable, Equatable {
