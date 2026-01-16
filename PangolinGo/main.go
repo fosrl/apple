@@ -132,8 +132,8 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		TunnelDNS:            config.TunnelDNS,
 		UpstreamDNS:          config.UpstreamDNS,
 		OrgID:                config.OrgID,
-		// InitialFingerprint:   config.Fingerprint,
-		// InitialPostures:      config.Postures,
+		InitialFingerprint:   config.Fingerprint,
+		InitialPostures:      config.Postures,
 	}
 
 	// print the config for debugging
@@ -230,7 +230,7 @@ func setPowerMode(mode *C.char) *C.char {
 	}
 
 	modeStr := C.GoString(mode)
-	olm.SetPowerMode(modeStr)
+	// olm.SetPowerMode(modeStr)
 	appLogger.Info("Power mode set to: %s", modeStr)
 	return C.CString(fmt.Sprintf("Power mode set to: %s", modeStr))
 }

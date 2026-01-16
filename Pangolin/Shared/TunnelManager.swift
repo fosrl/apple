@@ -8,10 +8,11 @@
 import Combine
 import Foundation
 import NetworkExtension
-#if os(macOS)
-import SystemExtensions
-#endif
 import os.log
+
+#if os(macOS)
+    import SystemExtensions
+#endif
 
 class TunnelManager: NSObject, ObservableObject {
     @Published var isNEConnected = false
@@ -20,14 +21,14 @@ class TunnelManager: NSObject, ObservableObject {
 
     private var tunnelManager: NETunnelProviderManager?
     #if os(iOS)
-    private let bundleIdentifier = "net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS"
+        private let bundleIdentifier = "net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS"
     #else
-    private let bundleIdentifier = "net.pangolin.Pangolin.PacketTunnel"
+        private let bundleIdentifier = "net.pangolin.Pangolin.PacketTunnel"
     #endif
     private var statusObserver: NSObjectProtocol?
     #if os(macOS)
-    private var systemExtensionRequest: OSSystemExtensionRequest?
-    private var systemExtensionInstallContinuation: CheckedContinuation<Bool, Error>?
+        private var systemExtensionRequest: OSSystemExtensionRequest?
+        private var systemExtensionInstallContinuation: CheckedContinuation<Bool, Error>?
     #endif
 
     // Version tracking for extension updates
@@ -41,6 +42,9 @@ class TunnelManager: NSObject, ObservableObject {
 
     // Separate manager for OLM status to avoid menu bar re-renders
     let olmStatusManager: OLMStatusManager
+
+    // Fingerprint/posture checking poller
+    let fingerprintManager: FingerprintManager
 
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
@@ -67,7 +71,8 @@ class TunnelManager: NSObject, ObservableObject {
         self.secretManager = secretManager
         self.authManager = authManager
         self.socketManager = SocketManager()
-        self.olmStatusManager = OLMStatusManager(socketManager: SocketManager())
+        self.olmStatusManager = OLMStatusManager(socketManager: self.socketManager)
+        self.fingerprintManager = FingerprintManager(socketManager: self.socketManager)
         super.init()
 
         // Observe VPN status changes
@@ -83,16 +88,16 @@ class TunnelManager: NSObject, ObservableObject {
 
         Task {
             #if os(macOS)
-            // First, ensure system extension is installed
-            let isInstalled = await installSystemExtensionIfNeeded()
-            if isInstalled {
+                // First, ensure system extension is installed
+                let isInstalled = await installSystemExtensionIfNeeded()
+                if isInstalled {
+                    await ensureExtensionRegistered()
+                    await updateConnectionStatus()
+                }
+            #else
+                // On iOS, just ensure extension is registered
                 await ensureExtensionRegistered()
                 await updateConnectionStatus()
-            }
-            #else
-            // On iOS, just ensure extension is registered
-            await ensureExtensionRegistered()
-            await updateConnectionStatus()
             #endif
         }
     }
@@ -161,44 +166,44 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     #if os(macOS)
-    private func installSystemExtensionIfNeeded() async -> Bool {
-        os_log("Installing/activating system extension...", log: logger, type: .info)
+        private func installSystemExtensionIfNeeded() async -> Bool {
+            os_log("Installing/activating system extension...", log: logger, type: .info)
 
-        await MainActor.run {
-            isRegistering = true
-            status = .registering
-        }
-
-        let manager = OSSystemExtensionManager.shared
-        // Always use activationRequest - the system will automatically detect if replacement is needed
-        // and call the delegate method actionForReplacingExtension
-        let request = OSSystemExtensionRequest.activationRequest(
-            forExtensionWithIdentifier: bundleIdentifier,
-            queue: .main
-        )
-
-        request.delegate = self
-
-        do {
-            let result = try await withCheckedThrowingContinuation {
-                (continuation: CheckedContinuation<Bool, Error>) in
-                systemExtensionInstallContinuation = continuation
-                systemExtensionRequest = request
-                manager.submitRequest(request)
-            }
-
-            return result
-        } catch {
-            os_log(
-                "Failed to install system extension: %{public}@", log: logger, type: .error,
-                error.localizedDescription)
             await MainActor.run {
-                status = .error
-                isRegistering = false
+                isRegistering = true
+                status = .registering
             }
-            return false
+
+            let manager = OSSystemExtensionManager.shared
+            // Always use activationRequest - the system will automatically detect if replacement is needed
+            // and call the delegate method actionForReplacingExtension
+            let request = OSSystemExtensionRequest.activationRequest(
+                forExtensionWithIdentifier: bundleIdentifier,
+                queue: .main
+            )
+
+            request.delegate = self
+
+            do {
+                let result = try await withCheckedThrowingContinuation {
+                    (continuation: CheckedContinuation<Bool, Error>) in
+                    systemExtensionInstallContinuation = continuation
+                    systemExtensionRequest = request
+                    manager.submitRequest(request)
+                }
+
+                return result
+            } catch {
+                os_log(
+                    "Failed to install system extension: %{public}@", log: logger, type: .error,
+                    error.localizedDescription)
+                await MainActor.run {
+                    status = .error
+                    isRegistering = false
+                }
+                return false
+            }
         }
-    }
     #endif
 
     // MARK: - Extension Version Management
@@ -218,9 +223,10 @@ class TunnelManager: NSObject, ObservableObject {
         // Look for the extension bundle in the app's PlugIns directory
         // On macOS: Contents/PlugIns, on iOS: PlugIns
         #if os(iOS)
-        let pluginsURL = mainBundle.appendingPathComponent("PlugIns", isDirectory: true)
+            let pluginsURL = mainBundle.appendingPathComponent("PlugIns", isDirectory: true)
         #else
-        let pluginsURL = mainBundle.appendingPathComponent("Contents/PlugIns", isDirectory: true)
+            let pluginsURL = mainBundle.appendingPathComponent(
+                "Contents/PlugIns", isDirectory: true)
         #endif
 
         // Check if PlugIns directory exists
@@ -512,12 +518,19 @@ class TunnelManager: NSObject, ObservableObject {
         let dnsValue = primaryDNS.isEmpty ? defaultDNS : primaryDNS
         tunnelOptions["dns"] = dnsValue as NSString
 
+        // Query for fingerprints and posture checks one time before init
+        tunnelOptions["fingerprint"] = fingerprintManager.gatherFingerprintInfo().asNSDict()
+        tunnelOptions["postures"] = fingerprintManager.gatherPostureChecks().asNSDict()
+
         do {
             // Start with options
             try manager.connection.startVPNTunnel(
                 options: tunnelOptions.isEmpty ? nil : tunnelOptions)
+
             // Don't set isNEConnected here - let updateConnectionStatus() handle it
             await updateConnectionStatus()
+
+            self.fingerprintManager.start()
         } catch {
             os_log(
                 "Error starting tunnel: %{public}@", log: logger, type: .error,
@@ -532,6 +545,8 @@ class TunnelManager: NSObject, ObservableObject {
         guard let manager = tunnelManager else {
             return
         }
+
+        self.fingerprintManager.stop()
 
         // Stop socket polling first
         stopSocketPolling()
@@ -661,67 +676,82 @@ class TunnelManager: NSObject, ObservableObject {
 
 // MARK: - OSSystemExtensionRequestDelegate
 #if os(macOS)
-extension TunnelManager: OSSystemExtensionRequestDelegate {
-    func request(
-        _ request: OSSystemExtensionRequest,
-        didFinishWithResult result: OSSystemExtensionRequest.Result
-    ) {
-        os_log(
-            "System extension request finished with result: %d", log: logger, type: .info,
-            result.rawValue)
+    extension TunnelManager: OSSystemExtensionRequestDelegate {
+        func request(
+            _ request: OSSystemExtensionRequest,
+            didFinishWithResult result: OSSystemExtensionRequest.Result
+        ) {
+            os_log(
+                "System extension request finished with result: %d", log: logger, type: .info,
+                result.rawValue)
 
-        let success = (result == .willCompleteAfterReboot || result == .completed)
+            let success = (result == .willCompleteAfterReboot || result == .completed)
 
-        Task { @MainActor in
-            if success {
-                if result == .willCompleteAfterReboot {
-                    status = .registering
+            Task { @MainActor in
+                if success {
+                    if result == .willCompleteAfterReboot {
+                        status = .registering
+                    } else {
+                        status = .disconnected
+                    }
                 } else {
-                    status = .disconnected
+                    status = .error
                 }
-            } else {
-                status = .error
+                isRegistering = false
             }
-            isRegistering = false
+
+            systemExtensionInstallContinuation?.resume(returning: success)
+            systemExtensionInstallContinuation = nil
+            systemExtensionRequest = nil
         }
 
-        systemExtensionInstallContinuation?.resume(returning: success)
-        systemExtensionInstallContinuation = nil
-        systemExtensionRequest = nil
-    }
+        func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
+            os_log(
+                "System extension request failed: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
 
-    func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        os_log(
-            "System extension request failed: %{public}@", log: logger, type: .error,
-            error.localizedDescription)
+            Task { @MainActor in
+                status = .error
+                isRegistering = false
+            }
 
-        Task { @MainActor in
-            status = .error
-            isRegistering = false
+            systemExtensionInstallContinuation?.resume(throwing: error)
+            systemExtensionInstallContinuation = nil
+            systemExtensionRequest = nil
         }
 
-        systemExtensionInstallContinuation?.resume(throwing: error)
-        systemExtensionInstallContinuation = nil
-        systemExtensionRequest = nil
-    }
+        func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
+            os_log(
+                "System extension needs user approval - user should see System Preferences prompt",
+                log: logger, type: .info)
+            // The system will show a prompt to the user
+            // User needs to go to System Preferences > Privacy & Security > System Extensions
+            // and approve the extension
+        }
 
-    func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
-        os_log(
-            "System extension needs user approval - user should see System Preferences prompt",
-            log: logger, type: .info)
-        // The system will show a prompt to the user
-        // User needs to go to System Preferences > Privacy & Security > System Extensions
-        // and approve the extension
+        func request(
+            _ request: OSSystemExtensionRequest,
+            actionForReplacingExtension existing: OSSystemExtensionProperties,
+            withExtension newExtension: OSSystemExtensionProperties
+        ) -> OSSystemExtensionRequest.ReplacementAction {
+            os_log("System extension replacement requested, replacing...", log: logger, type: .info)
+            // Always replace the existing extension with the new version
+            return .replace
+        }
     }
+#endif
 
-    func request(
-        _ request: OSSystemExtensionRequest,
-        actionForReplacingExtension existing: OSSystemExtensionProperties,
-        withExtension newExtension: OSSystemExtensionProperties
-    ) -> OSSystemExtensionRequest.ReplacementAction {
-        os_log("System extension replacement requested, replacing...", log: logger, type: .info)
-        // Always replace the existing extension with the new version
-        return .replace
+extension Encodable {
+    /// Converts any Encodable struct into an NSDictionary for tunnel options.
+    fileprivate func asNSDict() -> NSObject {
+        // Encode to JSON data
+        guard let data = try? JSONEncoder().encode(self),
+            let object = try? JSONSerialization.jsonObject(with: data, options: []),
+            let dict = object as? NSDictionary
+        else {
+            // Fallback: empty dictionary if something goes wrong
+            return NSDictionary()
+        }
+        return dict
     }
 }
-#endif
