@@ -388,6 +388,14 @@ class APIClient: ObservableObject {
         let (data, response) = try await makeRequest(method: "GET", path: "/user/\(userId)/olm/\(olmId)", queryParams: queryParams)
         return try parseResponse(data, response)
     }
+
+    func recoverOlmWithFingerprint(userId: String, platformFingerprint: String) async throws -> RecoverOlmResponse {
+        let requestBody = RecoverOlmRequest(platformFingerprint: platformFingerprint)
+        let bodyData = try JSONEncoder().encode(requestBody);
+
+        let (data, response) = try await makeRequest(method: "POST", path: "/user/\(userId)/olm/recover", body: bodyData)
+        return try parseResponse(data, response)
+    }
     
     // MARK: - Organization
     

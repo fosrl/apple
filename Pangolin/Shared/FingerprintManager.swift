@@ -20,7 +20,7 @@ import os.log
     import UIKit
 #endif
 
-class FingerprintManager: ObservableObject {
+class FingerprintManager {
     private let socketManager: SocketManager
     private var task: Task<Void, Never>?
 
@@ -56,94 +56,35 @@ class FingerprintManager: ObservableObject {
     }
 
     func gatherFingerprintInfo() -> Fingerprint {
+        let deviceModel = getDeviceModel()
+
+        let architecture = getArch()
+
+        let serialNumber = getSerialNumber()
+
         #if os(macOS)
-            let username = NSUserName()
-
-            let hostname = Host.current().localizedName ?? ""
-
-            let osVersion = {
-                let os = ProcessInfo.processInfo.operatingSystemVersion
-                return "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
-            }()
-
-            let kernelVersion = runCommand(["uname", "-r"])
-
-            #if arch(arm64)
-                let architecture = "arm64"
-            #elseif arch(x86_64)
-                let architecture = "x86_64"
-            #else
-                let architecture = ""
-            #endif
-
-            let deviceModel =
-                getIORegistryProperty("model")?.trimmingCharacters(in: .controlCharacters) ?? ""
-
-            let serialNumber = getIORegistryProperty("IOPlatformSerialNumber") ?? ""
-
             let platformUUID = getIORegistryProperty("IOPlatformUUID") ?? ""
 
             let platformFingerprint = computePlatformFingerprint(
                 arch: architecture, deviceModel: deviceModel, serialNumber: serialNumber,
                 platformUUID: platformUUID)
 
-            return Fingerprint(
-                username: username,
-                hostname: hostname,
-                platform: "macos",
-                osVersion: osVersion,
-                kernelVersion: kernelVersion,
-                arch: architecture,
-                deviceModel: deviceModel,
-                serialNumber: serialNumber,
-                platformFingerprint: platformFingerprint,
-            )
         #elseif os(iOS)
-            let osVersion = {
-                let os = ProcessInfo.processInfo.operatingSystemVersion
-                return "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
-            }()
-
-            var uts = utsname()
-            uname(&uts)
-
-            let kernelVersion = withUnsafePointer(to: &uts.release) {
-                $0.withMemoryRebound(to: CChar.self, capacity: 1) {
-                    String(cString: $0)
-                }
-            }
-
-            #if arch(arm64)
-                let architecture = "arm64"
-            #elseif arch(x86_64)
-                let architecture = "x86_64"
-            #else
-                let architecture = ""
-            #endif
-
-            let modelIdentifier = withUnsafePointer(to: &uts.machine) {
-                $0.withMemoryRebound(to: CChar.self, capacity: 1) {
-                    String(cString: $0)
-                }
-            }
-
-            // Treat this persistent UUID as a serial number.
-            let serialNumber = getOrCreatePersistentUUID()
-
             let platformFingerprint = computePlatformFingerprint(persistentUUID: serialNumber)
 
-            return Fingerprint(
-                username: "",
-                hostname: UIDevice.current.name,
-                platform: "ios",
-                osVersion: UIDevice.current.systemVersion,
-                kernelVersion: kernelVersion,
-                arch: architecture,
-                deviceModel: modelIdentifier,
-                serialNumber: serialNumber,
-                platformFingerprint: platformFingerprint,
-            )
         #endif
+
+        return Fingerprint(
+            username: getUsername(),
+            hostname: getHostname(),
+            platform: getPlatformString(),
+            osVersion: getOSVersion(),
+            kernelVersion: getKernelVersion(),
+            arch: architecture,
+            deviceModel: deviceModel,
+            serialNumber: serialNumber,
+            platformFingerprint: platformFingerprint,
+        )
     }
 
     func gatherPostureChecks() -> Postures {
@@ -159,6 +100,116 @@ class FingerprintManager: ObservableObject {
             macosGatekeeperEnabled: queryGatekeeperEnabled(),
             macosFirewallStealthMode: queryFirewallStealthMode(),
         )
+    }
+
+    func getPlatformFingerprintHash() -> String {
+        let serialNumber = getSerialNumber()
+
+        #if os(macOS)
+            let platformUUID = getIORegistryProperty("IOPlatformUUID") ?? ""
+            let architecture = getArch()
+            let deviceModel = getDeviceModel()
+
+            return computePlatformFingerprint(
+                arch: architecture, deviceModel: deviceModel, serialNumber: serialNumber,
+                platformUUID: platformUUID)
+        #elseif os(iOS)
+            return computePlatformFingerprint(persistentUUID: serialNumber)
+        #else
+            return ""
+        #endif
+    }
+
+    private func getUsername() -> String {
+        #if os(macOS)
+            return NSUserName()
+        #else
+            return ""
+        #endif
+    }
+
+    private func getHostname() -> String {
+        #if os(macOS)
+            return Host.current().localizedName ?? ""
+        #elseif os(iOS)
+            return UIDevice.current.name
+        #else
+            return ""
+        #endif
+    }
+
+    private func getPlatformString() -> String {
+        #if os(macOS)
+            return "macos"
+        #elseif os(iOS)
+            return "ios"
+        #else
+            return ""
+        #endif
+    }
+
+    private func getOSVersion() -> String {
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        return "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
+    }
+
+    private func getKernelVersion() -> String {
+        #if os(macOS)
+            return runCommand(["uname", "-r"])
+        #elseif os(iOS)
+            var uts = utsname()
+            uname(&uts)
+
+            let kernelVersion = withUnsafePointer(to: &uts.release) {
+                $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+                    String(cString: $0)
+                }
+            }
+
+            return kernelVersion
+        #else
+            return ""
+        #endif
+    }
+
+    private func getArch() -> String {
+        #if arch(arm64)
+            return "arm64"
+        #elseif arch(x86_64)
+            return "x86_64"
+        #else
+            return ""
+        #endif
+    }
+
+    private func getDeviceModel() -> String {
+        #if os(macOS)
+            return getIORegistryProperty("model")?.trimmingCharacters(in: .controlCharacters) ?? ""
+        #elseif os(iOS)
+            var uts = utsname()
+            uname(&uts)
+
+            let modelIdentifier = withUnsafePointer(to: &uts.machine) {
+                $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+                    String(cString: $0)
+                }
+            }
+
+            return modelIdentifier
+        #else
+            return ""
+        #endif
+    }
+
+    private func getSerialNumber() -> String {
+        #if os(macOS)
+            return getIORegistryProperty("IOPlatformSerialNumber") ?? ""
+        #elseif os(iOS)
+            return getOrCreatePersistentUUID()
+            return ""
+        #else
+            return ""
+        #endif
     }
 
     private func queryAutoUpdatesEnabled() -> Bool {
@@ -223,9 +274,9 @@ class FingerprintManager: ObservableObject {
     private func queryFirewallStealthMode() -> Bool {
         #if os(macOS)
             let output = runCommand([
-                "/usr/libexec/ApplicationFirewall/socketfilterfw", "--getstealthmode",
+                "/usr/bin/defaults", "read", "com.apple.alf", "stealthenabled",
             ]).lowercased()
-            return output.contains("is on")
+            return output.contains("1")
         #else
             return false
         #endif
