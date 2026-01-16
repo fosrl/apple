@@ -274,9 +274,9 @@ class FingerprintManager {
     private func queryFirewallStealthMode() -> Bool {
         #if os(macOS)
             let output = runCommand([
-                "/usr/libexec/ApplicationFirewall/socketfilterfw", "--getstealthmode",
+                "/usr/bin/defaults", "read", "com.apple.alf", "stealthenabled",
             ]).lowercased()
-            return output.contains("is on")
+            return output.contains("1")
         #else
             return false
         #endif
