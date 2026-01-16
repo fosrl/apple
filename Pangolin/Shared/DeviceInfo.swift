@@ -7,6 +7,7 @@
 
 import Foundation
 import Darwin
+import os.log
 
 #if os(macOS)
 import SystemConfiguration
@@ -17,45 +18,47 @@ import UIKit
 #endif
 
 enum DeviceInfo {
+    private static let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "DeviceInfo")
+    }()
+    
     static func getDeviceModelName() -> String {
         var size = 0
+        #if os(iOS)
+        // On iOS, use hw.machine to get identifiers like "iPhone10,2"
+        sysctlbyname("hw.machine", nil, &size, nil, 0)
+        #else
+        // On macOS, use hw.model to get identifiers like "MacBookPro18,3"
         sysctlbyname("hw.model", nil, &size, nil, 0)
+        #endif
+        
         var model = [CChar](repeating: 0, count: size)
+        #if os(iOS)
+        sysctlbyname("hw.machine", &model, &size, nil, 0)
+        #else
         sysctlbyname("hw.model", &model, &size, nil, 0)
+        #endif
         let modelString = String(cString: model)
         
         // Map model identifier to human-readable name
-        return mapModelIdentifierToName(modelString)
+        let friendlyName = mapModelIdentifierToName(modelString)
+        
+        os_log("Device model - raw: %{public}@, mapped: %{public}@", log: logger, type: .info, modelString, friendlyName)
+        
+        return friendlyName
     }
     
-    static func getUniqueDeviceIdentifier() -> String {
-        var size = 0
-        sysctlbyname("hw.uuid", nil, &size, nil, 0)
-        var uuid = [CChar](repeating: 0, count: size)
-        sysctlbyname("hw.uuid", &uuid, &size, nil, 0)
-        return String(cString: uuid)
-    }
     
     private static func mapModelIdentifierToName(_ identifier: String) -> String {
-        // Map model identifier prefix to device type
-        if identifier.hasPrefix("MacBookPro") {
-            return "MacBook Pro"
-        } else if identifier.hasPrefix("MacBookAir") {
-            return "MacBook Air"
-        } else if identifier.hasPrefix("iMac") {
-            return "iMac"
-        } else if identifier.hasPrefix("Macmini") {
-            return "Mac mini"
-        } else if identifier.hasPrefix("MacPro") {
-            return "Mac Pro"
-        } else if identifier.hasPrefix("Mac13,") {
-            // Mac Studio (Mac13,1 and Mac13,2)
-            return "Mac Studio"
-        } else if identifier.hasPrefix("Mac") {
-            return "Mac"
-        }
+         if identifier.contains("Mac") {
+             return "Mac"
+         } else if identifier.contains("iPhone") {
+             return "iPhone"
+         } else if identifier.contains("iPad") {
+             return "iPad"
+         }
         
-        // Fallback to identifier if no match
         return identifier
     }
 }
