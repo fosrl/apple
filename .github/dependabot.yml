@@ -8,6 +8,6 @@ updates:
       patch-updates:
         update-types:
           - "patch"
-      dminor-updates:
+      minor-updates:
         update-types:
           - "minor"
