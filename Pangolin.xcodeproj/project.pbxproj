@@ -153,6 +153,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Shared/GoLoggerBridge.m,
+				Shared/NetworkTransitionMonitor.swift,
 				Shared/PacketTunnelProvider.swift,
 				Shared/SocketPath.swift,
 				Shared/TunnelAdapter.swift,

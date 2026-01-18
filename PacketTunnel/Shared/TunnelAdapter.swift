@@ -93,6 +93,7 @@ public class TunnelAdapter {
     private var settingsPollTimer: DispatchSourceTimer?
     private let pollInterval: TimeInterval = 0.5  // 500ms
     private var overrideDNS: Bool = false
+    private var networkTransitionMonitor: NetworkTransitionMonitor?
     public init(with packetTunnelProvider: NEPacketTunnelProvider) {
         self.packetTunnelProvider = packetTunnelProvider
         // Set log level for Go logger to debug
@@ -356,6 +357,9 @@ public class TunnelAdapter {
         // Start polling for network settings updates
         startSettingsPolling()
 
+        // Start network transition monitoring
+        startNetworkTransitionMonitoring()
+
         completionHandler(nil)
     }
 
@@ -364,6 +368,7 @@ public class TunnelAdapter {
     // - Returns: An error if stopping failed, nil otherwise
     public func stop() -> Error? {
         stopSettingsPolling()
+        stopNetworkTransitionMonitoring()
         return stopGoTunnel()
     }
 
@@ -651,6 +656,46 @@ public class TunnelAdapter {
                 os_log("Network settings updated successfully", log: self.logger, type: .debug)
                 self.lastAppliedSettings = settings
             }
+        }
+    }
+
+    // MARK: - Network Transition Monitoring
+
+    private func startNetworkTransitionMonitoring() {
+        os_log("Starting network transition monitoring", log: logger, type: .debug)
+
+        // Create and configure the monitor
+        let monitor = NetworkTransitionMonitor()
+        monitor.onRebindRequired = { [weak self] in
+            self?.handleNetworkTransition()
+        }
+
+        // Start monitoring
+        monitor.start()
+        networkTransitionMonitor = monitor
+    }
+
+    private func stopNetworkTransitionMonitoring() {
+        os_log("Stopping network transition monitoring", log: logger, type: .debug)
+        networkTransitionMonitor?.stop()
+        networkTransitionMonitor = nil
+    }
+
+    private func handleNetworkTransition() {
+        os_log("Handling network transition - rebinding socket", log: logger, type: .info)
+
+        guard let result = PangolinGo.rebindSocket() else {
+            os_log("rebindSocket returned nil", log: logger, type: .error)
+            return
+        }
+
+        let message = String(cString: result)
+        result.deallocate()
+
+        if message.lowercased().contains("error") || message.lowercased().contains("fail") {
+            os_log("Failed to rebind socket: %{public}@", log: logger, type: .error, message)
+        } else {
+            os_log("Successfully rebound socket after network transition: %{public}@", log: logger, type: .info, message)
         }
     }
 }
