@@ -28,7 +28,7 @@ class NetworkTransitionMonitor {
     
     /// Debouncing support to prevent excessive rebind calls
     private var rebindWorkItem: DispatchWorkItem?
-    private let debounceInterval: TimeInterval = 0.5  // 500ms
+    private let debounceInterval: TimeInterval = 2.5
     
     /// Starts monitoring network path changes
     func start() {
