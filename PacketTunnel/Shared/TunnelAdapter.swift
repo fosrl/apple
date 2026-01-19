@@ -685,18 +685,18 @@ public class TunnelAdapter {
     private func handleNetworkTransition() {
         os_log("Handling network transition - rebinding socket", log: logger, type: .info)
 
-        // guard let result = PangolinGo.rebindSocket() else {
-        //     os_log("rebindSocket returned nil", log: logger, type: .error)
-        //     return
-        // }
+        guard let result = PangolinGo.rebindSocket() else {
+            os_log("rebindSocket returned nil", log: logger, type: .error)
+            return
+        }
 
-        // let message = String(cString: result)
-        // result.deallocate()
+        let message = String(cString: result)
+        result.deallocate()
 
-        // if message.lowercased().contains("error") || message.lowercased().contains("fail") {
-        //     os_log("Failed to rebind socket: %{public}@", log: logger, type: .error, message)
-        // } else {
-        //     os_log("Successfully rebound socket after network transition: %{public}@", log: logger, type: .info, message)
-        // }
+        if message.lowercased().contains("error") || message.lowercased().contains("fail") {
+            os_log("Failed to rebind socket: %{public}@", log: logger, type: .error, message)
+        } else {
+            os_log("Successfully rebound socket after network transition: %{public}@", log: logger, type: .info, message)
+        }
     }
 }

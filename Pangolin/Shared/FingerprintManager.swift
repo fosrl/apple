@@ -21,6 +21,9 @@ import os.log
 #endif
 
 class FingerprintManager {
+    // Set to false to entirely disable interval fingerprint checks
+    private let intervalFingerprintCheckEnabled: Bool = true
+    
     private let socketManager: SocketManager
     private var task: Task<Void, Never>?
 
@@ -30,6 +33,7 @@ class FingerprintManager {
 
     func start(interval: TimeInterval = 30) {
         guard task == nil else { return }
+        guard intervalFingerprintCheckEnabled else { return }
 
         task = Task {
             while !Task.isCancelled {
@@ -45,6 +49,8 @@ class FingerprintManager {
     }
 
     private func runUpdateMetadata() async {
+        guard intervalFingerprintCheckEnabled else { return }
+        
         let fingerprint = gatherFingerprintInfo()
         let postures = gatherPostureChecks()
 
