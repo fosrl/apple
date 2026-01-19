@@ -55,7 +55,7 @@ class TunnelManager: NSObject, ObservableObject {
     private var socketPollingTask: Task<Void, Never>?
     private let socketPollInterval: TimeInterval = 2.0  // Poll every 2 seconds
     private var isPollingSocket = false
-    
+
     // Flag to prevent duplicate error alerts
     private nonisolated(unsafe) var hasShownErrorAlert = false
 
@@ -367,7 +367,7 @@ class TunnelManager: NSObject, ObservableObject {
     func connect() async {
         // Clear error alert flag for new connection attempt
         hasShownErrorAlert = false
-        
+
         // Check if tunnel is already running by querying the socket
         if await socketManager.isRunning() {
             os_log("Tunnel is already running (socket responds)", log: logger, type: .info)
@@ -496,10 +496,6 @@ class TunnelManager: NSObject, ObservableObject {
         let dnsValue = primaryDNS.isEmpty ? defaultDNS : primaryDNS
         tunnelOptions["dns"] = dnsValue as NSString
 
-        // Query for fingerprints and posture checks one time before init
-        tunnelOptions["fingerprint"] = fingerprintManager.gatherFingerprintInfo().asNSDict()
-        tunnelOptions["postures"] = fingerprintManager.gatherPostureChecks().asNSDict()
-
         do {
             // Start with options
             try manager.connection.startVPNTunnel(
@@ -588,10 +584,10 @@ class TunnelManager: NSObject, ObservableObject {
                         // Set flag immediately to prevent duplicate alerts (check-and-set pattern)
                         let shouldShowAlert = !hasShownErrorAlert
                         hasShownErrorAlert = true
-                        
+
                         // Stop polling immediately to prevent duplicate alerts
                         self.stopSocketPolling()
-                        
+
                         if shouldShowAlert {
                             os_log(
                                 "Error received from socket before registration: %{public}@ - %{public}@",
@@ -599,7 +595,7 @@ class TunnelManager: NSObject, ObservableObject {
                                 type: .error,
                                 error.code,
                                 error.message)
-                            
+
                             // Show alert before disconnecting to avoid any async issues
                             await MainActor.run {
                                 AlertManager.shared.showAlertDialog(
@@ -608,9 +604,9 @@ class TunnelManager: NSObject, ObservableObject {
                                 )
                             }
                         }
-                        
+
                         await self.disconnect()
-                        
+
                         // Immediately set status to disconnected
                         await MainActor.run {
                             self.status = .disconnected

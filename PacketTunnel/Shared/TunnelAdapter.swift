@@ -260,9 +260,7 @@ public class TunnelAdapter {
             let upstreamDNS = options["upstreamDNS"] as? [String],
             let overrideDNSValue = (options["overrideDNS"] as? NSNumber)?.boolValue,
             let tunnelDNS = (options["tunnelDNS"] as? NSNumber)?.boolValue,
-            let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue,
-            let fingerprint = (options["fingerprint"]) as? [String: Any],
-            let postures = (options["postures"]) as? [String: Any]
+            let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue
         else {
             let error = NSError(
                 domain: "TunnelAdapter", code: -1,
@@ -273,6 +271,9 @@ public class TunnelAdapter {
             completionHandler(error)
             return
         }
+
+        let fingerprint = (options["fingerprint"]) as? [String: Any] ?? [:]
+        let postures = (options["postures"]) as? [String: Any] ?? [:]
 
         // Tunnel configuration
         let config: [String: Any] = [
