@@ -25,6 +25,23 @@ struct Account: Identifiable, Codable, Hashable {
     let hostname: String
     let email: String
     var orgId: String
+    var username: String?
+    var name: String?
+}
+
+extension Account {
+    var displayName: String {
+        if !email.isEmpty {
+            return email
+        }
+        if let name = name, !name.isEmpty {
+            return name
+        }
+        if let username = username, !username.isEmpty {
+            return username
+        }
+        return "Account"
+    }
 }
 
 struct AccountStore: Codable {
@@ -92,6 +109,21 @@ struct User: Codable {
     let serverAdmin: Bool?
     let idpName: String?
     let idpId: Int?
+}
+
+extension User {
+    var displayName: String {
+        if !email.isEmpty {
+            return email
+        }
+        if let name = name, !name.isEmpty {
+            return name
+        }
+        if let username = username, !username.isEmpty {
+            return username
+        }
+        return "User"
+    }
 }
 
 // MARK: - Organizations
@@ -354,4 +386,14 @@ struct SocketSwitchOrgResponse: Codable {
 
 struct UpdateMetadataResponse: Codable {
     let status: String
+}
+
+// MARK: - Server Info
+
+struct ServerInfo: Codable {
+    let version: String
+    let supporterStatusValid: Bool
+    let build: String  // "oss" | "enterprise" | "saas"
+    let enterpriseLicenseValid: Bool
+    let enterpriseLicenseType: String?
 }

@@ -416,6 +416,48 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    // MARK: - Server Info
+    
+    func getServerInfo() async throws -> ServerInfo {
+        let (data, response) = try await makeRequest(method: "GET", path: "/server-info")
+        return try parseResponse(data, response)
+    }
+    
+    // MARK: - Health Check
+    
+    func checkHealth() async throws -> Bool {
+        // Health check endpoint is exactly /api/v1 (root of API)
+        let normalizedHostname = Self.normalizeBaseURL(baseURL)
+        let fullURL = normalizedHostname + "/api/v1"
+        
+        guard let url = URL(string: fullURL) else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(agentName, forHTTPHeaderField: "User-Agent")
+        
+        // Add session cookie if available (health check may require auth)
+        if let token = sessionToken {
+            request.setValue("\(sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+        }
+        
+        do {
+            let (_, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return false
+            }
+            // Consider 200-299 as healthy, also allow 401/403 as server is up
+            return (200...299).contains(httpResponse.statusCode) || 
+                   httpResponse.statusCode == 401 || 
+                   httpResponse.statusCode == 403
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+    
     // MARK: - Connection Test
     
     func testConnection() async throws -> Bool {

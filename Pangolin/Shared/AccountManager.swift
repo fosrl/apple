@@ -104,6 +104,15 @@ class AccountManager: ObservableObject {
 
         _ = save()
     }
+    
+    func updateAccountUserInfo(userId: String, username: String?, name: String?) {
+        if var account = store.accounts[userId] {
+            account.username = username
+            account.name = name
+            store.accounts[userId] = account
+            _ = save()
+        }
+    }
 
     func activateAccount(userId: String) {
         guard store.accounts[userId] != nil else {

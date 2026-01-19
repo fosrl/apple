@@ -49,6 +49,22 @@ struct MenuBarView: View {
                         .foregroundColor(.secondary)
                 }
             } else {
+                // Server down message
+                if authManager.isServerDown {
+                    Text("The server appears to be down.")
+                        .foregroundColor(.secondary)
+                        .disabled(true)
+                    Divider()
+                }
+                
+                // Error message (for non-server-down errors)
+                if let errorMessage = authManager.errorMessage, !authManager.isServerDown {
+                    Text(errorMessage)
+                        .foregroundColor(.secondary)
+                        .disabled(true)
+                    Divider()
+                }
+                
                 if authManager.isAuthenticated && !isLoggedOut {
                     if accountManager.activeAccount != nil {
                         Text(tunnelManager.status.displayText)
@@ -135,6 +151,36 @@ struct MenuBarView: View {
 
             Divider()
 
+            // Personal license notice
+            if let serverInfo = authManager.serverInfo,
+               serverInfo.build == "enterprise",
+               let licenseType = serverInfo.enterpriseLicenseType,
+               licenseType.lowercased() == "personal" {
+                Text("Licensed for personal use only.")
+                    .foregroundColor(.secondary)
+                    .disabled(true)
+            }
+            
+            // Unlicensed enterprise notice
+            if let serverInfo = authManager.serverInfo,
+               serverInfo.build == "enterprise",
+               !serverInfo.enterpriseLicenseValid {
+                Text("This server is unlicensed.")
+                    .foregroundColor(.secondary)
+                    .disabled(true)
+            }
+            
+            // OSS community edition notice
+            if let serverInfo = authManager.serverInfo,
+               serverInfo.build == "oss",
+               !serverInfo.supporterStatusValid {
+                Text("Community Edition. Consider supporting.")
+                    .foregroundColor(.secondary)
+                    .disabled(true)
+            }
+
+            Divider()
+
             // Quit
             Button("Quit") {
                 Task {
@@ -171,6 +217,33 @@ struct MenuBarView: View {
     }
 
     private func handleMenuOpen() async {
+        // Check server health first
+        var healthCheckFailed = false
+        do {
+            let isHealthy = try await apiClient.checkHealth()
+            if !isHealthy {
+                healthCheckFailed = true
+            }
+        } catch {
+            // Health check failed, server is likely down
+            healthCheckFailed = true
+        }
+        
+        await MainActor.run {
+            if healthCheckFailed {
+                authManager.isServerDown = true
+                authManager.errorMessage = "The server appears to be down. Showing last known information."
+            } else {
+                authManager.isServerDown = false
+                authManager.errorMessage = nil
+            }
+        }
+        
+        // If server is down, don't try to fetch user data
+        if healthCheckFailed {
+            return
+        }
+        
         // First, try to get the user to verify session is still valid
         do {
             let user = try await apiClient.getUser()
@@ -178,6 +251,14 @@ struct MenuBarView: View {
             await MainActor.run {
                 authManager.currentUser = user
                 isLoggedOut = false
+                // Update stored account with latest user info
+                if let activeAccount = accountManager.activeAccount {
+                    accountManager.updateAccountUserInfo(
+                        userId: activeAccount.userId,
+                        username: user.username,
+                        name: user.name
+                    )
+                }
             }
 
             // await tunnelManager.disconnect()
@@ -388,8 +469,11 @@ struct AccountsMenu: View {
     }
 
     private var menuTitle: String {
+        if let user = authManager.currentUser {
+            return user.displayName
+        }
         if let activeAccount = accountManager.activeAccount {
-            return "\(activeAccount.email)"
+            return activeAccount.displayName
         }
 
         return "Select Account"
@@ -404,13 +488,15 @@ struct AccountsMenu: View {
         }
     }
 
-    private func formatEmailHostname(account: Account) -> String {
+    private func formatAccountLabel(account: Account) -> String {
+        let displayName = account.displayName
         let count = emailCounts[account.email, default: 0]
 
+        // If multiple accounts share the same email, show hostname to differentiate
         let text =
             count > 1
-            ? "\(account.email) (\(account.hostname))"
-            : account.email
+            ? "\(displayName) (\(account.hostname))"
+            : displayName
 
         return text
     }
@@ -425,7 +511,7 @@ struct AccountsMenu: View {
             Divider()
 
             ForEach(accounts, id: \.userId) { account in
-                let accountLabelText = formatEmailHostname(account: account)
+                let accountLabelText = formatAccountLabel(account: account)
 
                 Button {
                     Task {

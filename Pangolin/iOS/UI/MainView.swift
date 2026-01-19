@@ -141,6 +141,7 @@ struct HomeTabView: View {
         }
     }
     
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -152,6 +153,36 @@ struct HomeTabView: View {
                         .frame(height: 60)
                         .padding(.top, 20)
                         .padding(.bottom, 15)
+                    
+                    // Server down message
+                    if authManager.isServerDown {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("The server appears to be down.")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(24)
+                    }
+                    
+                    // Error message (for non-server-down errors)
+                    if let errorMessage = authManager.errorMessage, !authManager.isServerDown {
+                        HStack {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text(errorMessage)
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(24)
+                    }
                     
                     // Tunnel Status Card
                     VStack(spacing: 0) {
@@ -229,7 +260,7 @@ struct HomeTabView: View {
                     .animation(.easeInOut(duration: 0.3), value: tunnelStatus == .connected)
                     
                     // Account and Organization Section
-                    if let user = authManager.currentUser {
+                    if authManager.isAuthenticated {
                         VStack(alignment: .leading, spacing: 16) {
                             // Account section
                             VStack(alignment: .leading, spacing: 12) {
@@ -247,8 +278,16 @@ struct HomeTabView: View {
                                             .foregroundColor(.accentColor)
                                         
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(user.email)
-                                                .font(.headline)
+                                            if let user = authManager.currentUser {
+                                                Text(user.displayName)
+                                                    .font(.headline)
+                                            } else if let account = accountManager.activeAccount {
+                                                Text(account.displayName)
+                                                    .font(.headline)
+                                            } else {
+                                                Text("Account")
+                                                    .font(.headline)
+                                            }
                                         }
                                         
                                         Spacer()
@@ -295,6 +334,40 @@ struct HomeTabView: View {
                                     }
                                     .buttonStyle(.plain)
                                 }
+                            }
+                            
+                            // Personal license notice
+                            if let serverInfo = authManager.serverInfo,
+                               serverInfo.build == "enterprise",
+                               let licenseType = serverInfo.enterpriseLicenseType,
+                               licenseType.lowercased() == "personal" {
+                                Text("Licensed for personal use only.")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            
+                            // Unlicensed enterprise notice
+                            if let serverInfo = authManager.serverInfo,
+                               serverInfo.build == "enterprise",
+                               !serverInfo.enterpriseLicenseValid {
+                                Text("This server is unlicensed.")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            
+                            // OSS community edition notice
+                            if let serverInfo = authManager.serverInfo,
+                               serverInfo.build == "oss",
+                               !serverInfo.supporterStatusValid {
+                                Text("Community Edition. Consider supporting.")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
                             }
                         }
                         .padding()
@@ -437,13 +510,15 @@ struct AccountManagementView: View {
         accountManager.activeAccount?.userId
     }
     
-    private func formatEmailHostname(account: Account) -> String {
+    private func formatAccountLabel(account: Account) -> String {
+        let displayName = account.displayName
         let count = emailCounts[account.email, default: 0]
         
+        // If multiple accounts share the same email, show hostname to differentiate
         let text =
             count > 1
-            ? "\(account.email) (\(account.hostname))"
-            : account.email
+            ? "\(displayName) (\(account.hostname))"
+            : displayName
         
         return text
     }
@@ -463,7 +538,7 @@ struct AccountManagementView: View {
                 if !accounts.isEmpty {
                     Section {
                         ForEach(accounts, id: \.userId) { account in
-                            let accountLabelText = formatEmailHostname(account: account)
+                            let accountLabelText = formatAccountLabel(account: account)
                             
                             Button(action: {
                                 Task {

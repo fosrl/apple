@@ -32,6 +32,9 @@ class NetworkTransitionMonitor {
     
     /// Starts monitoring network path changes
     func start() {
+        // os_log("Network transition monitor disabled (temporarily)", log: logger, type: .debug)
+        // return
+        
         os_log("Starting network transition monitor", log: logger, type: .debug)
         
         monitor.pathUpdateHandler = { [weak self] path in

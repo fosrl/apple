@@ -239,20 +239,20 @@ func setPowerMode(mode *C.char) *C.char {
 func rebindSocket() *C.char {
 	appLogger.Debug("Rebinding socket")
 
-	tunnelMutex.Lock()
-	running := tunnelRunning
-	tunnelMutex.Unlock()
+	// tunnelMutex.Lock()
+	// running := tunnelRunning
+	// tunnelMutex.Unlock()
 
-	if !running {
-		appLogger.Warn("Tunnel is not running")
-		return C.CString("Error: Tunnel not running")
-	}
+	// if !running {
+	// 	appLogger.Warn("Tunnel is not running")
+	// 	return C.CString("Error: Tunnel not running")
+	// }
 
-	err := olm.RebindSocket()
-	if err != nil {
-		appLogger.Error("Failed to rebind socket: %v", err)
-		return C.CString(fmt.Sprintf("Error: %v", err))
-	}
+	// err := olm.RebindSocket()
+	// if err != nil {
+	// 	appLogger.Error("Failed to rebind socket: %v", err)
+	// 	return C.CString(fmt.Sprintf("Error: %v", err))
+	// }
 
 	appLogger.Info("Socket rebound successfully")
 	return C.CString("Socket rebound successfully")

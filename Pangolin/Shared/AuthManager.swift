@@ -24,6 +24,8 @@ class AuthManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var deviceAuthCode: String?
     @Published var deviceAuthLoginURL: String?
+    @Published var serverInfo: ServerInfo?
+    @Published var isServerDown = false
 
     let apiClient: APIClient
     private let configManager: ConfigManager
@@ -53,16 +55,47 @@ class AuthManager: ObservableObject {
     func initialize() async {
         isInitializing = true
         defer { isInitializing = false }
+        
+        isServerDown = false
 
         if let activeAccount = accountManager.activeAccount,
             let token = secretManager.getSessionToken(userId: activeAccount.userId)
         {
-
             apiClient.updateSessionToken(token)
+            apiClient.updateBaseURL(activeAccount.hostname)
+
+            // Check server health first
+            var healthCheckFailed = false
+            do {
+                let isHealthy = try await apiClient.checkHealth()
+                if !isHealthy {
+                    healthCheckFailed = true
+                }
+            } catch {
+                // Health check failed, server is likely down
+                healthCheckFailed = true
+            }
+            
+            if healthCheckFailed {
+                // Server is down, but show last known user info
+                isServerDown = true
+                // Keep showing the last known user if we have it
+                if currentUser == nil {
+                    // Try to load user from stored account info
+                    // We'll still show as authenticated to display the UI
+                    isAuthenticated = true
+                } else {
+                    // Keep authenticated state to show last known info
+                    isAuthenticated = true
+                }
+                return
+            }
 
             // Always fetch the latest user info to verify the user exists and update stored info
             do {
                 let user = try await apiClient.getUser()
+                // Update stored account with latest user info
+                accountManager.updateAccountUserInfo(userId: activeAccount.userId, username: user.username, name: user.name)
                 // Update stored config with latest user info
                 await handleSuccessfulAuth(
                     user: user, hostname: activeAccount.hostname, token: token)
@@ -268,12 +301,17 @@ class AuthManager: ObservableObject {
             hostname: hostname,
             email: user.email,
             orgId: selectedOrgId,
+            username: user.username,
+            name: user.name
         )
 
         accountManager.addAccount(newAccount, makeActive: true)
 
         isAuthenticated = true
         errorMessage = nil
+        
+        // Fetch server info
+        await fetchServerInfo()
     }
 
     private func ensureOrgIsSelected(preferredOrgId: String? = nil) async throws -> String {
@@ -359,58 +397,117 @@ class AuthManager: ObservableObject {
             return
         }
 
-        guard let token = secretManager.getSessionToken(userId: userId) else {
-            os_log(
-                "Session token does not exist for %{public}@", log: logger, type: .error, userId)
-            return
-        }
-
         // Disconnect tunnel before switching accounts
         if let tunnelManager = tunnelManager {
             await tunnelManager.disconnect()
         }
 
-        let prevToken = secretManager.getSessionToken(userId: accountManager.activeUserId)
-        let prevBaseURL = apiClient.currentBaseURL
-
-        // Update the API client with the new account's values and
-        // fetch the current user's data
-        do {
-            apiClient.updateSessionToken(token)
+        // Always switch account locally first (even if token is missing/invalid)
+        accountManager.setActiveUser(userId: userId)
+        
+        // Reset server down status and error message
+        isServerDown = false
+        errorMessage = nil
+        
+        // Clear current user/org data immediately when switching accounts
+        // This ensures UI shows the new account's email, not the old account's user name
+        currentUser = nil
+        currentOrg = nil
+        organizations = []
+        
+        // Keep authenticated state to show UI
+        isAuthenticated = true
+        
+        // Get token (may be nil for invalid accounts)
+        let token = secretManager.getSessionToken(userId: userId)
+        
+        if token == nil {
+            // No token available, but still switch the account
+            apiClient.updateSessionToken(nil)
             apiClient.updateBaseURL(accountToSwitchTo.hostname)
+            errorMessage = "No session token found for this account. Please log in again."
+            return
+        }
+        
+        // Update API client with token and hostname
+        apiClient.updateSessionToken(token)
+        apiClient.updateBaseURL(accountToSwitchTo.hostname)
 
-            let user = try await apiClient.getUser()
-            currentUser = user
+        // Now validate with the server (but don't revert if it fails)
+        
+        // Check server health
+        var healthCheckFailed = false
+        do {
+            let isHealthy = try await apiClient.checkHealth()
+            if !isHealthy {
+                healthCheckFailed = true
+            }
         } catch {
-            // In case a failure happens when switching, log it
-            // and switch the API client back to the previous
-            // values.
+            // Health check failed, server is likely down
+            healthCheckFailed = true
             os_log(
-                "Error switching accounts: %{public}@", log: logger, type: .error,
+                "Health check failed when switching accounts: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
-
-            apiClient.updateSessionToken(prevToken)
-            apiClient.updateBaseURL(prevBaseURL)
-
+        }
+        
+        if healthCheckFailed {
+            // Server is down, show message but keep account switched
+            isServerDown = true
+            errorMessage = "The server appears to be down."
+            // currentUser is already cleared above, so UI will show account email
             return
         }
 
+        // Fetch the current user's data
+        do {
+            let user = try await apiClient.getUser()
+            currentUser = user
+            // Update stored account with latest user info
+            accountManager.updateAccountUserInfo(userId: userId, username: user.username, name: user.name)
+            errorMessage = nil  // Clear any previous errors on success
+            isServerDown = false  // Clear server down status on success
+        } catch {
+            // Error fetching user, but keep account switched
+            os_log(
+                "Error fetching user when switching accounts: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
+            errorMessage = "Failed to fetch user information: \(error.localizedDescription)"
+            // Clear current user/org since we can't fetch them for this account
+            currentUser = nil
+            currentOrg = nil
+            organizations = []
+        }
+
+        // Try to select organization (non-fatal if it fails)
         let selectedOrgId: String
         do {
             // Use the account's stored org ID as preferred when switching accounts
             selectedOrgId = try await ensureOrgIsSelected(preferredOrgId: accountToSwitchTo.orgId)
+            accountManager.setUserOrganization(userId: userId, orgId: selectedOrgId)
         } catch {
-            // Failure to select an organization is non-fatal,
-            // so let's just indicate the failure through the logs
-            // and move on.
+            // Failure to select an organization is non-fatal
             os_log(
-                "Error ensuring org accounts: %{public}@", log: logger, type: .error,
+                "Error ensuring org when switching accounts: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
-            selectedOrgId = ""
+            selectedOrgId = accountToSwitchTo.orgId
+            accountManager.setUserOrganization(userId: userId, orgId: selectedOrgId)
         }
-
-        accountManager.setActiveUser(userId: userId)
-        accountManager.setUserOrganization(userId: userId, orgId: selectedOrgId)
+        
+        // Fetch server info (non-fatal if it fails)
+        await fetchServerInfo()
+    }
+    
+    private func fetchServerInfo() async {
+        do {
+            let info = try await apiClient.getServerInfo()
+            serverInfo = info
+        } catch {
+            // Log error but don't fail - server info is optional
+            os_log(
+                "Failed to fetch server info: %{public}@", log: logger, type: .debug,
+                error.localizedDescription)
+            serverInfo = nil
+        }
     }
 
     func checkOrgAccess(orgId: String) async -> Bool {
