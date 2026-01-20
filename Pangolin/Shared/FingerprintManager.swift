@@ -34,6 +34,11 @@ class FingerprintManager {
     func start(interval: TimeInterval = 30) {
         guard task == nil else { return }
         guard intervalFingerprintCheckEnabled else { return }
+        
+        #if os(iOS)
+            // Don't run background metadata updates on iOS
+            return
+        #endif
 
         task = Task.detached(priority: .utility) {
             while !Task.isCancelled {

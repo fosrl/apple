@@ -52,7 +52,7 @@ class TunnelManager: NSObject, ObservableObject {
 
     // Socket polling
     private var socketPollingTask: Task<Void, Never>?
-    private let socketPollInterval: TimeInterval = 2.0  // Poll every 2 seconds
+    private let socketPollInterval: TimeInterval = 1.0
     private var isPollingSocket = false
 
     // Flag to prevent duplicate error alerts
