@@ -224,7 +224,6 @@ class FingerprintManager {
             return getIORegistryProperty("IOPlatformSerialNumber") ?? ""
         #elseif os(iOS)
             return getOrCreatePersistentUUID()
-            return ""
         #else
             return ""
         #endif

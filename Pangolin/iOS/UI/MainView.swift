@@ -525,7 +525,7 @@ struct AccountManagementView: View {
     
     private var shouldDisableAccountButton: Bool {
         switch tunnelManager.status {
-        case .connecting, .registering, .reconnecting, .disconnecting:
+        case .starting, .registering:
             return true
         default:
             return false
@@ -646,7 +646,7 @@ struct OrganizationPickerView: View {
     
     private var shouldDisableOrgButtons: Bool {
         switch tunnelManager.status {
-        case .connecting, .registering, .reconnecting, .disconnecting:
+        case .starting, .registering:
             return true
         default:
             return false
