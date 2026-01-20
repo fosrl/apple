@@ -17,7 +17,6 @@ import os.log
 class TunnelManager: NSObject, ObservableObject {
     @Published var isNEConnected = false
     @Published var status: TunnelStatus = .disconnected
-    @Published var isRegistering = false
 
     private var tunnelManager: NETunnelProviderManager?
     #if os(iOS)
@@ -123,43 +122,42 @@ class TunnelManager: NSObject, ObservableObject {
 
         let vpnStatus = manager.connection.status
 
-        // Update status based on VPN connection status
-        // If we're connected, we'll use socket status as the source of truth
-        // Otherwise, use VPN status
+        // Simple state handling:
+        // - disconnected: Network extension is stopped
+        // - starting: User clicked connect, gathering fingerprint (preserved during this phase)
+        // - registering: Extension is running, polling socket
+        // - connected: Socket shows registered=true and connected=true
         switch vpnStatus {
-        case .invalid:
-            status = .invalid
-            isNEConnected = false
-            stopSocketPolling()
         case .disconnected:
+            // If we're in starting state, preserve it (fingerprint gathering in progress)
+            if status != .starting {
+                status = .disconnected
+                isNEConnected = false
+                stopSocketPolling()
+            }
+        case .connecting:
+            // Extension is starting, transition to registering
+            status = .registering
+            isNEConnected = true  // Extension is running, show disconnect button
+            stopSocketPolling()
+        case .connected:
+            // Extension is connected, start polling socket
+            isNEConnected = true
+            if !isPollingSocket && !hasShownErrorAlert {
+                startSocketPolling()
+                status = .registering
+            }
+        case .reasserting:
+            // Extension is reasserting, keep current state
+            break
+        case .disconnecting:
+            // Extension is disconnecting, show disconnected
             status = .disconnected
             isNEConnected = false
             stopSocketPolling()
-        case .connecting:
-            status = .connecting
-            isNEConnected = false
-            stopSocketPolling()
-        case .connected:
-            // Once VPN extension is connected, enable disconnect button immediately
-            isNEConnected = true
-            // Start polling socket for actual status
-            // Don't start polling if we've already shown an error alert (error handling will disconnect)
-            if !isPollingSocket && !hasShownErrorAlert {
-                startSocketPolling()
-                // Show registering status until socket polling provides actual status
-                status = .registering
-            }
-        // If already polling, don't update status here - let socket polling handle it
-        case .reasserting:
-            status = .reconnecting
-            isNEConnected = false
-            stopSocketPolling()
-        case .disconnecting:
-            status = .disconnecting
-            isNEConnected = false
-            stopSocketPolling()
-        @unknown default:
-            status = .error
+        default:
+            // For any other status, show disconnected
+            status = .disconnected
             isNEConnected = false
             stopSocketPolling()
         }
@@ -174,7 +172,6 @@ class TunnelManager: NSObject, ObservableObject {
             os_log("Installing/activating system extension...", log: logger, type: .info)
 
             await MainActor.run {
-                isRegistering = true
                 status = .registering
             }
 
@@ -202,8 +199,7 @@ class TunnelManager: NSObject, ObservableObject {
                     "Failed to install system extension: %{public}@", log: logger, type: .error,
                     error.localizedDescription)
                 await MainActor.run {
-                    status = .error
-                    isRegistering = false
+                    status = .disconnected
                 }
                 return false
             }
@@ -294,10 +290,6 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     func ensureExtensionRegistered() async {
-        await MainActor.run {
-            isRegistering = true
-        }
-
         // Load existing managers
         let managers = try? await NETunnelProviderManager.loadAllFromPreferences()
         let existingManager = managers?.first { manager in
@@ -314,16 +306,12 @@ class TunnelManager: NSObject, ObservableObject {
                 try await existing.loadFromPreferences()
                 await MainActor.run {
                     tunnelManager = existing
-                    isRegistering = false
                 }
                 await updateConnectionStatus()
             } catch {
                 os_log(
                     "Error loading manager: %{public}@", log: logger, type: .error,
                     error.localizedDescription)
-                await MainActor.run {
-                    isRegistering = false
-                }
             }
         } else {
             // Register the extension
@@ -350,7 +338,6 @@ class TunnelManager: NSObject, ObservableObject {
 
             await MainActor.run {
                 tunnelManager = manager
-                isRegistering = false
             }
             await updateConnectionStatus()
         } catch {
@@ -358,8 +345,7 @@ class TunnelManager: NSObject, ObservableObject {
                 "Error registering extension: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
             await MainActor.run {
-                isRegistering = false
-                status = .error
+                status = .disconnected
             }
         }
     }
@@ -367,6 +353,11 @@ class TunnelManager: NSObject, ObservableObject {
     func connect() async {
         // Clear error alert flag for new connection attempt
         hasShownErrorAlert = false
+
+        // Set starting status immediately so UI shows loading state
+        await MainActor.run {
+            status = .starting
+        }
 
         // Check if tunnel is already running by querying the socket
         if await socketManager.isRunning() {
@@ -387,6 +378,7 @@ class TunnelManager: NSObject, ObservableObject {
         guard let currentOrg = authManager.currentOrg else {
             os_log("No organization selected, aborting connection", log: logger, type: .error)
             await MainActor.run {
+                status = .disconnected
                 AlertManager.shared.showAlertDialog(
                     title: "No Organization Selected",
                     message: "Please select an organization before connecting."
@@ -398,6 +390,7 @@ class TunnelManager: NSObject, ObservableObject {
         guard let activeAccount = accountManager.activeAccount else {
             os_log("No account selected, aborting connection", log: logger, type: .error)
             await MainActor.run {
+                status = .disconnected
                 AlertManager.shared.showAlertDialog(
                     title: "No Account Selected",
                     message: "Please select one or re-login."
@@ -416,7 +409,7 @@ class TunnelManager: NSObject, ObservableObject {
 
         guard let manager = tunnelManager else {
             await MainActor.run {
-                status = .error
+                status = .disconnected
             }
             return
         }
@@ -496,12 +489,28 @@ class TunnelManager: NSObject, ObservableObject {
         let dnsValue = primaryDNS.isEmpty ? defaultDNS : primaryDNS
         tunnelOptions["dns"] = dnsValue as NSString
 
+        // Gather fingerprint and posture data before starting tunnel (runs off main thread)
+        let fingerprint = await fingerprintManager.gatherFingerprintInfo()
+        let postures = await fingerprintManager.gatherPostureChecks()
+        
+        // Convert Fingerprint to dictionary
+        if let fingerprintData = try? JSONEncoder().encode(fingerprint),
+           let fingerprintDict = try? JSONSerialization.jsonObject(with: fingerprintData) as? [String: Any] {
+            tunnelOptions["fingerprint"] = fingerprintDict as NSDictionary
+        }
+        
+        // Convert Postures to dictionary
+        if let posturesData = try? JSONEncoder().encode(postures),
+           let posturesDict = try? JSONSerialization.jsonObject(with: posturesData) as? [String: Any] {
+            tunnelOptions["postures"] = posturesDict as NSDictionary
+        }
+
         do {
             // Start with options
             try manager.connection.startVPNTunnel(
                 options: tunnelOptions.isEmpty ? nil : tunnelOptions)
 
-            // Don't set isNEConnected here - let updateConnectionStatus() handle it
+            // Update status - will transition from .starting to .registering when extension starts
             await updateConnectionStatus()
 
             self.fingerprintManager.start()
@@ -510,7 +519,7 @@ class TunnelManager: NSObject, ObservableObject {
                 "Error starting tunnel: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
             await MainActor.run {
-                status = .error
+                status = .disconnected
             }
         }
     }
@@ -704,9 +713,8 @@ class TunnelManager: NSObject, ObservableObject {
                         status = .disconnected
                     }
                 } else {
-                    status = .error
+                    status = .disconnected
                 }
-                isRegistering = false
             }
 
             systemExtensionInstallContinuation?.resume(returning: success)
@@ -720,8 +728,7 @@ class TunnelManager: NSObject, ObservableObject {
                 error.localizedDescription)
 
             Task { @MainActor in
-                status = .error
-                isRegistering = false
+                status = .disconnected
             }
 
             systemExtensionInstallContinuation?.resume(throwing: error)

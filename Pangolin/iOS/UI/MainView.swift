@@ -105,7 +105,8 @@ struct HomeTabView: View {
         Binding(
             get: { tunnelManager.isNEConnected },
             set: { newValue in
-                guard !isInIntermediateState else { return }
+                // Only prevent interaction when starting (not when registering)
+                guard tunnelStatus != .starting else { return }
                 Task {
                     if newValue {
                         await tunnelManager.connect()
@@ -118,8 +119,9 @@ struct HomeTabView: View {
     }
     
     private var isInIntermediateState: Bool {
+        // Used for showing loading animation - include both starting and registering
         switch tunnelStatus {
-        case .connecting, .registering, .reconnecting, .disconnecting:
+        case .starting, .registering:
             return true
         default:
             return false
@@ -132,12 +134,8 @@ struct HomeTabView: View {
             return .green
         case .disconnected:
             return .gray
-        case .connecting, .registering, .reconnecting:
+        case .starting, .registering:
             return .orange
-        case .disconnecting:
-            return .orange
-        case .error, .invalid:
-            return .red
         }
     }
     
@@ -187,7 +185,8 @@ struct HomeTabView: View {
                     // Tunnel Status Card
                     VStack(spacing: 0) {
                         Button(action: {
-                            guard !isInIntermediateState else { return }
+                            // Only prevent interaction when starting (not when registering)
+                            guard tunnelStatus != .starting else { return }
                             Task {
                                 if tunnelManager.isNEConnected {
                                     await tunnelManager.disconnect()
@@ -211,6 +210,7 @@ struct HomeTabView: View {
                                         if isInIntermediateState {
                                             ProgressView()
                                                 .scaleEffect(0.8)
+                                                .id("loading-progress") // Stable ID to prevent animation restart
                                         }
                                     }
                                     
@@ -225,7 +225,7 @@ struct HomeTabView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
-                        .disabled(isInIntermediateState)
+                        .disabled(tunnelStatus == .starting)
                         .buttonStyle(.plain)
                         .background(Color(.systemGray6))
                         .cornerRadius(24)

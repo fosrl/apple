@@ -260,25 +260,17 @@ struct Postures: Codable {
 
 enum TunnelStatus: String, CaseIterable {
     case disconnected = "Disconnected"
-    case connecting = "Connecting..."
+    case starting = "Starting..."
     case registering = "Registering..."
     case connected = "Connected"
-    case reconnecting = "Reconnecting..."
-    case disconnecting = "Disconnecting..."
-    case invalid = "Invalid"
-    case error = "Error"
 
     var displayText: String {
         // Remove ellipsis from loading states for cleaner display
         switch self {
-        case .connecting:
-            return "Connecting"
+        case .starting:
+            return "Starting"
         case .registering:
             return "Registering"
-        case .reconnecting:
-            return "Reconnecting"
-        case .disconnecting:
-            return "Disconnecting"
         default:
             return self.rawValue
         }

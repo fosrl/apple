@@ -55,8 +55,8 @@ class FingerprintManager {
         
         guard await socketManager.isRunning() else { return }
         
-        let fingerprint = gatherFingerprintInfo()
-        let postures = gatherPostureChecks()
+        let fingerprint = await gatherFingerprintInfo()
+        let postures = await gatherPostureChecks()
 
         do {
             _ = try await socketManager.updateMetadata(fingerprint: fingerprint, postures: postures)
@@ -65,7 +65,7 @@ class FingerprintManager {
         }
     }
 
-    func gatherFingerprintInfo() -> Fingerprint {
+    func gatherFingerprintInfo() async -> Fingerprint {
         let deviceModel = getDeviceModel()
 
         let architecture = getArch()
@@ -74,12 +74,15 @@ class FingerprintManager {
 
         #if os(macOS)
             let platformUUID = getIORegistryProperty("IOPlatformUUID") ?? ""
+            
+            let kernelVersion = await getKernelVersion()
 
             let platformFingerprint = computePlatformFingerprint(
                 arch: architecture, deviceModel: deviceModel, serialNumber: serialNumber,
                 platformUUID: platformUUID)
 
         #elseif os(iOS)
+            let kernelVersion = await getKernelVersion()
             let platformFingerprint = computePlatformFingerprint(persistentUUID: serialNumber)
 
         #endif
@@ -89,7 +92,7 @@ class FingerprintManager {
             hostname: getHostname(),
             platform: getPlatformString(),
             osVersion: getOSVersion(),
-            kernelVersion: getKernelVersion(),
+            kernelVersion: kernelVersion,
             arch: architecture,
             deviceModel: deviceModel,
             serialNumber: serialNumber,
@@ -97,18 +100,18 @@ class FingerprintManager {
         )
     }
 
-    func gatherPostureChecks() -> Postures {
+    func gatherPostureChecks() async -> Postures {
         return Postures(
-            autoUpdatesEnabled: queryAutoUpdatesEnabled(),
+            autoUpdatesEnabled: await queryAutoUpdatesEnabled(),
             biometricsEnabled: queryBiometricsEnabled(),
-            diskEncrypted: queryDiskEncrypted(),
-            firewallEnabled: queryFirewallEnabled(),
+            diskEncrypted: await queryDiskEncrypted(),
+            firewallEnabled: await queryFirewallEnabled(),
             // Secure Enclave and T2 are always available on iOS and macOS.
             tpmAvailable: true,
 
-            macosSipEnabled: querySipEnabled(),
-            macosGatekeeperEnabled: queryGatekeeperEnabled(),
-            macosFirewallStealthMode: queryFirewallStealthMode(),
+            macosSipEnabled: await querySipEnabled(),
+            macosGatekeeperEnabled: await queryGatekeeperEnabled(),
+            macosFirewallStealthMode: await queryFirewallStealthMode(),
         )
     }
 
@@ -163,9 +166,9 @@ class FingerprintManager {
         return "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
     }
 
-    private func getKernelVersion() -> String {
+    private func getKernelVersion() async -> String {
         #if os(macOS)
-            return runCommand(["uname", "-r"])
+            return await runCommand(["uname", "-r"])
         #elseif os(iOS)
             var uts = utsname()
             uname(&uts)
@@ -222,9 +225,9 @@ class FingerprintManager {
         #endif
     }
 
-    private func queryAutoUpdatesEnabled() -> Bool {
+    private func queryAutoUpdatesEnabled() async -> Bool {
         #if os(macOS)
-            let output = runCommand(["softwareupdate", "--schedule"]).lowercased()
+            let output = (await runCommand(["softwareupdate", "--schedule"])).lowercased()
             return output.contains("on")
         #else
             return false
@@ -241,21 +244,21 @@ class FingerprintManager {
         )
     }
 
-    private func queryDiskEncrypted() -> Bool {
+    private func queryDiskEncrypted() async -> Bool {
         #if os(macOS)
-            let output = runCommand(["fdesetup", "status"]).lowercased()
+            let output = (await runCommand(["fdesetup", "status"])).lowercased()
             return output.contains("filevault is on")
         #else
             return false
         #endif
     }
 
-    private func queryFirewallEnabled() -> Bool {
+    private func queryFirewallEnabled() async -> Bool {
         #if os(macOS)
-            let output = runCommand([
+            let output = (await runCommand([
                 "/usr/bin/defaults", "read", "/Library/Preferences/com.apple.alf",
                 "globalstate",
-            ]).lowercased()
+            ])).lowercased()
             // 0 = off, 1 = on for specific services, 2 = on for essential services
             return output != "0"
         #else
@@ -263,29 +266,29 @@ class FingerprintManager {
         #endif
     }
 
-    private func querySipEnabled() -> Bool {
+    private func querySipEnabled() async -> Bool {
         #if os(macOS)
-            let output = runCommand(["csrutil", "status"]).lowercased()
+            let output = (await runCommand(["csrutil", "status"])).lowercased()
             return output.contains("enabled")
         #else
             return false
         #endif
     }
 
-    private func queryGatekeeperEnabled() -> Bool {
+    private func queryGatekeeperEnabled() async -> Bool {
         #if os(macOS)
-            let output = runCommand(["spctl", "--status"]).lowercased()
+            let output = (await runCommand(["spctl", "--status"])).lowercased()
             return output.contains("enabled")
         #else
             return false
         #endif
     }
 
-    private func queryFirewallStealthMode() -> Bool {
+    private func queryFirewallStealthMode() async -> Bool {
         #if os(macOS)
-            let output = runCommand([
+            let output = (await runCommand([
                 "/usr/bin/defaults", "read", "com.apple.alf", "stealthenabled",
-            ]).lowercased()
+            ])).lowercased()
             return output.contains("1")
         #else
             return false
@@ -293,18 +296,28 @@ class FingerprintManager {
     }
 
     #if os(macOS)
-        private func runCommand(_ args: [String]) -> String {
-            let task = Process()
-            task.launchPath = "/usr/bin/env"
-            task.arguments = args
+        private func runCommand(_ args: [String]) async -> String {
+            // Run the blocking command in a background task to avoid blocking the UI
+            return await Task.detached(priority: .userInitiated) {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                task.arguments = args
 
-            let pipe = Pipe()
-            task.standardOutput = pipe
-            task.launch()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let pipe = Pipe()
+                task.standardOutput = pipe
+                task.standardError = pipe
+                
+                do {
+                    try task.run()
+                    task.waitUntilExit()
+                    
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    return String(data: data, encoding: .utf8)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                } catch {
+                    return ""
+                }
+            }.value
         }
 
         private func getIORegistryProperty(_ key: String) -> String? {

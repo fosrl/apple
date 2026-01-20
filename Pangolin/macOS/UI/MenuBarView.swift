@@ -410,7 +410,7 @@ struct OrganizationsMenu: View {
 
     private var shouldDisableOrgButtons: Bool {
         switch tunnelManager.status {
-        case .connecting, .registering, .reconnecting, .disconnecting:
+        case .starting, .registering:
             return true
         default:
             return false
@@ -481,7 +481,7 @@ struct AccountsMenu: View {
 
     private var shouldDisableAccountButton: Bool {
         switch tunnelManager.status {
-        case .connecting, .registering, .reconnecting, .disconnecting:
+        case .starting, .registering:
             return true
         default:
             return false
@@ -551,6 +551,12 @@ struct AccountsMenu: View {
 
 struct ConnectButtonItem: View {
     @ObservedObject var tunnelManager: TunnelManager
+    
+    private var shouldDisableButton: Bool {
+        // Only disable connect button when starting
+        // Disconnect button should be enabled during registering
+        return tunnelManager.status == .starting
+    }
 
     var body: some View {
         Button(tunnelManager.isNEConnected ? "Disconnect" : "Connect") {
@@ -562,6 +568,6 @@ struct ConnectButtonItem: View {
                 }
             }
         }
-        .disabled(tunnelManager.isRegistering)
+        .disabled(shouldDisableButton)
     }
 }

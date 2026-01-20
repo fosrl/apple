@@ -20,7 +20,7 @@ struct MenuBarIconView: View {
 
     private var isInIntermediateState: Bool {
         switch tunnelStatus {
-        case .connecting, .registering, .reconnecting, .disconnecting:
+        case .starting, .registering:
             return true
         default:
             return false
