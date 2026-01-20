@@ -35,9 +35,11 @@ class FingerprintManager {
         guard task == nil else { return }
         guard intervalFingerprintCheckEnabled else { return }
 
-        task = Task {
+        task = Task.detached(priority: .utility) {
             while !Task.isCancelled {
-                await runUpdateMetadata()
+                if await self.socketManager.isRunning() {
+                    await self.runUpdateMetadata()
+                }
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
         }
@@ -50,6 +52,8 @@ class FingerprintManager {
 
     private func runUpdateMetadata() async {
         guard intervalFingerprintCheckEnabled else { return }
+        
+        guard await socketManager.isRunning() else { return }
         
         let fingerprint = gatherFingerprintInfo()
         let postures = gatherPostureChecks()
