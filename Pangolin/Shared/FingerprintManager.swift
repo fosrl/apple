@@ -23,7 +23,7 @@ import os.log
 class FingerprintManager {
     // Set to false to entirely disable interval fingerprint checks
     private let intervalFingerprintCheckEnabled: Bool = true
-    
+
     private let socketManager: SocketManager
     private var task: Task<Void, Never>?
 
@@ -34,7 +34,7 @@ class FingerprintManager {
     func start(interval: TimeInterval = 30) {
         guard task == nil else { return }
         guard intervalFingerprintCheckEnabled else { return }
-        
+
         #if os(iOS)
             // Don't run background metadata updates on iOS
             return
@@ -57,9 +57,9 @@ class FingerprintManager {
 
     private func runUpdateMetadata() async {
         guard intervalFingerprintCheckEnabled else { return }
-        
+
         guard await socketManager.isRunning() else { return }
-        
+
         let fingerprint = await gatherFingerprintInfo()
         let postures = await gatherPostureChecks()
 
@@ -73,23 +73,23 @@ class FingerprintManager {
     func gatherFingerprintInfo() async -> Fingerprint {
         let deviceModel = getDeviceModel()
 
+        let kernelVersion = await getKernelVersion()
+
         let architecture = getArch()
 
         let serialNumber = getSerialNumber()
 
         #if os(macOS)
             let platformUUID = getIORegistryProperty("IOPlatformUUID") ?? ""
-            
-            let kernelVersion = await getKernelVersion()
 
             let platformFingerprint = computePlatformFingerprint(
                 arch: architecture, deviceModel: deviceModel, serialNumber: serialNumber,
                 platformUUID: platformUUID)
 
         #elseif os(iOS)
-            let kernelVersion = await getKernelVersion()
-            let platformFingerprint = computePlatformFingerprint(persistentUUID: serialNumber)
+            let pseudoSerialNumber = getOrCreatePersistentUUID()
 
+            let platformFingerprint = computePlatformFingerprint(persistentUUID: pseudoSerialNumber)
         #endif
 
         return Fingerprint(
@@ -222,8 +222,6 @@ class FingerprintManager {
     private func getSerialNumber() -> String {
         #if os(macOS)
             return getIORegistryProperty("IOPlatformSerialNumber") ?? ""
-        #elseif os(iOS)
-            return getOrCreatePersistentUUID()
         #else
             return ""
         #endif
@@ -259,10 +257,11 @@ class FingerprintManager {
 
     private func queryFirewallEnabled() async -> Bool {
         #if os(macOS)
-            let output = (await runCommand([
-                "/usr/bin/defaults", "read", "/Library/Preferences/com.apple.alf",
-                "globalstate",
-            ])).lowercased()
+            let output =
+                (await runCommand([
+                    "/usr/bin/defaults", "read", "/Library/Preferences/com.apple.alf",
+                    "globalstate",
+                ])).lowercased()
             // 0 = off, 1 = on for specific services, 2 = on for essential services
             return output != "0"
         #else
@@ -290,9 +289,10 @@ class FingerprintManager {
 
     private func queryFirewallStealthMode() async -> Bool {
         #if os(macOS)
-            let output = (await runCommand([
-                "/usr/bin/defaults", "read", "com.apple.alf", "stealthenabled",
-            ])).lowercased()
+            let output =
+                (await runCommand([
+                    "/usr/bin/defaults", "read", "com.apple.alf", "stealthenabled",
+                ])).lowercased()
             return output.contains("1")
         #else
             return false
@@ -310,11 +310,11 @@ class FingerprintManager {
                 let pipe = Pipe()
                 task.standardOutput = pipe
                 task.standardError = pipe
-                
+
                 do {
                     try task.run()
                     task.waitUntilExit()
-                    
+
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     return String(data: data, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
