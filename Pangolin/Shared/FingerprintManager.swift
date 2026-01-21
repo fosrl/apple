@@ -234,7 +234,9 @@ class FingerprintManager {
 
     private func queryAutoUpdatesEnabled() async -> Bool {
         #if os(macOS)
-            let output = (await runCommand(["softwareupdate", "--schedule"])).lowercased()
+            let rawOutput = await runCommand(["softwareupdate", "--schedule"])
+            os_log("queryAutoUpdatesEnabled() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
+            let output = rawOutput.lowercased()
             return output.contains("on")
         #else
             return false
@@ -245,15 +247,19 @@ class FingerprintManager {
         let context = LAContext()
         var error: NSError?
 
-        return context.canEvaluatePolicy(
+        let result = context.canEvaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics,
             error: &error
         )
+        os_log("queryBiometricsEnabled() - Result: %{public}@, Error: %{public}@", log: logger, type: .debug, result ? "true" : "false", error?.localizedDescription ?? "none")
+        return result
     }
 
     private func queryDiskEncrypted() async -> Bool {
         #if os(macOS)
-            let output = (await runCommand(["fdesetup", "status"])).lowercased()
+            let rawOutput = await runCommand(["fdesetup", "status"])
+            os_log("queryDiskEncrypted() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
+            let output = rawOutput.lowercased()
             return output.contains("filevault is on")
         #else
             return false
@@ -262,13 +268,13 @@ class FingerprintManager {
 
     private func queryFirewallEnabled() async -> Bool {
         #if os(macOS)
-            let output =
-                (await runCommand([
-                    "/usr/bin/defaults", "read", "/Library/Preferences/com.apple.alf",
-                    "globalstate",
-                ])).lowercased()
-            // 0 = off, 1 = on for specific services, 2 = on for essential services
-            return output != "0"
+            let rawOutput = await runCommand([
+                "/usr/libexec/ApplicationFirewall/socketfilterfw", "--getglobalstate",
+            ])
+            os_log("queryFirewallEnabled() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
+            let output = rawOutput.lowercased()
+            // Output is "Firewall is enabled. (State = 1)" or "Firewall is disabled. (State = 0)"
+            return output.contains("enabled")
         #else
             return false
         #endif
@@ -276,7 +282,9 @@ class FingerprintManager {
 
     private func querySipEnabled() async -> Bool {
         #if os(macOS)
-            let output = (await runCommand(["csrutil", "status"])).lowercased()
+            let rawOutput = await runCommand(["csrutil", "status"])
+            os_log("querySipEnabled() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
+            let output = rawOutput.lowercased()
             return output.contains("enabled")
         #else
             return false
@@ -285,7 +293,9 @@ class FingerprintManager {
 
     private func queryGatekeeperEnabled() async -> Bool {
         #if os(macOS)
-            let output = (await runCommand(["spctl", "--status"])).lowercased()
+            let rawOutput = await runCommand(["spctl", "--status"])
+            os_log("queryGatekeeperEnabled() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
+            let output = rawOutput.lowercased()
             return output.contains("enabled")
         #else
             return false
@@ -294,11 +304,13 @@ class FingerprintManager {
 
     private func queryFirewallStealthMode() async -> Bool {
         #if os(macOS)
-            let output =
-                (await runCommand([
-                    "/usr/bin/defaults", "read", "com.apple.alf", "stealthenabled",
-                ])).lowercased()
-            return output.contains("1")
+            let rawOutput = await runCommand([
+                "/usr/libexec/ApplicationFirewall/socketfilterfw", "--getstealthmode",
+            ])
+            os_log("queryFirewallStealthMode() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
+            let output = rawOutput.lowercased()
+            // Output is "Firewall stealth mode is on" or "Firewall stealth mode is off"
+            return output.contains("is on")
         #else
             return false
         #endif
@@ -309,8 +321,15 @@ class FingerprintManager {
             // Run the blocking command in a background task to avoid blocking the UI
             return await Task.detached(priority: .userInitiated) {
                 let task = Process()
-                task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                task.arguments = args
+                
+                // If first argument is a full path, use it directly; otherwise use env
+                if args.first?.hasPrefix("/") == true {
+                    task.executableURL = URL(fileURLWithPath: args[0])
+                    task.arguments = Array(args.dropFirst())
+                } else {
+                    task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                    task.arguments = args
+                }
 
                 let pipe = Pipe()
                 task.standardOutput = pipe
