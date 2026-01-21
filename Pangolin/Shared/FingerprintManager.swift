@@ -27,6 +27,11 @@ class FingerprintManager {
     private let socketManager: SocketManager
     private var task: Task<Void, Never>?
 
+    private let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "FingerprintManager")
+    }()
+
     init(socketManager: SocketManager) {
         self.socketManager = socketManager
     }
@@ -66,7 +71,7 @@ class FingerprintManager {
         do {
             _ = try await socketManager.updateMetadata(fingerprint: fingerprint, postures: postures)
         } catch {
-            print("Failed to push fingerprint and posture data state: \(error)")
+            os_log("Failed to push fingerprint and posture data state: %{public}@", log: logger, type: .error, error.localizedDescription)
         }
     }
 
@@ -132,7 +137,7 @@ class FingerprintManager {
                 arch: architecture, deviceModel: deviceModel, serialNumber: serialNumber,
                 platformUUID: platformUUID)
         #elseif os(iOS)
-            return computePlatformFingerprint(persistentUUID: serialNumber)
+            return computePlatformFingerprint(persistentUUID: getOrCreatePersistentUUID())
         #else
             return ""
         #endif
@@ -367,20 +372,28 @@ class FingerprintManager {
     #if os(iOS)
         private func getOrCreatePersistentUUID() -> String {
             let key = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+            os_log("getOrCreatePersistentUUID() - Key: %{public}@", log: logger, type: .debug, key)
 
             if let existing = KeychainHelper.shared.get(key: key) {
+                os_log("getOrCreatePersistentUUID() - Found existing UUID in Keychain: %{public}@", log: logger, type: .debug, existing)
                 return existing
             }
 
             let uuid = UUID().uuidString
+            os_log("getOrCreatePersistentUUID() - No existing UUID found, creating new UUID: %{public}@", log: logger, type: .debug, uuid)
             KeychainHelper.shared.set(key: key, value: uuid)
+            os_log("getOrCreatePersistentUUID() - Stored new UUID in Keychain with key: %{public}@", log: logger, type: .debug, key)
             return uuid
         }
 
         func computePlatformFingerprint(persistentUUID: String) -> String {
+            os_log("computePlatformFingerprint() - Input persistentUUID: %{public}@", log: logger, type: .debug, persistentUUID)
             let raw = ["ios", persistentUUID].joined(separator: "|")
+            os_log("computePlatformFingerprint() - Raw string to hash: %{public}@", log: logger, type: .debug, raw)
             let digest = SHA256.hash(data: Data(raw.utf8))
-            return digest.map { String(format: "%02x", $0) }.joined()
+            let result = digest.map { String(format: "%02x", $0) }.joined()
+            os_log("computePlatformFingerprint() - Resulting fingerprint hash: %{public}@", log: logger, type: .debug, result)
+            return result
         }
     #endif
 }
