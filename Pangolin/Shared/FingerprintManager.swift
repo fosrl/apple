@@ -233,10 +233,23 @@ class FingerprintManager {
 
     private func queryAutoUpdatesEnabled() async -> Bool {
         #if os(macOS)
-            let rawOutput = await runCommand(["softwareupdate", "--schedule"])
-            os_log("queryAutoUpdatesEnabled() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
-            let output = rawOutput.lowercased()
-            return output.contains("on")
+            // Check all required keys are set to 1
+            let keys = ["AutomaticDownload", "AutomaticallyInstallMacOSUpdates", "ConfigDataInstall", "CriticalUpdateInstall"]
+            var allEnabled = true
+            
+            for key in keys {
+                let rawOutput = await runCommand(["defaults", "read", "/Library/Preferences/com.apple.SoftwareUpdate.plist", key])
+                os_log("queryAutoUpdatesEnabled() - Key: %{public}@, Raw output: %{public}@", log: logger, type: .debug, key, rawOutput)
+                
+                let valueStr = rawOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+                if valueStr != "1" {
+                    // If we can't read a key or it's not "1", assume not enabled
+                    allEnabled = false
+                    break
+                }
+            }
+            
+            return allEnabled
         #else
             return false
         #endif
