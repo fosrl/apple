@@ -9,7 +9,6 @@ import Combine
 import CryptoKit
 import Darwin
 import Foundation
-import LocalAuthentication
 import os.log
 
 #if os(macOS)
@@ -113,7 +112,7 @@ class FingerprintManager {
     func gatherPostureChecks() async -> Postures {
         return Postures(
             autoUpdatesEnabled: await queryAutoUpdatesEnabled(),
-            biometricsEnabled: queryBiometricsEnabled(),
+            biometricsEnabled: await queryBiometricsEnabled(),
             diskEncrypted: await queryDiskEncrypted(),
             firewallEnabled: await queryFirewallEnabled(),
             // Secure Enclave and T2 are always available on iOS and macOS.
@@ -243,16 +242,36 @@ class FingerprintManager {
         #endif
     }
 
-    private func queryBiometricsEnabled() -> Bool {
-        let context = LAContext()
-        var error: NSError?
-
-        let result = context.canEvaluatePolicy(
-            .deviceOwnerAuthenticationWithBiometrics,
-            error: &error
-        )
-        os_log("queryBiometricsEnabled() - Result: %{public}@, Error: %{public}@", log: logger, type: .debug, result ? "true" : "false", error?.localizedDescription ?? "none")
-        return result
+    private func queryBiometricsEnabled() async -> Bool {
+        #if os(macOS)
+            let rawOutput = await runCommand(["bioutil", "-r"])
+            os_log("queryBiometricsEnabled() - Raw output: %{public}@", log: logger, type: .debug, rawOutput)
+            
+            // Regex pattern: "Biometrics for unlock:" followed by optional whitespace and digits
+            let pattern = "Biometrics for unlock:\\s*(\\d+)"
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+                return false
+            }
+            
+            let range = NSRange(rawOutput.startIndex..<rawOutput.endIndex, in: rawOutput)
+            guard let match = regex.firstMatch(in: rawOutput, options: [], range: range) else {
+                return false
+            }
+            
+            // matches[0] is the full match, matches[1] is the captured group (the number)
+            if match.numberOfRanges > 1 {
+                let numberRange = match.range(at: 1)
+                if let swiftRange = Range(numberRange, in: rawOutput),
+                   let number = Int(rawOutput[swiftRange]),
+                   number > 0 {
+                    return true
+                }
+            }
+            
+            return false
+        #else
+            return false
+        #endif
     }
 
     private func queryDiskEncrypted() async -> Bool {
