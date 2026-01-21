@@ -150,7 +150,7 @@ class FingerprintManager {
         #if os(macOS)
             return Host.current().localizedName ?? ""
         #elseif os(iOS)
-            return UIDevice.current.name
+            return ""
         #else
             return ""
         #endif
