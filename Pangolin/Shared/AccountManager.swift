@@ -35,6 +35,8 @@ class AccountManager: ObservableObject {
     }()
 
     init() {
+        // Migrate data from sandboxed location if needed
+        _ = SandboxMigration.migrateIfNeeded()
         load()
     }
 

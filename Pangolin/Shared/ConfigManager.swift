@@ -24,6 +24,9 @@ class ConfigManager: ObservableObject {
     }()
 
     init() {
+        // Migrate data from sandboxed location if needed
+        _ = SandboxMigration.migrateIfNeeded()
+        
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask
         ).first!
