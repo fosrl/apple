@@ -168,8 +168,11 @@ struct LoginView: View {
             }
         )
         .onAppear {
-            // Configure window without showing dock icon
+            // Show app in dock when window appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                guard NSApp.activationPolicy() != .regular else { return }
+                NSApp.setActivationPolicy(.regular)
+                
                 // Ensure window identifier is set and close duplicates
                 // Find this window by title first
                 if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }
@@ -224,6 +227,17 @@ struct LoginView: View {
         .onDisappear {
             // Reset state when view disappears
             resetLoginState()
+            
+            // Hide app from dock when window closes (if no other windows)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                let hasOtherWindows = NSApplication.shared.windows.contains { window in
+                    window.isVisible && (window.identifier?.rawValue == "main" || window.identifier?.rawValue == "preferences")
+                }
+                if !hasOtherWindows {
+                    guard NSApp.activationPolicy() != .accessory else { return }
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
         }
     }
 
@@ -488,9 +502,6 @@ struct LoginView: View {
         if window.identifier?.rawValue != "main" {
             window.identifier = NSUserInterfaceItemIdentifier("main")
         }
-
-        // Make window float on top of all other windows
-        window.level = .floating
 
         // Configure window style: remove minimize and maximize, keep close button
         var styleMask = window.styleMask

@@ -438,6 +438,8 @@ class APIClient: ObservableObject {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(agentName, forHTTPHeaderField: "User-Agent")
+        // Use shorter timeout for health check to fail fast when server is unreachable
+        request.timeoutInterval = 5.0
         
         // Add session cookie if available (health check may require auth)
         if let token = sessionToken {

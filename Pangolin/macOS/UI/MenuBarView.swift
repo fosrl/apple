@@ -281,6 +281,12 @@ struct MenuBarView: View {
     }
 
     private func openLoginWindow() {
+        // Show app in dock when opening window
+        DispatchQueue.main.async {
+            guard NSApp.activationPolicy() != .regular else { return }
+            NSApp.setActivationPolicy(.regular)
+        }
+
         // Find existing window by identifier or title
         let existingWindow = NSApplication.shared.windows.first { window in
             window.identifier?.rawValue == "main" || window.title == "Pangolin"
@@ -300,9 +306,6 @@ struct MenuBarView: View {
             styleMask.remove([.miniaturizable, .resizable])
             styleMask.insert([.titled, .closable])
             window.styleMask = styleMask
-
-            // Make window float on top of all other windows
-            window.level = .floating
 
             // Hide minimize and zoom buttons, keep only close button
             if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
@@ -335,8 +338,6 @@ struct MenuBarView: View {
                 if let window = NSApplication.shared.windows.first(where: {
                     $0.identifier?.rawValue == "main" || $0.title == "Pangolin"
                 }) {
-                    // Make window float on top of all other windows
-                    window.level = .floating
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()
                     NSApp.activate(ignoringOtherApps: true)
