@@ -35,8 +35,10 @@ class AccountManager: ObservableObject {
     }()
 
     init() {
-        // Migrate data from sandboxed location if needed
+        // Migrate data from sandboxed location if needed (macOS only)
+        #if os(macOS)
         _ = SandboxMigration.migrateIfNeeded()
+        #endif
         load()
     }
 

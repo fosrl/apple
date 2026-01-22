@@ -140,7 +140,6 @@
 				Shared/DeviceInfo.swift,
 				Shared/FingerprintManager.swift,
 				Shared/KeychainHelper.swift,
-				Shared/Migrations/SandboxMigration.swift,
 				Shared/Model/Models.swift,
 				Shared/OLMStatusManager.swift,
 				Shared/SecretManager.swift,

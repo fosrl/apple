@@ -8,6 +8,7 @@
 import Foundation
 import os.log
 
+#if os(macOS)
 /// Handles migration of data from sandboxed container to non-sandboxed location.
 /// This migration is needed when upgrading from a sandboxed version to a non-sandboxed version.
 enum SandboxMigration {
@@ -162,3 +163,4 @@ enum SandboxMigration {
         }
     }
 }
+#endif
