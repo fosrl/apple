@@ -8,11 +8,21 @@
 
 /* Begin PBXBuildFile section */
 		9039ACD52ECFB01000FCA982 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 9039ACD42ECFB01000FCA982 /* Sparkle */; };
+		907A6C7D2F05AE620097F387 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90D1911A2EC9248100912E68 /* NetworkExtension.framework */; };
+		907A6C862F05AE620097F387 /* PacketTunneliOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 907A6C7C2F05AE620097F387 /* PacketTunneliOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		907A6C942F05AFE60097F387 /* libpangolin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 907A6C932F05AFE60097F387 /* libpangolin.a */; };
 		90D1973A2EC96BEC00912E68 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90D1911A2EC9248100912E68 /* NetworkExtension.framework */; };
 		90D197442EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		907A6C832F05AE620097F387 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 90BC22AC2EBC6C1D0072B44A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 907A6C7B2F05AE620097F387;
+			remoteInfo = PacketTunneliOS;
+		};
 		90D191C32EC9276900912E68 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 90BC22AC2EBC6C1D0072B44A /* Project object */;
@@ -51,14 +61,25 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		90D191372EC9260400912E68 /* Embed App Extensions */ = {
+		907A6C852F05AE620097F387 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				907A6C862F05AE620097F387 /* PacketTunneliOS.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		90D191372EC9260400912E68 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 12;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		90D1919E2EC926F500912E68 /* Embed System Extensions */ = {
@@ -75,6 +96,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		907A6C5E2F05ACAF0097F387 /* PangoliniOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PangoliniOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		907A6C7C2F05AE620097F387 /* PacketTunneliOS.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunneliOS.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		907A6C932F05AFE60097F387 /* libpangolin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libpangolin.a; path = PangolinGo/libpangolin.a; sourceTree = "<group>"; };
 		90BC22B42EBC6C1D0072B44A /* Pangolin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pangolin.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		90D1911A2EC9248100912E68 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = net.pangolin.Pangolin.PacketTunnel.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -84,24 +108,86 @@
 		901FF5E22EC7EE9900711D4E /* Exceptions for "Pangolin" folder in "Pangolin" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				iOS/Info.plist,
+				iOS/PangolinApp.swift,
+				iOS/UI/AboutView.swift,
+				iOS/UI/LoginView.swift,
+				iOS/UI/MainView.swift,
+				iOS/UI/Preferences/DNSServerModalView.swift,
+				iOS/UI/Preferences/PreferencesView.swift,
+				iOS/UI/StatusView.swift,
+				macOS/Info.plist,
 			);
 			target = 90BC22B32EBC6C1D0072B44A /* Pangolin */;
+		};
+		907A6C6C2F05ADBB0097F387 /* Exceptions for "Pangolin" folder in "PangoliniOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Assets.xcassets,
+				iOS/PangolinApp.swift,
+				iOS/UI/AboutView.swift,
+				iOS/UI/LoginView.swift,
+				iOS/UI/MainView.swift,
+				iOS/UI/Preferences/DNSServerModalView.swift,
+				iOS/UI/Preferences/PreferencesView.swift,
+				iOS/UI/StatusView.swift,
+				"pangolin-app-icon.icon",
+				Shared/AccountManager.swift,
+				Shared/AlertManager.swift,
+				Shared/APIClient.swift,
+				Shared/AuthManager.swift,
+				Shared/ConfigManager.swift,
+				Shared/DeviceInfo.swift,
+				Shared/FingerprintManager.swift,
+				Shared/KeychainHelper.swift,
+				Shared/Model/Models.swift,
+				Shared/OLMStatusManager.swift,
+				Shared/SecretManager.swift,
+				Shared/SocketManager.swift,
+				Shared/SocketPath.swift,
+				Shared/TunnelManager.swift,
+			);
+			target = 907A6C5D2F05ACAF0097F387 /* PangoliniOS */;
+		};
+		907A6C912F05AF920097F387 /* Exceptions for "PacketTunnel" folder in "PacketTunneliOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Shared/GoLoggerBridge.m,
+				Shared/NetworkTransitionMonitor.swift,
+				Shared/PacketTunnelProvider.swift,
+				Shared/SocketPath.swift,
+				Shared/TunnelAdapter.swift,
+			);
+			target = 907A6C7B2F05AE620097F387 /* PacketTunneliOS */;
 		};
 		90D197482EC96BEC00912E68 /* Exceptions for "PacketTunnel" folder in "PacketTunnel" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				iOS/Info.plist,
+				macOS/Info.plist,
 			);
 			target = 90D197382EC96BEC00912E68 /* PacketTunnel */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		907A6C922F05AF920097F387 /* Exceptions for "PacketTunnel" folder in "Compile Sources" phase from "PacketTunneliOS" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = 907A6C782F05AE620097F387 /* Sources */;
+			membershipExceptions = (
+				Shared/GoLoggerBridge.h,
+				"Shared/PacketTunnel-Bridging-Header.h",
+				Shared/TunnelFileDescriptor.h,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		90BC22B62EBC6C1D0072B44A /* Pangolin */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				901FF5E22EC7EE9900711D4E /* Exceptions for "Pangolin" folder in "Pangolin" target */,
+				907A6C6C2F05ADBB0097F387 /* Exceptions for "Pangolin" folder in "PangoliniOS" target */,
 			);
 			path = Pangolin;
 			sourceTree = "<group>";
@@ -110,6 +196,8 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				90D197482EC96BEC00912E68 /* Exceptions for "PacketTunnel" folder in "PacketTunnel" target */,
+				907A6C912F05AF920097F387 /* Exceptions for "PacketTunnel" folder in "PacketTunneliOS" target */,
+				907A6C922F05AF920097F387 /* Exceptions for "PacketTunnel" folder in "Compile Sources" phase from "PacketTunneliOS" target */,
 			);
 			path = PacketTunnel;
 			sourceTree = "<group>";
@@ -117,6 +205,22 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		907A6C5B2F05ACAF0097F387 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		907A6C792F05AE620097F387 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				907A6C942F05AFE60097F387 /* libpangolin.a in Frameworks */,
+				907A6C7D2F05AE620097F387 /* NetworkExtension.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		90BC22B12EBC6C1D0072B44A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -151,6 +255,8 @@
 			children = (
 				90BC22B42EBC6C1D0072B44A /* Pangolin.app */,
 				90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */,
+				907A6C5E2F05ACAF0097F387 /* PangoliniOS.app */,
+				907A6C7C2F05AE620097F387 /* PacketTunneliOS.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,6 +264,7 @@
 		90D191192EC9248100912E68 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				907A6C932F05AFE60097F387 /* libpangolin.a */,
 				90D1911A2EC9248100912E68 /* NetworkExtension.framework */,
 			);
 			name = Frameworks;
@@ -166,6 +273,46 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		907A6C5D2F05ACAF0097F387 /* PangoliniOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 907A6C682F05ACB00097F387 /* Build configuration list for PBXNativeTarget "PangoliniOS" */;
+			buildPhases = (
+				907A6C5A2F05ACAF0097F387 /* Sources */,
+				907A6C5B2F05ACAF0097F387 /* Frameworks */,
+				907A6C5C2F05ACAF0097F387 /* Resources */,
+				907A6C852F05AE620097F387 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				907A6C842F05AE620097F387 /* PBXTargetDependency */,
+			);
+			name = PangoliniOS;
+			packageProductDependencies = (
+			);
+			productName = PangoliniOS;
+			productReference = 907A6C5E2F05ACAF0097F387 /* PangoliniOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		907A6C7B2F05AE620097F387 /* PacketTunneliOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 907A6C872F05AE620097F387 /* Build configuration list for PBXNativeTarget "PacketTunneliOS" */;
+			buildPhases = (
+				907A6C782F05AE620097F387 /* Sources */,
+				907A6C792F05AE620097F387 /* Frameworks */,
+				907A6C7A2F05AE620097F387 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PacketTunneliOS;
+			packageProductDependencies = (
+			);
+			productName = PacketTunneliOS;
+			productReference = 907A6C7C2F05AE620097F387 /* PacketTunneliOS.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		90BC22B32EBC6C1D0072B44A /* Pangolin */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 90BC22BF2EBC6C1F0072B44A /* Build configuration list for PBXNativeTarget "Pangolin" */;
@@ -173,7 +320,7 @@
 				90BC22B02EBC6C1D0072B44A /* Sources */,
 				90BC22B12EBC6C1D0072B44A /* Frameworks */,
 				90BC22B22EBC6C1D0072B44A /* Resources */,
-				90D191372EC9260400912E68 /* Embed App Extensions */,
+				90D191372EC9260400912E68 /* Embed Foundation Extensions */,
 				90D1919E2EC926F500912E68 /* Embed System Extensions */,
 			);
 			buildRules = (
@@ -225,9 +372,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2610;
-				LastUpgradeCheck = 2610;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					907A6C5D2F05ACAF0097F387 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					907A6C7B2F05AE620097F387 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					90BC22B32EBC6C1D0072B44A = {
 						CreatedOnToolsVersion = 26.1;
 					};
@@ -255,11 +408,27 @@
 			targets = (
 				90BC22B32EBC6C1D0072B44A /* Pangolin */,
 				90D197382EC96BEC00912E68 /* PacketTunnel */,
+				907A6C5D2F05ACAF0097F387 /* PangoliniOS */,
+				907A6C7B2F05AE620097F387 /* PacketTunneliOS */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		907A6C5C2F05ACAF0097F387 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		907A6C7A2F05AE620097F387 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		90BC22B22EBC6C1D0072B44A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -277,6 +446,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		907A6C5A2F05ACAF0097F387 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		907A6C782F05AE620097F387 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		90BC22B02EBC6C1D0072B44A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -294,6 +477,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		907A6C842F05AE620097F387 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 907A6C7B2F05AE620097F387 /* PacketTunneliOS */;
+			targetProxy = 907A6C832F05AE620097F387 /* PBXContainerItemProxy */;
+		};
 		90D191C42EC9276900912E68 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 90D197382EC96BEC00912E68 /* PacketTunnel */;
@@ -322,6 +510,186 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		907A6C662F05ACB00097F387 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "pangolin-app-icon";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Pangolin/iOS/Pangolin.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 4668XHFAHF;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Pangolin/iOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Pangolin;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.4.0;
+				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
+				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		907A6C672F05ACB00097F387 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "pangolin-app-icon";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Pangolin/iOS/Pangolin.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 4668XHFAHF;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Pangolin/iOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Pangolin;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.4.0;
+				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
+				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		907A6C882F05AE620097F387 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/iOS/PacketTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 4668XHFAHF;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PacketTunnel/iOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PacketTunneliOS;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/PangolinGo",
+				);
+				MARKETING_VERSION = 0.4.0;
+				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
+				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/Shared/PacketTunnel-Bridging-Header.h";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		907A6C892F05AE620097F387 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/iOS/PacketTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 4668XHFAHF;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PacketTunnel/iOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PacketTunneliOS;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/PangolinGo",
+				);
+				MARKETING_VERSION = 0.4.0;
+				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
+				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
+				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/Shared/PacketTunnel-Bridging-Header.h";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		90BC22BD2EBC6C1F0072B44A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -356,6 +724,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 4668XHFAHF;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -379,6 +748,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -419,6 +789,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 4668XHFAHF;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -435,6 +806,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)";
 			};
@@ -446,17 +818,18 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "pangolin-app-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
-				CODE_SIGN_ENTITLEMENTS = Pangolin/Pangolin.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Pangolin/macOS/Pangolin.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4668XHFAHF;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
@@ -468,7 +841,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Pangolin/Info.plist;
+				INFOPLIST_FILE = Pangolin/macOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Pangolin;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -484,9 +857,12 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/PangolinGo",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 0.4.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -512,17 +888,18 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "pangolin-app-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
-				CODE_SIGN_ENTITLEMENTS = Pangolin/Pangolin.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Pangolin/macOS/Pangolin.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4668XHFAHF;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
@@ -534,7 +911,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Pangolin/Info.plist;
+				INFOPLIST_FILE = Pangolin/macOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Pangolin;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -550,9 +927,12 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/PangolinGo",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 0.4.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -576,11 +956,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
-				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/macOS/PacketTunnel.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4668XHFAHF;
 				ENABLE_APP_SANDBOX = NO;
@@ -596,7 +977,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PacketTunnel/Info.plist;
+				INFOPLIST_FILE = PacketTunnel/macOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PacketTunnel;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -604,9 +985,12 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/PangolinGo",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 0.4.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
@@ -619,7 +1003,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)";
-				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/PacketTunnel-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/Shared/PacketTunnel-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -629,11 +1013,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
-				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/macOS/PacketTunnel.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4668XHFAHF;
 				ENABLE_APP_SANDBOX = NO;
@@ -649,7 +1034,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PacketTunnel/Info.plist;
+				INFOPLIST_FILE = PacketTunnel/macOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PacketTunnel;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -657,9 +1042,12 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/PangolinGo";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/PangolinGo",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 0.4.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
@@ -672,7 +1060,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_INCLUDE_PATHS = "$(SRCROOT)";
-				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/PacketTunnel-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "PacketTunnel/Shared/PacketTunnel-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -681,6 +1069,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		907A6C682F05ACB00097F387 /* Build configuration list for PBXNativeTarget "PangoliniOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				907A6C662F05ACB00097F387 /* Debug */,
+				907A6C672F05ACB00097F387 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		907A6C872F05AE620097F387 /* Build configuration list for PBXNativeTarget "PacketTunneliOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				907A6C882F05AE620097F387 /* Debug */,
+				907A6C892F05AE620097F387 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		90BC22AF2EBC6C1D0072B44A /* Build configuration list for PBXProject "Pangolin" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

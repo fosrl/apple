@@ -1,8 +1,8 @@
 package main
 
 /*
-#cgo CFLAGS: -I../PacketTunnel
-#include "../PacketTunnel/GoLoggerBridge.h"
+#cgo CFLAGS: -I../PacketTunnel/Shared
+#include "../PacketTunnel/Shared/GoLoggerBridge.h"
 #include <stdlib.h>
 */
 import "C"

@@ -1,21 +1,31 @@
 {
-  "fill" : {
-    "solid" : "srgb:0.08627,0.08627,0.09412,1.00000"
-  },
+  "fill-specializations" : [
+    {
+      "value" : {
+        "solid" : "display-p3:0.09412,0.09412,0.10588,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.09412,0.09412,0.10588,1.00000"
+      }
+    }
+  ],
   "groups" : [
     {
       "blur-material" : null,
       "hidden" : false,
       "layers" : [
         {
-          "glass" : true,
+          "glass" : false,
           "image-name" : "pangolin_orange.svg",
           "name" : "pangolin_orange",
           "position" : {
-            "scale" : 0.85,
+            "scale" : 0.82,
             "translation-in-points" : [
-              0,
-              0
+              3,
+              -1
             ]
           }
         }
