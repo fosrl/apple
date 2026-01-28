@@ -33,17 +33,28 @@ struct PreferencesContentView: View {
     private var displaySecondaryDNS: String {
         secondaryDNSServer.isEmpty ? "Not set" : secondaryDNSServer
     }
+
+    private static let docsConfigureClientURL = URL(string: "https://docs.pangolin.net/manage/clients/configure-client")!
     
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
+                    Section {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("Tip:")
+                                .font(.system(size: 13))
+                            Link("See the docs for more information on these settings.", destination: Self.docsConfigureClientURL)
+                                .font(.system(size: 13))
+                        }
+                    }
+
                     Section(header: Text("DNS Settings")) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("DNS Override")
+                                Text("Enable Aliases (DNS Override)")
                                     .font(.system(size: 13))
-                                Text("When enabled, the tunnel uses custom DNS servers to resolve internal resources and aliases. External queries use your configured upstream DNS.")
+                                Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a Pangolin resource will be forwarded to your configured Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
@@ -60,9 +71,9 @@ struct PreferencesContentView: View {
                         
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("DNS Tunnel")
+                                Text("DNS Over Tunnel")
                                     .font(.system(size: 13))
-                                Text("When enabled, DNS queries are sent through the tunnel to a resource. A private resource must be created for the address for it to work and resolve to the correct site.")
+                                Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a Pangolin resource and enter its address as an Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
