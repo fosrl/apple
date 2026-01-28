@@ -139,6 +139,7 @@
 				Shared/ConfigManager.swift,
 				Shared/DeviceInfo.swift,
 				Shared/FingerprintManager.swift,
+				Shared/IPAddressValidator.swift,
 				Shared/KeychainHelper.swift,
 				Shared/Model/Models.swift,
 				Shared/OLMStatusManager.swift,
