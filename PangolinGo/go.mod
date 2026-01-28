@@ -32,5 +32,5 @@ require (
 )
 
 // Uncomment when developing dependencies.
-// replace github.com/fosrl/olm => ../../olm
-//replace github.com/fosrl/newt => ../../newt
+replace github.com/fosrl/olm => ../../olm
+replace github.com/fosrl/newt => ../../newt
