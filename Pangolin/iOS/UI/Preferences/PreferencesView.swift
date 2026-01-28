@@ -39,12 +39,15 @@ struct PreferencesView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("Tip:")
-                            .font(.subheadline)
-                        Link("See the docs for more information on these settings.", destination: Self.docsConfigureClientURL)
-                            .font(.subheadline)
+                Section(header: Text("Help")) {
+                    Link(destination: Self.docsConfigureClientURL) {
+                        HStack {
+                            Text("See docs for more info on these settings")
+                            Spacer()
+                            Image(systemName: "arrow.up.forward")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
                     }
                 }
 
