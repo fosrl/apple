@@ -16,6 +16,8 @@ struct PangolinApp: App {
     @StateObject private var apiClient: APIClient
     @StateObject private var authManager: AuthManager
     @StateObject private var tunnelManager: TunnelManager
+    @StateObject private var onboardingStateManager: OnboardingStateManager
+    @StateObject private var onboardingViewModel: OnboardingViewModel
 
     init() {
         let configMgr = ConfigManager()
@@ -47,12 +49,20 @@ struct PangolinApp: App {
         // Set tunnel manager reference in auth manager for org switching
         authMgr.tunnelManager = tunnelMgr
 
+        let onboardingState = OnboardingStateManager()
+        let onboardingVM = OnboardingViewModel(
+            onboardingState: onboardingState,
+            tunnelManager: tunnelMgr
+        )
+
         _configManager = StateObject(wrappedValue: configMgr)
         _secretManager = StateObject(wrappedValue: secretMgr)
         _accountManager = StateObject(wrappedValue: accountMgr)
         _apiClient = StateObject(wrappedValue: client)
         _authManager = StateObject(wrappedValue: authMgr)
         _tunnelManager = StateObject(wrappedValue: tunnelMgr)
+        _onboardingStateManager = StateObject(wrappedValue: onboardingState)
+        _onboardingViewModel = StateObject(wrappedValue: onboardingVM)
     }
 
     var body: some Scene {
@@ -89,7 +99,11 @@ struct PangolinApp: App {
             .onAppear {
                 Task {
                     await authManager.initialize()
+                    await onboardingViewModel.refreshPages()
                 }
+            }
+            .fullScreenCover(isPresented: $onboardingViewModel.isPresenting) {
+                OnboardingFlowView(viewModel: onboardingViewModel)
             }
         }
     }
