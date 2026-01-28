@@ -1,10 +1,3 @@
-//
-//  MainView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import SwiftUI
 
 enum TabSelection: Int {

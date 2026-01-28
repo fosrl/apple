@@ -1,10 +1,3 @@
-//
-//  OnboardingFlowView.swift
-//  Pangolin
-//
-//  Created by Cursor on 1/28/26.
-//
-
 import SwiftUI
 import Combine
 

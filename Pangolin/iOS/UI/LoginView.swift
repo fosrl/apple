@@ -1,10 +1,3 @@
-//
-//  LoginView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import SwiftUI
 import UIKit
 import AuthenticationServices

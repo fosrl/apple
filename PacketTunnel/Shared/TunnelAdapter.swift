@@ -1,10 +1,3 @@
-//
-//  TunnelAdapter.swift
-//  PacketTunnel
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import Darwin
 import Foundation
 import NetworkExtension

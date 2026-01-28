@@ -1,10 +1,3 @@
-//
-//  DNSServerModalView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import SwiftUI
 
 struct DNSServerModalView: View {

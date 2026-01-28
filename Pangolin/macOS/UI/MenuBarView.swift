@@ -1,10 +1,3 @@
-//
-//  MenuBarView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import AppKit
 import Sparkle
 import SwiftUI

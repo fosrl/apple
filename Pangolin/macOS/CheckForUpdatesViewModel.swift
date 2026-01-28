@@ -1,10 +1,3 @@
-//
-//  CheckForUpdatesViewModel.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/20/25.
-//
-
 import Foundation
 import Combine
 import Sparkle

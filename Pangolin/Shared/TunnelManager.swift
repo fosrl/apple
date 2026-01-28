@@ -1,10 +1,3 @@
-//
-//  TunnelManager.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import Combine
 import Foundation
 import NetworkExtension
