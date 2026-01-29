@@ -156,7 +156,7 @@ private struct OnboardingWelcomePage: View {
                 .padding(.bottom, 8)
 
             Text(
-                "Pangolin securely connects your devices to your team’s private network, so you can safely reach your internal apps and resources from anywhere."
+                "Pangolin securely connects your devices to your private networks, so you can safely access internal apps and resources from anywhere."
             )
             .font(.body)
             .foregroundColor(.secondary)
@@ -226,10 +226,10 @@ private struct OnboardingPrivacyPage: View {
                     "We collect your email, device name and model, OS version, and IP address. This enables us to connect your device to your network securely."
                 )
                 Text(
-                    "Your traffic is end-to-end encrypted and is never readable by Pangolin or anyone outside your network."
+                    "Your traffic is end-to-end encrypted and is never readable by us or anyone outside your network."
                 )
                 Text(
-                    "If you're using a self-hosted Pangolin server, all data remains on your server and is never sent to us."
+                    "If you're using a self-hosted Pangolin server, all data remains on your server and is never sent to our servers."
                 )
             }
             .font(.body)
