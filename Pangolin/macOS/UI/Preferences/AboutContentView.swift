@@ -52,6 +52,7 @@ struct AboutContentView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .foregroundColor(.accentColor)
                         
                         Link(destination: URL(string: "https://docs.pangolin.net/about/how-pangolin-works")!) {
                             HStack {
@@ -63,6 +64,7 @@ struct AboutContentView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .foregroundColor(.accentColor)
                     } header: {
                         Text("Resources")
                     }
@@ -78,6 +80,7 @@ struct AboutContentView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .foregroundColor(.accentColor)
                         
                         Link(destination: URL(string: "https://pangolin.net/privacy-policy.html")!) {
                             HStack {
@@ -89,6 +92,7 @@ struct AboutContentView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .foregroundColor(.accentColor)
                     } header: {
                         Text("Legal")
                     }

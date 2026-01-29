@@ -33,13 +33,17 @@ struct PreferencesContentView: View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
-                    Section {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("Tip:")
-                                .font(.system(size: 13))
-                            Link("See the docs for more information on these settings.", destination: Self.docsConfigureClientURL)
-                                .font(.system(size: 13))
+                    Section(header: Text("Help")) {
+                        Link(destination: Self.docsConfigureClientURL) {
+                            HStack {
+                                Text("See docs for more info on these settings")
+                                Spacer()
+                                Image(systemName: "arrow.up.forward")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
                         }
+                        .foregroundColor(.accentColor)
                     }
 
                     Section(header: Text("DNS Settings")) {
