@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/fosrl/newt v1.9.0
-	github.com/fosrl/olm v1.4.0
+	github.com/fosrl/olm v1.4.1
 )
 
 require (
@@ -33,4 +33,4 @@ require (
 
 // Uncomment when developing dependencies.
 // replace github.com/fosrl/olm => ../../olm
-//replace github.com/fosrl/newt => ../../newt
+// replace github.com/fosrl/newt => ../../newt

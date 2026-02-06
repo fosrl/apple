@@ -1,10 +1,3 @@
-//
-//  PacketTunnelProvider.swift
-//  PacketTunnel
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import NetworkExtension
 import os.log
 import PangolinGo

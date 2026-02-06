@@ -1,10 +1,3 @@
-//
-//  LoginView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import SwiftUI
 import UIKit
 import AuthenticationServices
@@ -29,6 +22,7 @@ struct LoginView: View {
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var apiClient: APIClient
+    var startDeviceAuthImmediately: Binding<Bool>? = nil
 
     var body: some View {
         NavigationStack {
@@ -92,7 +86,9 @@ struct LoginView: View {
                     if !hostname.isEmpty {
                         // Remove middle hyphen from code (e.g., "XXXX-XXXX" -> "XXXXXXXX")
                         let codeWithoutHyphen = code.replacingOccurrences(of: "-", with: "")
-                        let autoOpenURL = "\(hostname)/auth/login/device?code=\(codeWithoutHyphen)"
+                        let username = accountManager.activeAccount?.email ?? authManager.currentUser?.username ?? authManager.currentUser?.email ?? ""
+                        let usernameEncoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                        let autoOpenURL = "\(hostname)/auth/login/device?code=\(codeWithoutHyphen)&user=\(usernameEncoded)"
                         openBrowser(url: autoOpenURL)
                     }
                 } else if newValue == nil {
@@ -109,6 +105,17 @@ struct LoginView: View {
             .onDisappear {
                 // Reset state when view disappears
                 resetLoginState()
+            }
+            .onAppear {
+                if startDeviceAuthImmediately?.wrappedValue == true {
+                    startDeviceAuthImmediately?.wrappedValue = false
+                    let hostname = accountManager.activeAccount?.hostname ?? ""
+                    if !hostname.isEmpty {
+                        hostingOption = .selfHosted
+                        selfHostedURL = hostname
+                        performLogin()
+                    }
+                }
             }
         }
     }
@@ -301,16 +308,6 @@ struct LoginView: View {
                         .controlSize(.large)
                     }
                 }
-            }
-
-            // Manual URL instructions
-            let currentHostname = getCurrentHostname()
-            if !currentHostname.isEmpty {
-                Text("Or visit: \(currentHostname)/auth/login/device")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
             }
 
             ProgressView()

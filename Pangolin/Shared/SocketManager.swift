@@ -1,10 +1,3 @@
-//
-//  SocketManager.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import Darwin
 import Foundation
 import os.log

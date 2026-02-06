@@ -1,10 +1,3 @@
-//
-//  SocketManager.swift
-//  Pangolin
-//
-//  Created by Varun Narravula on 1/6/2025.
-//
-
 import Combine
 import CryptoKit
 import Darwin

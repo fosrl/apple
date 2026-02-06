@@ -1,10 +1,3 @@
-//
-//  DNSServerModalView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import SwiftUI
 import AppKit
 
@@ -14,6 +7,11 @@ struct DNSServerModalView: View {
     @Binding var isPresented: Bool
     let onSave: (String) -> Void
     @State private var editedValue: String
+    @State private var showValidationError = false
+
+    private var trimmedValue: String {
+        editedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     
     init(title: String, dnsServer: Binding<String>, isPresented: Binding<Bool>, onSave: @escaping (String) -> Void) {
         self.title = title
@@ -39,6 +37,13 @@ struct DNSServerModalView: View {
                     .padding(.vertical, 6)
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(4)
+                    .onChange(of: editedValue) { _ in showValidationError = false }
+                
+                if showValidationError && !trimmedValue.isEmpty && !IPAddressValidator.isValid(trimmedValue) {
+                    Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.red)
+                }
             }
             .padding(20)
             .onAppear {
@@ -64,8 +69,13 @@ struct DNSServerModalView: View {
                 .controlSize(.regular)
                 
                 Button("Done") {
-                    onSave(editedValue.isEmpty ? "" : editedValue)
-                    isPresented = false
+                    if IPAddressValidator.isValid(trimmedValue) {
+                        let value = trimmedValue.isEmpty ? "" : trimmedValue
+                        onSave(value)
+                        isPresented = false
+                    } else {
+                        showValidationError = true
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)

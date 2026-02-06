@@ -1,10 +1,3 @@
-//
-//  SocketPath.swift
-//  PacketTunnel
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import Foundation
 
 /// Returns the platform-appropriate socket path for the OLM socket.

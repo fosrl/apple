@@ -1,10 +1,3 @@
-//
-//  LoginView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import AppKit
 import SwiftUI
 
@@ -168,26 +161,26 @@ struct LoginView: View {
             }
         )
         .onAppear {
-            // Show app in dock when window appears
+            if authManager.startDeviceAuthImmediately {
+                authManager.startDeviceAuthImmediately = false
+                let hostname = accountManager.activeAccount?.hostname ?? ""
+                if !hostname.isEmpty {
+                    hostingOption = .selfHosted
+                    selfHostedURL = hostname
+                    performLogin()
+                }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 guard NSApp.activationPolicy() != .regular else { return }
                 NSApp.setActivationPolicy(.regular)
-                
-                // Ensure window identifier is set and close duplicates
-                // Find this window by title first
-                if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }
-                ) {
+                if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }) {
                     configureWindow(window)
-
-                    // Close any other windows with the same identifier or title
                     let duplicates = NSApplication.shared.windows.filter { w in
                         (w.identifier?.rawValue == "main" || w.title == "Pangolin") && w != window
                     }
                     for duplicate in duplicates {
                         duplicate.close()
                     }
-
-                    // Bring window to front
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()
                     NSApp.activate(ignoringOtherApps: true)
@@ -199,21 +192,30 @@ struct LoginView: View {
             if let window = notification.object as? NSWindow, window.identifier?.rawValue == "main"
             {
                 configureWindow(window)
+                if authManager.startDeviceAuthImmediately {
+                    authManager.startDeviceAuthImmediately = false
+                    let hostname = accountManager.activeAccount?.hostname ?? ""
+                    if !hostname.isEmpty {
+                        hostingOption = .selfHosted
+                        selfHostedURL = hostname
+                        performLogin()
+                    }
+                }
             }
         }
         .onChange(of: authManager.deviceAuthCode) { oldValue, newValue in
             // Auto-open browser when code is generated
-            if let code = newValue, !hasAutoOpenedBrowser {
-                hasAutoOpenedBrowser = true
-                // Use temporary hostname from login flow
-                let hostname = getCurrentHostname()
-                if !hostname.isEmpty {
-                    // Remove middle hyphen from code (e.g., "XXXX-XXXX" -> "XXXXXXXX")
-                    let codeWithoutHyphen = code.replacingOccurrences(of: "-", with: "")
-                    let autoOpenURL = "\(hostname)/auth/login/device?code=\(codeWithoutHyphen)"
-                    openBrowser(url: autoOpenURL)
-                }
-            } else if newValue == nil {
+                if let code = newValue, !hasAutoOpenedBrowser {
+                    hasAutoOpenedBrowser = true
+                    let hostname = getCurrentHostname()
+                    if !hostname.isEmpty {
+                        let codeWithoutHyphen = code.replacingOccurrences(of: "-", with: "")
+                        let username = accountManager.activeAccount?.email ?? authManager.currentUser?.username ?? authManager.currentUser?.email ?? ""
+                        let usernameEncoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                        let autoOpenURL = "\(hostname)/auth/login/device?code=\(codeWithoutHyphen)&user=\(usernameEncoded)"
+                        openBrowser(url: autoOpenURL)
+                    }
+                } else if newValue == nil {
                 // Reset flag when code is cleared
                 hasAutoOpenedBrowser = false
             }

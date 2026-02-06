@@ -1,10 +1,3 @@
-//
-//  MenuBarView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import AppKit
 import Sparkle
 import SwiftUI
@@ -57,8 +50,8 @@ struct MenuBarView: View {
                     Divider()
                 }
                 
-                // Error message (for non-server-down errors)
-                if let errorMessage = authManager.errorMessage, !authManager.isServerDown {
+                // Error message (for non-server-down, non-session-expired errors)
+                if let errorMessage = authManager.errorMessage, !authManager.isServerDown, !authManager.sessionExpired {
                     Text(errorMessage)
                         .foregroundColor(.secondary)
                         .disabled(true)
@@ -67,12 +60,19 @@ struct MenuBarView: View {
                 
                 if authManager.isAuthenticated && !isLoggedOut {
                     if accountManager.activeAccount != nil {
-                        Text(tunnelManager.status.displayText)
-                            .foregroundColor(.secondary)
-
-                        // Connect toggle (when authenticated and not logged out)
-                        ConnectButtonItem(tunnelManager: tunnelManager)
-
+                        if authManager.sessionExpired {
+                            Text("Account Locked")
+                                .foregroundColor(.secondary)
+                            Button("Log In") {
+                                authManager.startDeviceAuthImmediately = true
+                                openLoginWindow()
+                            }
+                            .disabled(authManager.isDeviceAuthInProgress)
+                        } else {
+                            Text(tunnelManager.status.displayText)
+                                .foregroundColor(.secondary)
+                            ConnectButtonItem(tunnelManager: tunnelManager)
+                        }
                         Divider()
                     }
                 }
@@ -262,8 +262,15 @@ struct MenuBarView: View {
             }
 
             // await tunnelManager.disconnect()
+        } catch let error as APIError {
+            if case .httpError(let statusCode, _) = error, statusCode == 401 || statusCode == 403 {
+                // Session expired; leave isLoggedOut false so "Account Locked" / "Log In" show
+            } else {
+                await MainActor.run {
+                    isLoggedOut = true
+                }
+            }
         } catch {
-            // If getting user fails, mark as logged out
             await MainActor.run {
                 isLoggedOut = true
             }

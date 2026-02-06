@@ -1,10 +1,3 @@
-//
-//  TunnelManager.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import Combine
 import Foundation
 import NetworkExtension
@@ -62,6 +55,15 @@ class TunnelManager: NSObject, ObservableObject {
     private nonisolated(unsafe) var lastTunnelStatus: TunnelStatus?
     private nonisolated(unsafe) var lastIsNEConnected: Bool = false
 
+    /// Socket error codes that indicate session expired; re-auth button should be shown.
+    private static let sessionExpiredSocketErrorCodes: Set<String> = [
+        "UNAUTHORIZED",
+        "SESSION_EXPIRED",
+        "ORG_ACCESS_POLICY_SESSION_EXPIRED",
+        "INVALID_USER_SESSION",
+        "USER_ID_NOT_FOUND",
+    ]
+
     init(
         configManager: ConfigManager,
         accountManager: AccountManager,
@@ -97,9 +99,19 @@ class TunnelManager: NSObject, ObservableObject {
                     await updateConnectionStatus()
                 }
             #else
-                // On iOS, just ensure extension is registered
-                await ensureExtensionRegistered()
-                await updateConnectionStatus()
+                // On iOS, defer installing/registering the VPN configuration until
+                // the user explicitly requests it (e.g. from onboarding or connect).
+                // Here we only update any cached status if a configuration already
+                // exists, to avoid triggering the system VPN prompt on first launch.
+                if await hasRegisteredExtension() {
+                    await ensureExtensionRegistered()
+                    await updateConnectionStatus()
+                } else {
+                    await MainActor.run {
+                        self.isNEConnected = false
+                        self.status = .disconnected
+                    }
+                }
             #endif
         }
     }
@@ -289,8 +301,36 @@ class TunnelManager: NSObject, ObservableObject {
         UserDefaults.standard.set(version, forKey: extensionVersionKey)
     }
 
-    func ensureExtensionRegistered() async {
-        // Load existing managers
+    // MARK: - VPN Profile / Extension Helpers
+
+    /// Checks whether a NETunnelProviderManager for the Pangolin packet tunnel
+    /// extension already exists in the user's VPN configurations.
+    func isVPNProfileInstalled() async -> Bool {
+        await hasRegisteredExtension()
+    }
+
+    /// Ensures that the VPN profile is installed, prompting the user to allow
+    /// the configuration if needed.
+    ///
+    /// Returns `true` if a profile exists after this call (either pre-existing
+    /// or newly created), and `false` if creation failed.
+    func ensureVPNProfileInstalled() async -> Bool {
+        // Fast path: configuration already exists.
+        if await hasRegisteredExtension() {
+            return true
+        }
+
+        // Otherwise, attempt to register the extension, which will trigger
+        // the iOS VPN configuration prompt as needed.
+        await ensureExtensionRegistered()
+
+        // Re-check after attempting registration.
+        return await hasRegisteredExtension()
+    }
+
+    /// Internal helper that inspects existing NETunnelProviderManager instances
+    /// without creating or modifying any configuration.
+    private func hasRegisteredExtension() async -> Bool {
         let managers = try? await NETunnelProviderManager.loadAllFromPreferences()
         let existingManager = managers?.first { manager in
             guard let protocolConfig = manager.protocolConfiguration as? NETunnelProviderProtocol
@@ -300,12 +340,26 @@ class TunnelManager: NSObject, ObservableObject {
             return protocolConfig.providerBundleIdentifier == bundleIdentifier
         }
 
-        if let existing = existingManager {
+        return existingManager != nil
+    }
+
+    func ensureExtensionRegistered() async {
+        if let managers = try? await NETunnelProviderManager.loadAllFromPreferences(),
+            let existingManager = managers.first(where: { manager in
+                guard
+                    let protocolConfig = manager.protocolConfiguration
+                        as? NETunnelProviderProtocol
+                else {
+                    return false
+                }
+                return protocolConfig.providerBundleIdentifier == bundleIdentifier
+            })
+        {
             // Reload to get the actual manager instance
             do {
-                try await existing.loadFromPreferences()
+                try await existingManager.loadFromPreferences()
                 await MainActor.run {
-                    tunnelManager = existing
+                    tunnelManager = existingManager
                 }
                 await updateConnectionStatus()
             } catch {
@@ -611,6 +665,12 @@ class TunnelManager: NSObject, ObservableObject {
                                     title: "Connection Error",
                                     message: error.message
                                 )
+                            }
+                        }
+
+                        if Self.sessionExpiredSocketErrorCodes.contains(error.code) {
+                            await MainActor.run {
+                                self.authManager.markSessionExpiredFromConnection()
                             }
                         }
 

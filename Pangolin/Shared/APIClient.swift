@@ -1,10 +1,3 @@
-//
-//  APIClient.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import Foundation
 import Combine
 import os.log
@@ -54,7 +47,10 @@ class APIClient: ObservableObject {
     private var sessionToken: String?
     private let sessionCookieName = "p_session_token"
     private let csrfToken = "x-csrf-protection"
-    
+
+    /// Called when a request made with a session token returns 401 or 403. Set by AuthManager to mark session expired.
+    var onUnauthorized: (() -> Void)?
+
     private var agentName: String {
         #if os(iOS)
         let platform = "iOS"
@@ -219,10 +215,15 @@ class APIClient: ObservableObject {
         }
     }
     
+    private func notifyUnauthorizedIfNeeded(statusCode: Int) {
+        guard (statusCode == 401 || statusCode == 403), sessionToken != nil else { return }
+        onUnauthorized?()
+    }
+
     private func parseResponse<T: Codable>(_ data: Data, _ response: HTTPURLResponse) throws -> T {
         // Check HTTP status first
         guard (200...299).contains(response.statusCode) else {
-            // Try to parse error message from response
+            notifyUnauthorizedIfNeeded(statusCode: response.statusCode)
             var errorMessage: String? = nil
             if let errorResponse = try? JSONDecoder().decode(APIResponse<EmptyResponse>.self, from: data) {
                 errorMessage = errorResponse.message
@@ -246,12 +247,14 @@ class APIClient: ObservableObject {
         if let success = apiResponse.success, !success {
             let message = apiResponse.message ?? "Request failed"
             let status = apiResponse.status ?? response.statusCode
+            notifyUnauthorizedIfNeeded(statusCode: status)
             throw APIError.httpError(status, message)
         }
         
         if let error = apiResponse.error, error == true {
             let message = apiResponse.message ?? "Request failed"
             let status = apiResponse.status ?? response.statusCode
+            notifyUnauthorizedIfNeeded(statusCode: status)
             throw APIError.httpError(status, message)
         }
         

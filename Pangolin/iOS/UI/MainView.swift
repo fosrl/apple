@@ -1,10 +1,3 @@
-//
-//  MainView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import SwiftUI
 
 enum TabSelection: Int {
@@ -23,6 +16,7 @@ struct MainView: View {
     @State private var showAccountPicker = false
     @State private var showOrganizationPicker = false
     @State private var showLoginView = false
+    @State private var startDeviceAuthImmediately = false
     @State private var selectedTab: TabSelection = .home
     
     var body: some View {
@@ -34,6 +28,8 @@ struct MainView: View {
                 tunnelManager: tunnelManager,
                 showAccountPicker: $showAccountPicker,
                 showOrganizationPicker: $showOrganizationPicker,
+                showLoginView: $showLoginView,
+                startDeviceAuthImmediately: $startDeviceAuthImmediately,
                 selectedTab: $selectedTab
             )
             .tabItem {
@@ -80,7 +76,8 @@ struct MainView: View {
                 authManager: authManager,
                 accountManager: accountManager,
                 configManager: configManager,
-                apiClient: apiClient
+                apiClient: apiClient,
+                startDeviceAuthImmediately: $startDeviceAuthImmediately
             )
         }
     }
@@ -95,6 +92,8 @@ struct HomeTabView: View {
     @ObservedObject var tunnelManager: TunnelManager
     @Binding var showAccountPicker: Bool
     @Binding var showOrganizationPicker: Bool
+    @Binding var showLoginView: Bool
+    @Binding var startDeviceAuthImmediately: Bool
     @Binding var selectedTab: TabSelection
     
     private var tunnelStatus: TunnelStatus {
@@ -105,6 +104,7 @@ struct HomeTabView: View {
         Binding(
             get: { tunnelManager.isNEConnected },
             set: { newValue in
+                guard !authManager.sessionExpired else { return }
                 // Only prevent interaction when starting (not when registering)
                 guard tunnelStatus != .starting else { return }
                 Task {
@@ -167,8 +167,8 @@ struct HomeTabView: View {
                         .cornerRadius(24)
                     }
                     
-                    // Error message (for non-server-down errors)
-                    if let errorMessage = authManager.errorMessage, !authManager.isServerDown {
+                    // Error message (for non-server-down, non-session-expired errors)
+                    if let errorMessage = authManager.errorMessage, !authManager.isServerDown, !authManager.sessionExpired {
                         HStack {
                             Image(systemName: "exclamationmark.circle.fill")
                                 .foregroundColor(.red)
@@ -184,54 +184,72 @@ struct HomeTabView: View {
                     
                     // Tunnel Status Card
                     VStack(spacing: 0) {
-                        Button(action: {
-                            // Only prevent interaction when starting (not when registering)
-                            guard tunnelStatus != .starting else { return }
-                            Task {
-                                if tunnelManager.isNEConnected {
-                                    await tunnelManager.disconnect()
-                                } else {
-                                    await tunnelManager.connect()
+                        if authManager.sessionExpired {
+                            HStack(spacing: 12) {
+                                Image(systemName: "lock.fill")
+                                Text("Account Locked")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Button("Log In") {
+                                    startDeviceAuthImmediately = true
+                                    showLoginView = true
                                 }
-                            }
-                        }) {
-                            VStack(spacing: 16) {
-                                // Status indicator with toggle
-                                HStack(spacing: 12) {
-                                    Circle()
-                                        .fill(statusColor)
-                                        .frame(width: 12, height: 12)
-                                    
-                                    HStack(spacing: 8) {
-                                        Text(tunnelStatus.displayText)
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
-                                        
-                                        if isInIntermediateState {
-                                            ProgressView()
-                                                .scaleEffect(0.8)
-                                                .id("loading-progress") // Stable ID to prevent animation restart
-                                        }
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Toggle("", isOn: toggleBinding)
-                                        .tint(.accentColor)
-                                        .allowsHitTesting(false)
-                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(authManager.isDeviceAuthInProgress)
                             }
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+                            .background(Color(.systemGray6))
+                            .cornerRadius(24)
+                        } else {
+                            Button(action: {
+                                guard tunnelStatus != .starting else { return }
+                                Task {
+                                    if tunnelManager.isNEConnected {
+                                        await tunnelManager.disconnect()
+                                    } else {
+                                        await tunnelManager.connect()
+                                    }
+                                }
+                            }) {
+                                VStack(spacing: 16) {
+                                    HStack(spacing: 12) {
+                                        Circle()
+                                            .fill(statusColor)
+                                            .frame(width: 12, height: 12)
+                                        
+                                        HStack(spacing: 8) {
+                                            Text(tunnelStatus.displayText)
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            
+                                            if isInIntermediateState {
+                                                ProgressView()
+                                                    .scaleEffect(0.8)
+                                                    .id("loading-progress")
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Toggle("", isOn: toggleBinding)
+                                            .tint(.accentColor)
+                                            .allowsHitTesting(false)
+                                    }
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .disabled(tunnelStatus == .starting)
+                            .buttonStyle(.plain)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(24)
                         }
-                        .disabled(tunnelStatus == .starting)
-                        .buttonStyle(.plain)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(24)
                         
-                        // Status page dropdown button (only when connected)
-                        if tunnelStatus == .connected {
+                        // Status page dropdown button (only when connected and not session expired)
+                        if !authManager.sessionExpired, tunnelStatus == .connected {
                             Button(action: {
                                 selectedTab = .status
                             }) {
@@ -302,8 +320,8 @@ struct HomeTabView: View {
                                 .buttonStyle(.plain)
                             }
                             
-                            // Organization section
-                            if let org = authManager.currentOrg {
+                            // Organization section (hidden when session expired)
+                            if !authManager.sessionExpired, let org = authManager.currentOrg {
                                 VStack(alignment: .leading, spacing: 12) {
                                     // Organization section header
                                     Text("Organization")
@@ -336,8 +354,9 @@ struct HomeTabView: View {
                                 }
                             }
                             
-                            // Personal license notice
-                            if let serverInfo = authManager.serverInfo,
+                            // Personal license notice (hidden when session expired)
+                            if !authManager.sessionExpired,
+                               let serverInfo = authManager.serverInfo,
                                serverInfo.build == "enterprise",
                                let licenseType = serverInfo.enterpriseLicenseType,
                                licenseType.lowercased() == "personal" {
@@ -348,8 +367,9 @@ struct HomeTabView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             
-                            // Unlicensed enterprise notice
-                            if let serverInfo = authManager.serverInfo,
+                            // Unlicensed enterprise notice (hidden when session expired)
+                            if !authManager.sessionExpired,
+                               let serverInfo = authManager.serverInfo,
                                serverInfo.build == "enterprise",
                                !serverInfo.enterpriseLicenseValid {
                                 Text("This server is unlicensed.")
@@ -359,8 +379,9 @@ struct HomeTabView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             
-                            // OSS community edition notice
-                            if let serverInfo = authManager.serverInfo,
+                            // OSS community edition notice (hidden when session expired)
+                            if !authManager.sessionExpired,
+                               let serverInfo = authManager.serverInfo,
                                serverInfo.build == "oss",
                                !serverInfo.supporterStatusValid {
                                 Text("Community Edition. Consider supporting.")

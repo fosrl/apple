@@ -1,10 +1,3 @@
-//
-//  SandboxMigration.swift
-//  Pangolin
-//
-//  Created on 1/14/26.
-//
-
 import Foundation
 import os.log
 

@@ -1,10 +1,3 @@
-//
-//  DNSServerModalView.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import SwiftUI
 
 struct DNSServerModalView: View {
@@ -13,7 +6,12 @@ struct DNSServerModalView: View {
     @Binding var isPresented: Bool
     let onSave: (String) -> Void
     @State private var editedValue: String
+    @State private var showValidationError = false
     @FocusState private var isTextFieldFocused: Bool
+
+    private var trimmedValue: String {
+        editedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     
     init(title: String, dnsServer: Binding<String>, isPresented: Binding<Bool>, onSave: @escaping (String) -> Void) {
         self.title = title
@@ -33,9 +31,16 @@ struct DNSServerModalView: View {
                         .keyboardType(.numbersAndPunctuation)
                         .focused($isTextFieldFocused)
                 } footer: {
-                    Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
-                        .font(.caption)
+                    if showValidationError && !trimmedValue.isEmpty && !IPAddressValidator.isValid(trimmedValue) {
+                        Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    } else {
+                        Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
+                            .font(.caption)
+                    }
                 }
+                .onChange(of: editedValue) { _ in showValidationError = false }
                 
                 Section {
                     Button(action: {
@@ -60,8 +65,13 @@ struct DNSServerModalView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        onSave(editedValue.isEmpty ? "" : editedValue)
-                        isPresented = false
+                        if IPAddressValidator.isValid(trimmedValue) {
+                            let value = trimmedValue.isEmpty ? "" : trimmedValue
+                            onSave(value)
+                            isPresented = false
+                        } else {
+                            showValidationError = true
+                        }
                     }
                     .fontWeight(.semibold)
                 }

@@ -1,10 +1,3 @@
-//
-//  AuthManager.swift
-//  Pangolin
-//
-//  Created by Milo Schwartz on 11/5/25.
-//
-
 import Combine
 import Foundation
 import UserNotifications
@@ -24,8 +17,13 @@ class AuthManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var deviceAuthCode: String?
     @Published var deviceAuthLoginURL: String?
+    /// True while device auth (login) is in progress; use to disable re-auth buttons.
+    @Published var isDeviceAuthInProgress = false
     @Published var serverInfo: ServerInfo?
     @Published var isServerDown = false
+    @Published var sessionExpired = false
+    /// When true, macOS LoginView should auto-start device auth with current account hostname (set by menu bar "Log In").
+    @Published var startDeviceAuthImmediately = false
 
     let apiClient: APIClient
     private let configManager: ConfigManager
@@ -50,6 +48,11 @@ class AuthManager: ObservableObject {
         self.configManager = configManager
         self.accountManager = accountManager
         self.secretManager = secretManager
+        apiClient.onUnauthorized = { [weak self] in
+            Task { @MainActor in
+                self?.markSessionExpiredFromConnection()
+            }
+        }
     }
 
     func initialize() async {
@@ -99,8 +102,15 @@ class AuthManager: ObservableObject {
                 // Update stored config with latest user info
                 await handleSuccessfulAuth(
                     user: user, hostname: activeAccount.hostname, token: token)
+            } catch let error as APIError {
+                if case .httpError(let statusCode, _) = error, statusCode == 401 || statusCode == 403 {
+                    sessionExpired = true
+                    isAuthenticated = true
+                    errorMessage = "Session expired. Please sign in again."
+                } else {
+                    isAuthenticated = false
+                }
             } catch {
-                // Token is invalid or user doesn't exist, clear it
                 isAuthenticated = false
             }
         } else {
@@ -123,6 +133,9 @@ class AuthManager: ObservableObject {
 
         // Create the main login task that can be cancelled
         deviceAuthTask = Task {
+            await MainActor.run {
+                self.isDeviceAuthInProgress = true
+            }
             do {
                 // Get device name (user's computer/device name)
                 let deviceName = DeviceInfo.getDeviceModelName()
@@ -229,12 +242,14 @@ class AuthManager: ObservableObject {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
             } catch let error as APIError {
                 await MainActor.run {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
                 errorMessage = error.errorDescription
                 throw error
@@ -243,6 +258,7 @@ class AuthManager: ObservableObject {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
                 throw CancellationError()
             } catch {
@@ -250,6 +266,7 @@ class AuthManager: ObservableObject {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
                 errorMessage = error.localizedDescription
                 throw error
@@ -266,6 +283,7 @@ class AuthManager: ObservableObject {
         deviceAuthCode = nil
         deviceAuthLoginURL = nil
         errorMessage = nil
+        isDeviceAuthInProgress = false
     }
 
     private func handleSuccessfulAuth(user: User, hostname: String, token: String) async {
@@ -309,9 +327,15 @@ class AuthManager: ObservableObject {
 
         isAuthenticated = true
         errorMessage = nil
-        
+        sessionExpired = false
+        startDeviceAuthImmediately = false
+
         // Fetch server info
         await fetchServerInfo()
+    }
+
+    func markSessionExpiredFromConnection() {
+        sessionExpired = true
     }
 
     private func ensureOrgIsSelected(preferredOrgId: String? = nil) async throws -> String {
@@ -405,10 +429,11 @@ class AuthManager: ObservableObject {
         // Always switch account locally first (even if token is missing/invalid)
         accountManager.setActiveUser(userId: userId)
         
-        // Reset server down status and error message
+        // Reset server down status, error message, and session-expired state for the new user
         isServerDown = false
         errorMessage = nil
-        
+        sessionExpired = false
+
         // Clear current user/org data immediately when switching accounts
         // This ensures UI shows the new account's email, not the old account's user name
         currentUser = nil
@@ -466,6 +491,16 @@ class AuthManager: ObservableObject {
             accountManager.updateAccountUserInfo(userId: userId, username: user.username, name: user.name)
             errorMessage = nil  // Clear any previous errors on success
             isServerDown = false  // Clear server down status on success
+        } catch let error as APIError {
+            if case .httpError(let statusCode, _) = error, statusCode == 401 || statusCode == 403 {
+                sessionExpired = true
+                errorMessage = "Session expired. Please sign in again."
+            } else {
+                errorMessage = "Failed to fetch user information: \(error.errorDescription ?? error.localizedDescription)"
+            }
+            currentUser = nil
+            currentOrg = nil
+            organizations = []
         } catch {
             // Error fetching user, but keep account switched
             os_log(
@@ -643,6 +678,14 @@ class AuthManager: ObservableObject {
                         // Clear invalid credentials
                         _ = secretManager.deleteOlmCredentials(userId: userId)
                     }
+                } catch let error as APIError {
+                    if case .httpError(let statusCode, _) = error, statusCode == 401 || statusCode == 403 {
+                        markSessionExpiredFromConnection()
+                    }
+                    os_log(
+                        "Failed to verify OLM credentials: %{public}@", log: logger, type: .error,
+                        error.localizedDescription)
+                    _ = secretManager.deleteOlmCredentials(userId: userId)
                 } catch {
                     // If getting OLM fails, the OLM might not exist
                     os_log(

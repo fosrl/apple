@@ -1,10 +1,3 @@
-//
-//  AccountManager.swift
-//  Pangolin
-//
-//  Created by Varun Narravula on 12/24/25.
-//
-
 import Combine
 import Foundation
 import SwiftUI
