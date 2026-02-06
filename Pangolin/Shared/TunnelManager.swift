@@ -55,6 +55,15 @@ class TunnelManager: NSObject, ObservableObject {
     private nonisolated(unsafe) var lastTunnelStatus: TunnelStatus?
     private nonisolated(unsafe) var lastIsNEConnected: Bool = false
 
+    /// Socket error codes that indicate session expired; re-auth button should be shown.
+    private static let sessionExpiredSocketErrorCodes: Set<String> = [
+        "UNAUTHORIZED",
+        "SESSION_EXPIRED",
+        "ORG_ACCESS_POLICY_SESSION_EXPIRED",
+        "INVALID_USER_SESSION",
+        "USER_ID_NOT_FOUND",
+    ]
+
     init(
         configManager: ConfigManager,
         accountManager: AccountManager,
@@ -656,6 +665,12 @@ class TunnelManager: NSObject, ObservableObject {
                                     title: "Connection Error",
                                     message: error.message
                                 )
+                            }
+                        }
+
+                        if Self.sessionExpiredSocketErrorCodes.contains(error.code) {
+                            await MainActor.run {
+                                self.authManager.markSessionExpiredFromConnection()
                             }
                         }
 
