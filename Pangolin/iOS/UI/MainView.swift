@@ -196,6 +196,7 @@ struct HomeTabView: View {
                                     showLoginView = true
                                 }
                                 .buttonStyle(.borderedProminent)
+                                .disabled(authManager.isDeviceAuthInProgress)
                             }
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)

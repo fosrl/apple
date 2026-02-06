@@ -17,9 +17,13 @@ class AuthManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var deviceAuthCode: String?
     @Published var deviceAuthLoginURL: String?
+    /// True while device auth (login) is in progress; use to disable re-auth buttons.
+    @Published var isDeviceAuthInProgress = false
     @Published var serverInfo: ServerInfo?
     @Published var isServerDown = false
     @Published var sessionExpired = false
+    /// When true, macOS LoginView should auto-start device auth with current account hostname (set by menu bar "Log In").
+    @Published var startDeviceAuthImmediately = false
 
     let apiClient: APIClient
     private let configManager: ConfigManager
@@ -129,6 +133,9 @@ class AuthManager: ObservableObject {
 
         // Create the main login task that can be cancelled
         deviceAuthTask = Task {
+            await MainActor.run {
+                self.isDeviceAuthInProgress = true
+            }
             do {
                 // Get device name (user's computer/device name)
                 let deviceName = DeviceInfo.getDeviceModelName()
@@ -235,12 +242,14 @@ class AuthManager: ObservableObject {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
             } catch let error as APIError {
                 await MainActor.run {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
                 errorMessage = error.errorDescription
                 throw error
@@ -249,6 +258,7 @@ class AuthManager: ObservableObject {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
                 throw CancellationError()
             } catch {
@@ -256,6 +266,7 @@ class AuthManager: ObservableObject {
                     self.deviceAuthCode = nil
                     self.deviceAuthLoginURL = nil
                     self.deviceAuthTask = nil
+                    self.isDeviceAuthInProgress = false
                 }
                 errorMessage = error.localizedDescription
                 throw error
@@ -272,6 +283,7 @@ class AuthManager: ObservableObject {
         deviceAuthCode = nil
         deviceAuthLoginURL = nil
         errorMessage = nil
+        isDeviceAuthInProgress = false
     }
 
     private func handleSuccessfulAuth(user: User, hostname: String, token: String) async {
@@ -316,6 +328,7 @@ class AuthManager: ObservableObject {
         isAuthenticated = true
         errorMessage = nil
         sessionExpired = false
+        startDeviceAuthImmediately = false
 
         // Fetch server info
         await fetchServerInfo()
