@@ -552,7 +552,13 @@ struct AccountManagementView: View {
             return false
         }
     }
-    
+
+    private var deleteAccountFromServerURL: URL? {
+        guard let hostname = accountManager.activeAccount?.hostname else { return nil }
+        let base = hostname.hasSuffix("/") ? String(hostname.dropLast()) : hostname
+        return URL(string: "\(base)?internal_redirect=/auth/delete-account")
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -617,8 +623,10 @@ struct AccountManagementView: View {
                             Text("Add Account")
                         }
                     }
-                    
-                    if accountManager.activeAccount != nil {
+                }
+
+                if accountManager.activeAccount != nil {
+                    Section {
                         Button(role: .destructive, action: {
                             Task {
                                 await authManager.logout()
@@ -629,6 +637,19 @@ struct AccountManagementView: View {
                                 Text("Logout")
                             }
                         }
+
+                        if let deleteURL = deleteAccountFromServerURL {
+                            Link(destination: deleteURL) {
+                                HStack {
+                                    Text("Delete Account from Server")
+                                }
+                            }
+                            .id(accountManager.activeAccount?.hostname ?? "")
+                        }
+                    } header: {
+                        Text("Current Account")
+                    } footer: {
+                        Text("These actions affect the account you are currently signed into.")
                     }
                 }
             }
