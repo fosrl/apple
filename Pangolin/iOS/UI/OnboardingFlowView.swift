@@ -113,6 +113,7 @@ struct OnboardingFlowView: View {
 
                 OnboardingInstallVPNPage(
                     vpnInstalled: viewModel.vpnInstalled,
+                    hasAcknowledgedPrivacy: viewModel.hasAcknowledgedPrivacy,
                     isInstalling: viewModel.isInstallingVPN,
                     installAction: {
                         Task {
@@ -291,6 +292,7 @@ private struct OnboardingPrivacyPage: View {
 
 private struct OnboardingInstallVPNPage: View {
     let vpnInstalled: Bool
+    let hasAcknowledgedPrivacy: Bool
     let isInstalling: Bool
     let installAction: () -> Void
     let doneAction: () -> Void
@@ -352,7 +354,7 @@ private struct OnboardingInstallVPNPage: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(isInstalling)
+                .disabled(isInstalling || !hasAcknowledgedPrivacy)
                     // Extra bottom padding so dots don't overlap the button
                     .padding(.bottom, 56)
             }
