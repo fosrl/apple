@@ -363,6 +363,10 @@ struct SocketExitResponse: Codable {
 
 struct SocketSwitchOrgRequest: Codable {
     let orgId: String
+    
+    enum CodingKeys: String, CodingKey {
+        case orgId = "org_id"
+    }
 }
 
 struct SocketSwitchOrgResponse: Codable {
