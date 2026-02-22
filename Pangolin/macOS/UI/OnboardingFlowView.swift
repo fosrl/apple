@@ -19,11 +19,17 @@ final class MacOnboardingViewModel: ObservableObject {
 
     private let onboardingState: OnboardingStateManager
     private let tunnelManager: TunnelManager
+    private let accountManager: AccountManager
+
+    private var hasNoAccounts: Bool {
+        accountManager.accounts.isEmpty
+    }
 
     @MainActor
-    init(onboardingState: OnboardingStateManager, tunnelManager: TunnelManager) {
+    init(onboardingState: OnboardingStateManager, tunnelManager: TunnelManager, accountManager: AccountManager) {
         self.onboardingState = onboardingState
         self.tunnelManager = tunnelManager
+        self.accountManager = accountManager
         self.hasSeenWelcome = onboardingState.hasSeenWelcome
         self.hasAcknowledgedPrivacy = onboardingState.hasAcknowledgedPrivacy
         self.hasCompletedSystemExtension = onboardingState.hasCompletedSystemExtensionOnboarding
@@ -105,6 +111,11 @@ final class MacOnboardingViewModel: ObservableObject {
 
     @MainActor
     func handleDoneTapped() {
+        // On VPN step with no accounts: show completion page instead of closing
+        if currentIndex == 3, vpnInstalled, hasNoAccounts {
+            currentIndex = 4
+            return
+        }
         isPresenting = false
         hasOpenedOnboardingWindowThisSession = false
         closeOnboardingWindow()
@@ -112,12 +123,19 @@ final class MacOnboardingViewModel: ObservableObject {
 
     @MainActor
     func goToNextPage() {
-        currentIndex = min(currentIndex + 1, 3)
+        currentIndex = min(currentIndex + 1, 4)
     }
 
     @MainActor
     func goToPreviousPage() {
         currentIndex = max(0, currentIndex - 1)
+    }
+
+    @MainActor
+    func handleCompletionDoneTapped() {
+        isPresenting = false
+        hasOpenedOnboardingWindowThisSession = false
+        closeOnboardingWindow()
     }
 
     @MainActor
@@ -132,7 +150,7 @@ struct MacOnboardingFlowView: View {
     @ObservedObject var viewModel: MacOnboardingViewModel
     @Environment(\.colorScheme) private var colorScheme
 
-    private static let stepCount = 4
+    private var stepCount: Int { viewModel.currentIndex == 4 ? 5 : 4 }
 
     /// Matches LoginView background: dark #161618, light #FDFDFD
     private var windowBackgroundColor: Color {
@@ -149,13 +167,13 @@ struct MacOnboardingFlowView: View {
             VStack(spacing: 0) {
                 // Step indicator
                 HStack(spacing: 6) {
-                    ForEach(0..<Self.stepCount, id: \.self) { index in
+                    ForEach(0..<stepCount, id: \.self) { index in
                         Circle()
                             .fill(index <= viewModel.currentIndex ? Color.accentColor : Color.secondary.opacity(0.3))
                             .frame(width: 8, height: 8)
                     }
                     Spacer()
-                    Text("Step \(viewModel.currentIndex + 1) of \(Self.stepCount)")
+                    Text("Step \(viewModel.currentIndex + 1) of \(stepCount)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -175,11 +193,13 @@ struct MacOnboardingFlowView: View {
                             isCompleted: viewModel.hasCompletedSystemExtension,
                             isInstalling: viewModel.isInstallingSystemExtension
                         )
-                    default:
+                    case 3:
                         MacOnboardingVPNPageContent(
                             vpnInstalled: viewModel.vpnInstalled,
                             isInstalling: viewModel.isInstallingVPN
                         )
+                    default:
+                        MacOnboardingCompletionPageContent()
                     }
                 }
                 .padding(.horizontal, 24)
@@ -189,7 +209,7 @@ struct MacOnboardingFlowView: View {
                 HStack(alignment: .center) {
                     footerConfirmationText
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if viewModel.currentIndex > 0 {
+                    if viewModel.currentIndex > 0 && viewModel.currentIndex < 4 {
                         Button("Back") {
                             viewModel.goToPreviousPage()
                         }
@@ -202,7 +222,7 @@ struct MacOnboardingFlowView: View {
                 .padding(.top, 16)
             }
         }
-        .frame(minWidth: 440, minHeight: 400)
+        .frame(minWidth: 560, minHeight: 520)
         .background(windowBackgroundColor)
         .background(
             OnboardingWindowAccessor { window in
@@ -262,8 +282,10 @@ struct MacOnboardingFlowView: View {
             return (viewModel.hasAcknowledgedPrivacy, "You've already confirmed this step")
         case 2:
             return (viewModel.hasCompletedSystemExtension, "System extension installed")
-        default:
+        case 3:
             return (viewModel.vpnInstalled, "VPN configuration installed")
+        default:
+            return (false, "")
         }
     }
 
@@ -290,22 +312,12 @@ struct MacOnboardingFlowView: View {
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
             } else {
-                Button {
+                Button("Install System Extension") {
                     Task { await viewModel.handleSystemExtensionInstallTapped() }
-                } label: {
-                    HStack(spacing: 6) {
-                        if viewModel.isInstallingSystemExtension {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.7)
-                        }
-                        Text(viewModel.isInstallingSystemExtension ? "Installing…" : "Install System Extension")
-                    }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isInstallingSystemExtension)
             }
-        default:
+        case 3:
             if viewModel.vpnInstalled {
                 Button("Done") {
                     viewModel.handleDoneTapped()
@@ -313,21 +325,17 @@ struct MacOnboardingFlowView: View {
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
             } else {
-                Button {
+                Button("Install") {
                     Task { await viewModel.handleVPNInstallTapped() }
-                } label: {
-                    HStack(spacing: 6) {
-                        if viewModel.isInstallingVPN {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.7)
-                        }
-                        Text(viewModel.isInstallingVPN ? "Installing…" : "Install")
-                    }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isInstallingVPN)
             }
+        default:
+            Button("Done") {
+                viewModel.handleCompletionDoneTapped()
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
         }
     }
 }
@@ -448,41 +456,78 @@ private struct MacOnboardingSystemExtensionPageContent: View {
     let isInstalling: Bool
 
     var body: some View {
-        VStack {
-            Spacer(minLength: 24)
-
-            Image(systemName: "gearshape.2.fill")
-                .font(.system(size: 44))
-                .foregroundColor(.accentColor)
-                .padding(.bottom, 24)
-
+        VStack(spacing: 12) {
             Text("Install System Extension")
                 .font(.title2.weight(.semibold))
+                .padding(.bottom, 2)
+
+            Text("In System Settings: General → Login Items & Extensions → By Category → Network Extensions. Ensure Pangolin.app is toggled on.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Image("InstallNetworkExtension")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.vertical, 4)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 8)
+    }
+}
+
+// MARK: - Completion Page (no accounts — prompt to log in)
+
+private struct MacOnboardingCompletionPageContent: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer(minLength: 24)
+
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 52))
+                .foregroundColor(.green)
                 .padding(.bottom, 8)
 
-            Text(
-                "Pangolin uses a system extension to provide secure network access. You may be prompted to allow the extension in System Settings → Privacy & Security."
-            )
-            .font(.body)
-            .foregroundColor(.secondary)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal)
+            Text("You're All Set")
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.center)
 
-            Spacer()
+            Text("Setup is complete. You can now log in to connect to your network.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
 
-            if isInstalling {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Installing…")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 8)
+            VStack(spacing: 12) {
+                Image("PangolinMenuBarIcon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 44)
+                Text("Look for the Pangolin icon in your menu bar to log in.")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
             }
-            Spacer().frame(minHeight: 16)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
+            .padding(.horizontal, 24)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.secondary.opacity(0.4), lineWidth: 1)
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 8)
     }
 }
 
@@ -513,40 +558,27 @@ private struct MacOnboardingVPNPageContent: View {
     let isInstalling: Bool
 
     var body: some View {
-        VStack {
-            Spacer(minLength: 24)
-
-            Image(systemName: "network")
-                .font(.system(size: 44))
-                .foregroundColor(.accentColor)
-                .padding(.bottom, 24)
-
+        VStack(spacing: 12) {
             Text("Add VPN Configuration")
                 .font(.title2.weight(.semibold))
+                .padding(.bottom, 2)
+
+            Text("When prompted, tap \"Allow\" so Pangolin can add a VPN configuration. Your traffic will be routed securely to your private network.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.bottom, 8)
+                .padding(.horizontal)
 
-            Text(
-                "Pangolin needs to add a VPN configuration so it can securely route traffic to devices and services on your private network."
-            )
-            .font(.body)
-            .foregroundColor(.secondary)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal)
+            Image("AllowVPN")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.vertical, 4)
 
-            Spacer()
-
-            if isInstalling {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Installing…")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 8)
-            }
-            Spacer().frame(minHeight: 16)
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 8)
     }
 }

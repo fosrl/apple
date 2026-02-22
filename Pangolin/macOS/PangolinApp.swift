@@ -99,7 +99,8 @@ struct PangolinApp: App {
         let onboardingState = OnboardingStateManager()
         let onboardingVM = MacOnboardingViewModel(
             onboardingState: onboardingState,
-            tunnelManager: tunnelMgr
+            tunnelManager: tunnelMgr,
+            accountManager: accountMgr
         )
 
         _configManager = StateObject(wrappedValue: configMgr)
@@ -171,7 +172,7 @@ struct PangolinApp: App {
                 .handlesExternalEvents(preferring: ["onboarding"], allowing: ["onboarding"])
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 480, height: 420)
+        .defaultSize(width: 560, height: 520)
         .windowResizability(.contentSize)
 
         // Preferences Window

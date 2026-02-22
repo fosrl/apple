@@ -78,7 +78,11 @@ struct MenuBarView: View {
                         } else {
                             Text(tunnelManager.status.displayText)
                                 .foregroundColor(.secondary)
-                            ConnectButtonItem(tunnelManager: tunnelManager)
+                            ConnectButtonItem(
+                                tunnelManager: tunnelManager,
+                                onboardingViewModel: onboardingViewModel,
+                                openWindow: openWindow
+                            )
                         }
                         Divider()
                     }
@@ -585,6 +589,8 @@ struct AccountsMenu: View {
 
 struct ConnectButtonItem: View {
     @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var onboardingViewModel: MacOnboardingViewModel
+    var openWindow: OpenWindowAction
 
     private var shouldDisableButton: Bool {
         return tunnelManager.status == .starting
@@ -592,8 +598,17 @@ struct ConnectButtonItem: View {
 
     var body: some View {
         Button(tunnelManager.isNEConnected ? "Disconnect" : "Connect") {
-            Task {
+            Task { @MainActor in
                 if !tunnelManager.isNEConnected {
+                    await onboardingViewModel.refreshPages()
+                    if onboardingViewModel.isPresenting {
+                        onboardingViewModel.hasOpenedOnboardingWindowThisSession = true
+                        openWindow(id: "onboarding")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            NSApplication.shared.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                        }
+                        return
+                    }
                     await tunnelManager.connect()
                 } else {
                     await tunnelManager.disconnect()
