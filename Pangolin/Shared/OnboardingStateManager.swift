@@ -8,6 +8,8 @@ final class OnboardingStateManager: ObservableObject {
             "net.pangolin.Pangolin.Onboarding.hasAcknowledgedPrivacy"
         static let hasCompletedVPNInstallOnboarding =
             "net.pangolin.Pangolin.Onboarding.hasCompletedVPNInstallOnboarding"
+        static let hasCompletedSystemExtensionOnboarding =
+            "net.pangolin.Pangolin.Onboarding.hasCompletedSystemExtensionOnboarding"
     }
 
     private let userDefaults: UserDefaults
@@ -34,6 +36,12 @@ final class OnboardingStateManager: ObservableObject {
         set { userDefaults.set(newValue, forKey: Keys.hasCompletedVPNInstallOnboarding) }
     }
 
+    /// Whether the user has completed the system extension install onboarding step (macOS).
+    var hasCompletedSystemExtensionOnboarding: Bool {
+        get { userDefaults.bool(forKey: Keys.hasCompletedSystemExtensionOnboarding) }
+        set { userDefaults.set(newValue, forKey: Keys.hasCompletedSystemExtensionOnboarding) }
+    }
+
     func markWelcomeSeen() {
         hasSeenWelcome = true
     }
@@ -44,6 +52,10 @@ final class OnboardingStateManager: ObservableObject {
 
     func markCompletedVPNInstallOnboarding() {
         hasCompletedVPNInstallOnboarding = true
+    }
+
+    func markSystemExtensionOnboardingComplete() {
+        hasCompletedSystemExtensionOnboarding = true
     }
 }
 

@@ -9,6 +9,7 @@ struct MenuBarView: View {
     @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
     let updater: SPUUpdater
+    @ObservedObject var onboardingViewModel: MacOnboardingViewModel
     @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
     @Environment(\.openWindow) private var openWindow
     @State private var menuOpenCount = 0
@@ -21,6 +22,7 @@ struct MenuBarView: View {
         authManager: AuthManager,
         tunnelManager: TunnelManager,
         updater: SPUUpdater,
+        onboardingViewModel: MacOnboardingViewModel,
     ) {
         self.configManager = configManager
         self.accountManager = accountManager
@@ -28,13 +30,18 @@ struct MenuBarView: View {
         self.authManager = authManager
         self.tunnelManager = tunnelManager
         self.updater = updater
+        self.onboardingViewModel = onboardingViewModel
         self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
     }
 
     var body: some View {
         Group {
-            // Show loading state during initialization
-            if authManager.isInitializing {
+            // When onboarding is needed, show only a minimal menu (don't load full menu)
+            if onboardingViewModel.isPresenting {
+                Button("Open Pangolin Setup") {
+                    openWindow(id: "onboarding")
+                }
+            } else if authManager.isInitializing {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.7)
@@ -194,6 +201,25 @@ struct MenuBarView: View {
                 }
             }
             .keyboardShortcut("q")
+        }
+        .task {
+            await onboardingViewModel.refreshPages()
+            if onboardingViewModel.isPresenting, !onboardingViewModel.hasOpenedOnboardingWindowThisSession {
+                onboardingViewModel.hasOpenedOnboardingWindowThisSession = true
+                openWindow(id: "onboarding")
+                await MainActor.run {
+                    NSApp.setActivationPolicy(.regular)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        NSApp.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                    }
+                }
+            }
+        }
+        .onChange(of: onboardingViewModel.isPresenting) { _, newValue in
+            if !newValue {
+                onboardingViewModel.hasOpenedOnboardingWindowThisSession = false
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
         .onAppear {
             // Increment counter to force view recreation and trigger task
@@ -559,10 +585,8 @@ struct AccountsMenu: View {
 
 struct ConnectButtonItem: View {
     @ObservedObject var tunnelManager: TunnelManager
-    
+
     private var shouldDisableButton: Bool {
-        // Only disable connect button when starting
-        // Disconnect button should be enabled during registering
         return tunnelManager.status == .starting
     }
 
