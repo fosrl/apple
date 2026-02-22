@@ -58,6 +58,8 @@ struct PangolinApp: App {
     @StateObject private var apiClient: APIClient
     @StateObject private var authManager: AuthManager
     @StateObject private var tunnelManager: TunnelManager
+    @StateObject private var onboardingStateManager: OnboardingStateManager
+    @StateObject private var onboardingViewModel: MacOnboardingViewModel
 
     private let updaterController: SPUStandardUpdaterController
 
@@ -94,12 +96,21 @@ struct PangolinApp: App {
         // Set tunnel manager reference in auth manager for org switching
         authMgr.tunnelManager = tunnelMgr
 
+        let onboardingState = OnboardingStateManager()
+        let onboardingVM = MacOnboardingViewModel(
+            onboardingState: onboardingState,
+            tunnelManager: tunnelMgr,
+            accountManager: accountMgr
+        )
+
         _configManager = StateObject(wrappedValue: configMgr)
         _secretManager = StateObject(wrappedValue: secretMgr)
         _accountManager = StateObject(wrappedValue: accountMgr)
         _apiClient = StateObject(wrappedValue: client)
         _authManager = StateObject(wrappedValue: authMgr)
         _tunnelManager = StateObject(wrappedValue: tunnelMgr)
+        _onboardingStateManager = StateObject(wrappedValue: onboardingState)
+        _onboardingViewModel = StateObject(wrappedValue: onboardingVM)
     }
 
     var body: some Scene {
@@ -110,12 +121,13 @@ struct PangolinApp: App {
                 apiClient: apiClient,
                 authManager: authManager,
                 tunnelManager: tunnelManager,
-                updater: updaterController.updater
+                updater: updaterController.updater,
+                onboardingViewModel: onboardingViewModel
             )
             .onAppear {
-                // Set activation policy to accessory (menu bar only) on first appearance
+                // Set activation policy to accessory (menu bar only) when not showing onboarding
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    guard NSApp.activationPolicy() != .accessory else { return }
+                    guard !onboardingViewModel.isPresenting, NSApp.activationPolicy() != .accessory else { return }
                     NSApp.setActivationPolicy(.accessory)
                 }
 
@@ -153,6 +165,15 @@ struct PangolinApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
         }
+
+        // Onboarding Window
+        WindowGroup("Pangolin Setup", id: "onboarding") {
+            MacOnboardingFlowView(viewModel: onboardingViewModel)
+                .handlesExternalEvents(preferring: ["onboarding"], allowing: ["onboarding"])
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 560, height: 520)
+        .windowResizability(.contentSize)
 
         // Preferences Window
         WindowGroup("Preferences", id: "preferences") {

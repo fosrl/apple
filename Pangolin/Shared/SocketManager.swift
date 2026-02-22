@@ -75,7 +75,7 @@ class SocketManager {
     func switchOrg(orgId: String) async throws -> SocketSwitchOrgResponse {
         let requestBody = SocketSwitchOrgRequest(orgId: orgId)
         let bodyData = try JSONEncoder().encode(requestBody)
-        return try await performRequest(method: "POST", path: "metadata", body: bodyData)
+        return try await performRequest(method: "POST", path: "/switch-org", body: bodyData)
     }
 
     /// Switches to a different organization

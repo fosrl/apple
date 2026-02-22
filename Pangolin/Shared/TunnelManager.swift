@@ -92,11 +92,17 @@ class TunnelManager: NSObject, ObservableObject {
 
         Task {
             #if os(macOS)
-                // First, ensure system extension is installed
-                let isInstalled = await installSystemExtensionIfNeeded()
-                if isInstalled {
+                // Defer system extension and VPN setup until the user completes onboarding
+                // (or taps Connect). Only update status if a configuration already exists,
+                // to avoid showing system prompts on launch.
+                if await hasRegisteredExtension() {
                     await ensureExtensionRegistered()
                     await updateConnectionStatus()
+                } else {
+                    await MainActor.run {
+                        self.isNEConnected = false
+                        self.status = .disconnected
+                    }
                 }
             #else
                 // On iOS, defer installing/registering the VPN configuration until
@@ -180,7 +186,8 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     #if os(macOS)
-        private func installSystemExtensionIfNeeded() async -> Bool {
+        /// Installs or activates the Packet Tunnel system extension. Returns true on success.
+        func installSystemExtensionIfNeeded() async -> Bool {
             os_log("Installing/activating system extension...", log: logger, type: .info)
 
             await MainActor.run {

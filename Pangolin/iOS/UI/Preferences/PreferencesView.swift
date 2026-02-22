@@ -76,38 +76,41 @@ struct PreferencesView: View {
                     }
                 }
                 .tint(.accentColor)
+                .disabled(!dnsOverrideEnabled)
                 
-                Button(action: {
-                    editingPrimaryDNS = primaryDNSServer
-                    showPrimaryDNSModal = true
-                }) {
-                    HStack {
-                        Text("Primary Upstream DNS Server")
-                        Spacer()
-                        Text(primaryDNSServer)
-                            .foregroundColor(.secondary)
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
+                if dnsOverrideEnabled {
+                    Button(action: {
+                        editingPrimaryDNS = primaryDNSServer
+                        showPrimaryDNSModal = true
+                    }) {
+                        HStack {
+                            Text("Primary Upstream DNS Server")
+                            Spacer()
+                            Text(primaryDNSServer)
+                                .foregroundColor(.secondary)
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
                     }
-                }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    editingSecondaryDNS = secondaryDNSServer
-                    showSecondaryDNSModal = true
-                }) {
-                    HStack {
-                        Text("Secondary Upstream DNS Server")
-                        Spacer()
-                        Text(displaySecondaryDNS)
-                            .foregroundColor(.secondary)
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        editingSecondaryDNS = secondaryDNSServer
+                        showSecondaryDNSModal = true
+                    }) {
+                        HStack {
+                            Text("Secondary Upstream DNS Server")
+                            Spacer()
+                            Text(displaySecondaryDNS)
+                                .foregroundColor(.secondary)
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
                 }
             }
             .navigationTitle("Preferences")

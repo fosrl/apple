@@ -83,36 +83,39 @@ struct PreferencesContentView: View {
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
-                        } 
-                        
-                        HStack {
-                            Text("Primary Upstream DNS Server")
-                                .font(.system(size: 13))
-                            Spacer()
-                            Text(primaryDNSServer)
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
-                            Button("Set...") {
-                                editingPrimaryDNS = primaryDNSServer
-                                showPrimaryDNSModal = true
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                            .disabled(!dnsOverrideEnabled)
                         }
                         
-                        HStack {
-                            Text("Secondary Upstream DNS Server")
-                                .font(.system(size: 13))
-                            Spacer()
-                            Text(displaySecondaryDNS)
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
-                            Button("Set...") {
-                                editingSecondaryDNS = secondaryDNSServer
-                                showSecondaryDNSModal = true
+                        if dnsOverrideEnabled {
+                            HStack {
+                                Text("Primary Upstream DNS Server")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Text(primaryDNSServer)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                                Button("Set...") {
+                                    editingPrimaryDNS = primaryDNSServer
+                                    showPrimaryDNSModal = true
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                            
+                            HStack {
+                                Text("Secondary Upstream DNS Server")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Text(displaySecondaryDNS)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                                Button("Set...") {
+                                    editingSecondaryDNS = secondaryDNSServer
+                                    showSecondaryDNSModal = true
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
                         }
                     }
                 }
