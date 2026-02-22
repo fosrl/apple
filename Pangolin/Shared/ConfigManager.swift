@@ -136,6 +136,9 @@ class ConfigManager: ObservableObject {
     func setDNSOverrideEnabled(_ enabled: Bool) -> Bool {
         var updatedConfig = config ?? Config()
         updatedConfig.dnsOverrideEnabled = enabled
+        if !enabled {
+            updatedConfig.dnsTunnelEnabled = false
+        }
         return save(updatedConfig)
     }
 
