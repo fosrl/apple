@@ -170,6 +170,7 @@ struct PangolinApp: App {
             MacOnboardingFlowView(viewModel: onboardingViewModel)
                 .handlesExternalEvents(preferring: ["onboarding"], allowing: ["onboarding"])
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 480, height: 420)
         .windowResizability(.contentSize)
 

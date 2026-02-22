@@ -130,12 +130,20 @@ final class MacOnboardingViewModel: ObservableObject {
 
 struct MacOnboardingFlowView: View {
     @ObservedObject var viewModel: MacOnboardingViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     private static let stepCount = 4
 
+    /// Matches LoginView background: dark #161618, light #FDFDFD
+    private var windowBackgroundColor: Color {
+        colorScheme == .dark
+            ? Color(.sRGB, red: 0x16/255.0, green: 0x16/255.0, blue: 0x18/255.0, opacity: 1)
+            : Color(.sRGB, red: 0xFD/255.0, green: 0xFD/255.0, blue: 0xFD/255.0, opacity: 1)
+    }
+
     var body: some View {
         ZStack {
-            Color(NSColor.windowBackgroundColor)
+            windowBackgroundColor
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -177,9 +185,10 @@ struct MacOnboardingFlowView: View {
                 .padding(.horizontal, 24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Footer: Back + primary action (bottom right)
-                HStack {
-                    Spacer()
+                // Footer: confirmation text (bottom left) ↔ Back + primary action (bottom right)
+                HStack(alignment: .center) {
+                    footerConfirmationText
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if viewModel.currentIndex > 0 {
                         Button("Back") {
                             viewModel.goToPreviousPage()
@@ -194,10 +203,67 @@ struct MacOnboardingFlowView: View {
             }
         }
         .frame(minWidth: 440, minHeight: 400)
+        .background(windowBackgroundColor)
+        .background(
+            OnboardingWindowAccessor { window in
+                configureOnboardingWindow(window)
+            }
+        )
         .onAppear {
             DispatchQueue.main.async {
                 NSApplication.shared.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
             }
+        }
+    }
+
+    private func configureOnboardingWindow(_ window: NSWindow) {
+        var styleMask = window.styleMask
+        styleMask.remove([.miniaturizable, .resizable])
+        styleMask.insert([.titled, .closable])
+        window.styleMask = styleMask
+        window.styleMask.remove(.resizable)
+
+        if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
+            minimizeButton.isHidden = true
+        }
+        if let zoomButton = window.standardWindowButton(.zoomButton) {
+            zoomButton.isHidden = true
+        }
+        if let closeButton = window.standardWindowButton(.closeButton) {
+            closeButton.isHidden = false
+        }
+
+        window.isMovableByWindowBackground = false
+    }
+
+    @ViewBuilder
+    private var footerConfirmationText: some View {
+        let (show, message) = footerConfirmationState
+        if show {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                Text(message)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            Spacer()
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var footerConfirmationState: (show: Bool, message: String) {
+        switch viewModel.currentIndex {
+        case 0:
+            return (viewModel.hasSeenWelcome, "You've completed this step")
+        case 1:
+            return (viewModel.hasAcknowledgedPrivacy, "You've already confirmed this step")
+        case 2:
+            return (viewModel.hasCompletedSystemExtension, "System extension installed")
+        default:
+            return (viewModel.vpnInstalled, "VPN configuration installed")
         }
     }
 
@@ -296,17 +362,6 @@ private struct MacOnboardingWelcomePageContent: View {
 
             Spacer()
 
-            if isCompleted {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("You've already seen this introduction.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.bottom, 8)
-            }
-
             if let docsURL = URL(string: "https://docs.pangolin.net/about/how-pangolin-works") {
                 HStack(spacing: 4) {
                     Text("New to Pangolin?")
@@ -358,17 +413,6 @@ private struct MacOnboardingPrivacyPageContent: View {
             .padding(.horizontal)
 
             Spacer()
-
-            if isAcknowledged {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("You've already confirmed the privacy policy.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.bottom, 8)
-            }
 
             if let termsURL = URL(string: "https://pangolin.net/terms-of-service.html"),
                let privacyURL = URL(string: "https://pangolin.net/privacy-policy.html") {
@@ -427,15 +471,6 @@ private struct MacOnboardingSystemExtensionPageContent: View {
 
             Spacer()
 
-            if isCompleted {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("System extension installed")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-            }
             if isInstalling {
                 HStack(spacing: 8) {
                     ProgressView()
@@ -447,6 +482,26 @@ private struct MacOnboardingSystemExtensionPageContent: View {
                 .padding(.top, 8)
             }
             Spacer().frame(minHeight: 16)
+        }
+    }
+}
+
+// MARK: - Window configuration (matches LoginView title bar style)
+
+private struct OnboardingWindowAccessor: NSViewRepresentable {
+    var callback: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if let window = view.window { callback(window) }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if let window = nsView.window { callback(window) }
         }
     }
 }
@@ -481,15 +536,6 @@ private struct MacOnboardingVPNPageContent: View {
 
             Spacer()
 
-            if vpnInstalled {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("VPN configuration installed")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-            }
             if isInstalling {
                 HStack(spacing: 8) {
                     ProgressView()
