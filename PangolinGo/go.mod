@@ -3,7 +3,7 @@ module github.com/fosrl/apple
 go 1.25
 
 require (
-	github.com/fosrl/newt v1.9.0
+	github.com/fosrl/newt v1.10.0
 	github.com/fosrl/olm v1.4.2
 )
 
