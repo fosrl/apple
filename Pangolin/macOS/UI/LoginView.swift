@@ -30,19 +30,11 @@ extension Color {
     }
 }
 
-enum HostingOption {
-    case cloud
-    case selfHosted
-}
-
 struct LoginView: View {
-    @State private var hostingOption: HostingOption?
-    @State private var selfHostedURL: String = ""
     @State private var isLoggingIn = false
-    @State private var isCloudButtonHovered = false
-    @State private var isSelfHostedButtonHovered = false
     @State private var showSuccess = false
     @State private var hasAutoOpenedBrowser = false
+    @State private var hasAutoStartedLogin = false
     @State private var loginTask: Task<Void, Never>?
 
     @ObservedObject var authManager: AuthManager
@@ -62,15 +54,13 @@ struct LoginView: View {
                 if showSuccess {
                     // Success view
                     successView
-                } else if hostingOption == nil {
-                    // Step 1: Select hosting option
-                    hostingSelectionView
                 } else if authManager.deviceAuthCode != nil {
-                    // Step 3: Show code (after starting auth)
+                    // Show code (after starting auth)
                     deviceAuthCodeView
-                } else if hostingOption == .selfHosted {
-                    // Step 2: Ready to login (only for self-hosted)
-                    readyToLoginView
+                } else {
+                    // Waiting for auth to start
+                    ProgressView()
+                        .scaleEffect(0.8)
                 }
 
             }
@@ -95,58 +85,13 @@ struct LoginView: View {
                 VStack {
                     Spacer()
 
-                    // Terms and Privacy Policy text (only on hosting selection page)
-                    if hostingOption == nil {
-                        HStack(spacing: 4) {
-                            Text("By continuing, you agree to our")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Button("Terms of Service") {
-                                openBrowser(url: "https://pangolin.net/terms-of-service.html")
-                            }
-                            .font(.caption2)
-                            .buttonStyle(.plain)
-                            Text("and")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Button("Privacy Policy.") {
-                                openBrowser(url: "https://pangolin.net/privacy-policy.html")
-                            }
-                            .font(.caption2)
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.bottom, 8)
-                    }
-
                     HStack {
                         Spacer()
-
-                        if hostingOption != nil {
-                            Button("Back") {
-                                if authManager.deviceAuthCode != nil {
-                                    // Cancel the auth flow
-                                    authManager.deviceAuthCode = nil
-                                    authManager.deviceAuthLoginURL = nil
-                                } else {
-                                    hostingOption = nil
-                                    selfHostedURL = ""
-                                }
-                            }
-                            .disabled(isLoggingIn)
-                        }
 
                         Button("Cancel") {
                             closeWindow()
                         }
                         .keyboardShortcut(.cancelAction)
-
-                        if hostingOption != nil && authManager.deviceAuthCode == nil {
-                            Button("Log in") {
-                                performLogin()
-                            }
-                            .keyboardShortcut(.defaultAction)
-                            .disabled(isLoggingIn || !isReadyToLogin)
-                        }
                     }
                 }
             }
@@ -161,14 +106,10 @@ struct LoginView: View {
             }
         )
         .onAppear {
-            if authManager.startDeviceAuthImmediately {
+            if !hasAutoStartedLogin {
+                hasAutoStartedLogin = true
                 authManager.startDeviceAuthImmediately = false
-                let hostname = accountManager.activeAccount?.hostname ?? ""
-                if !hostname.isEmpty {
-                    hostingOption = .selfHosted
-                    selfHostedURL = hostname
-                    performLogin()
-                }
+                performLogin()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 guard NSApp.activationPolicy() != .regular else { return }
@@ -192,15 +133,6 @@ struct LoginView: View {
             if let window = notification.object as? NSWindow, window.identifier?.rawValue == "main"
             {
                 configureWindow(window)
-                if authManager.startDeviceAuthImmediately {
-                    authManager.startDeviceAuthImmediately = false
-                    let hostname = accountManager.activeAccount?.hostname ?? ""
-                    if !hostname.isEmpty {
-                        hostingOption = .selfHosted
-                        selfHostedURL = hostname
-                        performLogin()
-                    }
-                }
             }
         }
         .onChange(of: authManager.deviceAuthCode) { oldValue, newValue in
@@ -220,12 +152,6 @@ struct LoginView: View {
                 hasAutoOpenedBrowser = false
             }
         }
-        .onChange(of: hostingOption) { oldValue, newValue in
-            // Reset auto-open flag when hosting option changes
-            if newValue == nil {
-                hasAutoOpenedBrowser = false
-            }
-        }
         .onDisappear {
             // Reset state when view disappears
             resetLoginState()
@@ -239,93 +165,6 @@ struct LoginView: View {
                     guard NSApp.activationPolicy() != .accessory else { return }
                     NSApp.setActivationPolicy(.accessory)
                 }
-            }
-        }
-    }
-
-    private var hostingSelectionView: some View {
-        VStack(alignment: .center, spacing: 8) {
-            Button(action: {
-                hostingOption = .cloud
-                // Immediately start device auth flow for cloud
-                performLogin()
-            }) {
-                HStack {
-                    VStack(alignment: .center, spacing: 4) {
-                        Text("Pangolin Cloud")
-                            .font(.headline)
-                        Text("app.pangolin.net")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(
-                            isCloudButtonHovered ? Color.accentColor : Color.clear, lineWidth: 2)
-                )
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                isCloudButtonHovered = hovering
-            }
-
-            Button(action: {
-                hostingOption = .selfHosted
-                // Prefill with saved hostname if it exists and is not cloud
-                let savedHostname = accountManager.activeAccount?.hostname ?? ""
-
-                if !savedHostname.isEmpty && savedHostname != "https://app.pangolin.net" {
-                    selfHostedURL = savedHostname
-                }
-            }) {
-                HStack {
-                    VStack(alignment: .center, spacing: 4) {
-                        Text("Self-hosted or dedicated instance")
-                            .font(.headline)
-                        Text("Enter your custom hostname")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(
-                            isSelfHostedButtonHovered ? Color.accentColor : Color.clear,
-                            lineWidth: 2)
-                )
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                isSelfHostedButtonHovered = hovering
-            }
-        }
-    }
-
-    private var readyToLoginView: some View {
-        VStack(alignment: .center, spacing: 12) {
-            if hostingOption == .selfHosted {
-                Text("Pangolin Server URL")
-                    .font(.headline)
-
-                TextField("https://your-server.com", text: $selfHostedURL)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-            } else {
-                Text("Pangolin Cloud")
-                    .font(.headline)
-
-                Text("app.pangolin.net")
-                    .font(.body)
-                    .foregroundColor(.secondary)
             }
         }
     }
@@ -392,59 +231,13 @@ struct LoginView: View {
         .padding(.top, 30)
     }
 
-    private var isReadyToLogin: Bool {
-        if hostingOption == .cloud {
-            return true
-        } else if hostingOption == .selfHosted {
-            return !selfHostedURL.trimmingCharacters(in: .whitespaces).isEmpty
-        }
-        return false
-    }
-
     private func getCurrentHostname() -> String {
-        if hostingOption == .cloud {
-            return "https://app.pangolin.net"
-        } else if hostingOption == .selfHosted {
-            let url = selfHostedURL.trimmingCharacters(in: .whitespaces)
-            if !url.isEmpty {
-                // Normalize the URL
-                var normalized = url
-                if !normalized.hasPrefix("http://") && !normalized.hasPrefix("https://") {
-                    normalized = "https://" + normalized
-                }
-                normalized = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                return normalized
-            }
-        }
-
-        return accountManager.activeAccount?.hostname ?? ConfigManager.defaultHostname
+        return "https://app.pangolin.net"
     }
 
     private func performLogin() {
         isLoggingIn = true
-
-        // Determine hostname to use for login
-        let hostname: String?
-        if hostingOption == .cloud {
-            hostname = "https://app.pangolin.net"
-        } else if hostingOption == .selfHosted {
-            let url = selfHostedURL.trimmingCharacters(in: .whitespaces)
-            if url.isEmpty {
-                AlertManager.shared.showAlertDialog(
-                    title: "Error", message: "Please enter a server URL.")
-                isLoggingIn = false
-                return
-            }
-            // Normalize the URL
-            var normalized = url
-            if !normalized.hasPrefix("http://") && !normalized.hasPrefix("https://") {
-                normalized = "https://" + normalized
-            }
-            normalized = normalized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            hostname = normalized
-        } else {
-            hostname = nil
-        }
+        let hostname = "https://app.pangolin.net"
 
         loginTask = Task {
             do {
@@ -493,10 +286,9 @@ struct LoginView: View {
 
         // Reset local state
         isLoggingIn = false
-        hostingOption = nil
-        selfHostedURL = ""
         showSuccess = false
         hasAutoOpenedBrowser = false
+        hasAutoStartedLogin = false
     }
 
     private func configureWindow(_ window: NSWindow) {
