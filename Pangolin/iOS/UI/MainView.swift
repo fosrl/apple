@@ -145,7 +145,7 @@ struct HomeTabView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // Logo
-                    Image("PangolinLogo")
+                    Image("CNDFLogo")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 60)

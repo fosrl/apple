@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "pangolin-logo-dark.png",
+      "filename" : "cndf-logo-dark.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
@@ -12,12 +12,12 @@
           "value" : "light"
         }
       ],
-      "filename" : "pangolin-logo-light.png",
+      "filename" : "cndf-logo-light.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "pangolin-logo-dark@2x.png",
+      "filename" : "cndf-logo-dark@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
@@ -28,7 +28,7 @@
           "value" : "light"
         }
       ],
-      "filename" : "pangolin-logo-light@2x.png",
+      "filename" : "cndf-logo-light@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },

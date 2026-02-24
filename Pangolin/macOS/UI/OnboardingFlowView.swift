@@ -349,7 +349,7 @@ private struct MacOnboardingWelcomePageContent: View {
         VStack {
             Spacer(minLength: 24)
 
-            Image("PangolinLogo")
+            Image("CNDFLogo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(height: 60)
@@ -483,7 +483,7 @@ private struct MacOnboardingCompletionPageContent: View {
                 .padding(.horizontal)
 
             VStack(spacing: 12) {
-                Image("PangolinMenuBarIcon")
+                Image("CNDFMenuBarIcon")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(height: 44)

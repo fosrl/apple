@@ -51,7 +51,7 @@ struct AnimatedLoadingIcon: View {
 }
 
 @main
-struct PangolinApp: App {
+struct CNDFVPNApp: App {
     @StateObject private var configManager = ConfigManager()
     @StateObject private var secretManager = SecretManager()
     @StateObject private var accountManager = AccountManager()

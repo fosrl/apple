@@ -310,7 +310,7 @@ class TunnelManager: NSObject, ObservableObject {
 
     // MARK: - VPN Profile / Extension Helpers
 
-    /// Checks whether a NETunnelProviderManager for the Pangolin packet tunnel
+    /// Checks whether a NETunnelProviderManager for the CNDF-VPN packet tunnel
     /// extension already exists in the user's VPN configurations.
     func isVPNProfileInstalled() async -> Bool {
         await hasRegisteredExtension()

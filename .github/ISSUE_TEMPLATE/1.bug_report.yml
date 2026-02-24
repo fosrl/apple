@@ -15,7 +15,7 @@ body:
           description: Please fill out the relevant details below for your environment.
           value: |
               - OS Type & Version: (e.g., Ubuntu 22.04)
-              - Pangolin Version:
+              - CNDF-VPN Version:
               - Gerbil Version:
               - Traefik Version:
               - Newt Version:

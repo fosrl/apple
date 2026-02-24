@@ -29,7 +29,7 @@ struct LoginView: View {
             ScrollView {
                 VStack(spacing: 32) {
                     // Logo
-                    Image("PangolinLogo")
+                    Image("CNDFLogo")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 60)

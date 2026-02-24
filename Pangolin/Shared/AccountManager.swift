@@ -140,7 +140,7 @@ enum AccountStoreLocation {
             in: .userDomainMask
         )[0]
 
-        let dir = base.appendingPathComponent("Pangolin", isDirectory: true)
+        let dir = base.appendingPathComponent("CNDFVPN", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         return dir.appendingPathComponent("accounts.json")

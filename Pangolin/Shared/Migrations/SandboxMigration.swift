@@ -79,11 +79,11 @@ enum SandboxMigration {
         let containerPath = homeDirectory
             .appendingPathComponent("Library")
             .appendingPathComponent("Containers")
-            .appendingPathComponent("net.pangolin.Pangolin")
+            .appendingPathComponent("com.cndf.vpn")
             .appendingPathComponent("Data")
             .appendingPathComponent("Library")
             .appendingPathComponent("Application Support")
-            .appendingPathComponent("Pangolin", isDirectory: true)
+            .appendingPathComponent("CNDFVPN", isDirectory: true)
 
         // Check if the sandboxed path exists
         guard FileManager.default.fileExists(atPath: containerPath.path) else {
@@ -100,7 +100,7 @@ enum SandboxMigration {
             in: .userDomainMask
         )[0]
 
-        return appSupport.appendingPathComponent("Pangolin", isDirectory: true)
+        return appSupport.appendingPathComponent("CNDFVPN", isDirectory: true)
     }
 
     /// Migrates a single file from sandboxed to non-sandboxed location.

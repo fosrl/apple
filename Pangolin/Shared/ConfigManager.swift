@@ -25,12 +25,25 @@ class ConfigManager: ObservableObject {
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask
         ).first!
-        let pangolinDir = appSupport.appendingPathComponent("Pangolin", isDirectory: true)
+        let cndfDir = appSupport.appendingPathComponent("CNDFVPN", isDirectory: true)
+
+        // Migrate from old "Pangolin" directory if it exists
+        let oldDir = appSupport.appendingPathComponent("Pangolin", isDirectory: true)
+        if FileManager.default.fileExists(atPath: oldDir.path) && !FileManager.default.fileExists(atPath: cndfDir.path) {
+            try? FileManager.default.moveItem(at: oldDir, to: cndfDir)
+        }
 
         // Create directory if it doesn't exist
-        try? FileManager.default.createDirectory(at: pangolinDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: cndfDir, withIntermediateDirectories: true)
 
-        self.configPath = pangolinDir.appendingPathComponent("pangolin.json")
+        // Migrate old config file name if needed
+        let oldConfig = cndfDir.appendingPathComponent("pangolin.json")
+        let newConfig = cndfDir.appendingPathComponent("cndfvpn.json")
+        if FileManager.default.fileExists(atPath: oldConfig.path) && !FileManager.default.fileExists(atPath: newConfig.path) {
+            try? FileManager.default.moveItem(at: oldConfig, to: newConfig)
+        }
+
+        self.configPath = newConfig
         self.config = load()
         ensureDNSDefaults()
     }

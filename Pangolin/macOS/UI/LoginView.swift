@@ -70,7 +70,7 @@ struct LoginView: View {
             VStack {
                 HStack {
                     Spacer()
-                    Image("PangolinLogo")
+                    Image("CNDFLogo")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 60)

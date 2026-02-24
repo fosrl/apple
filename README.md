@@ -1,19 +1,18 @@
-# [Pangolin](https://pangolin.net) Client for Apple Devices
+# CNDF-VPN Client for Apple Devices
 
-This is the official Pangolin client with GUI for Apple devices. 
+This is the CNDF-VPN client with GUI for Apple devices.
 
-Pangolin Client is currently available for macOS and iOS/iPadOS devices via the App Store.
+CNDF-VPN Client is currently available for macOS and iOS/iPadOS devices.
 
 This client can be used with both:
 
-- [Pangolin Cloud](https://app.pangolin.net/auth/login) - Quickest and easiest way to get started using Pangolin.
-- [Self-hosted Pangolin](https://docs.pangolin.net/self-host/quick-install) - Fully self-hosted Community and Enterprise editions of Pangolin.
+- [Pangolin Cloud](https://app.pangolin.net/auth/login) - Quickest and easiest way to get started.
+- [Self-hosted Pangolin](https://docs.pangolin.net/self-host/quick-install) - Fully self-hosted Community and Enterprise editions.
 
 ## Download & Install
 
-- [Pangolin for macOS Installer](https://pangolin.net/downloads/mac) - This is the official page to download the latest installer file for macOS.
-- [Pangolin for iOS/iPadOS](https://pangolin.net/downloads/ios) - This is the official page to download the latest version of the Pangolin app for iOS/iPadOS via the App Store.
-- [All Versions](https://github.com/fosrl/apple/releases) - The releases section of this repository contains release notes and download artifacts for the latest version and all older versions.
+- [CNDF-VPN for macOS](https://cndfupdates.blob.core.windows.net/releases/) - Download the latest installer for macOS.
+- [All Versions](https://github.com/DanivosYoun/vpn-apple/releases) - Release notes and download artifacts.
 
 ## Compatibility
 

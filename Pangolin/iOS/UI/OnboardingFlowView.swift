@@ -145,7 +145,7 @@ private struct OnboardingWelcomePage: View {
         VStack {
             Spacer(minLength: 40)
 
-            Image("PangolinLogo")
+            Image("CNDFLogo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(height: 60)

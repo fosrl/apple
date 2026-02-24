@@ -2,8 +2,8 @@
 
 LEVEL=${1:-debug}
 
-echo "Tailing logs for subsystem: net.pangolin.Pangolin.PacketTunnel (level: $LEVEL)"
+echo "Tailing logs for subsystem: com.cndf.vpn (level: $LEVEL)"
 echo "Press Ctrl+C to stop"
 echo ""
 
-log stream --predicate 'subsystem == "net.pangolin.Pangolin" OR subsystem == "net.pangolin.Pangolin.PacketTunnel"' --level $LEVEL --style compact
+log stream --predicate 'subsystem == "com.cndf.vpn" OR subsystem == "com.cndf.vpn.PacketTunnel"' --level $LEVEL --style compact
