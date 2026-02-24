@@ -10,6 +10,7 @@ struct MenuBarView: View {
     @ObservedObject var tunnelManager: TunnelManager
     let updater: SPUUpdater
     @ObservedObject var onboardingViewModel: MacOnboardingViewModel
+    @ObservedObject var resourceManager: ResourceManager
     @ObservedObject private var checkForUpdatesViewModel: CheckForUpdatesViewModel
     @Environment(\.openWindow) private var openWindow
     @State private var menuOpenCount = 0
@@ -23,6 +24,7 @@ struct MenuBarView: View {
         tunnelManager: TunnelManager,
         updater: SPUUpdater,
         onboardingViewModel: MacOnboardingViewModel,
+        resourceManager: ResourceManager
     ) {
         self.configManager = configManager
         self.accountManager = accountManager
@@ -31,6 +33,7 @@ struct MenuBarView: View {
         self.tunnelManager = tunnelManager
         self.updater = updater
         self.onboardingViewModel = onboardingViewModel
+        self.resourceManager = resourceManager
         self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
     }
 
@@ -110,6 +113,7 @@ struct MenuBarView: View {
 
                 if authManager.isAuthenticated && !isLoggedOut {
                     OrganizationsMenu(authManager: authManager, tunnelManager: tunnelManager)
+                    ResourcesMenu(resourceManager: resourceManager)
                 }
 
             }
@@ -132,17 +136,7 @@ struct MenuBarView: View {
 
                 Divider()
 
-                // Copyright
-                Text("© \(String(Calendar.current.component(.year, from: Date()))) Fossorial, Inc.")
-                    .foregroundColor(.secondary)
-
-                Button("Terms of Service") {
-                    openURL("https://pangolin.net/terms-of-service.html")
-                }
-
-                Button("Privacy Policy") {
-                    openURL("https://pangolin.net/privacy-policy.html")
-                }
+                // Legal links will be added when available
 
                 Divider()
 
@@ -214,7 +208,7 @@ struct MenuBarView: View {
                 await MainActor.run {
                     NSApp.setActivationPolicy(.regular)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        NSApp.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                        NSApp.windows.first { $0.title == "CNDF-VPN Setup" }?.makeKeyAndOrderFront(nil)
                     }
                 }
             }
@@ -306,9 +300,10 @@ struct MenuBarView: View {
             }
         }
 
-        // Refresh organizations in background
+        // Refresh organizations and resources in background
         if authManager.isAuthenticated {
             await authManager.refreshOrganizations()
+            await resourceManager.refreshIfNeeded()
         }
     }
 
@@ -587,6 +582,106 @@ struct AccountsMenu: View {
     }
 }
 
+struct ResourcesMenu: View {
+    @ObservedObject var resourceManager: ResourceManager
+
+    var body: some View {
+        Menu("Resources") {
+            if resourceManager.isLoading {
+                Text("Loading...")
+                    .foregroundColor(.secondary)
+            } else if resourceManager.resourceGroups.isEmpty {
+                Text("No resources")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(resourceManager.resourceGroups) { group in
+                    Section(group.label) {
+                        ForEach(group.categories) { category in
+                            Menu(category.name) {
+                                ForEach(category.resources) { item in
+                                    ResourceMenuItem(
+                                        item: item,
+                                        resourceManager: resourceManager
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct ResourceMenuItem: View {
+    let item: CategorizedResource
+    @ObservedObject var resourceManager: ResourceManager
+    @State private var targets: [Target]?
+    @State private var isLoadingTargets = false
+
+    var body: some View {
+        Menu(item.displayName) {
+            if let subdomain = item.resource.subdomain, !subdomain.isEmpty {
+                Text("Alias: \(subdomain)")
+                    .foregroundColor(.secondary)
+            }
+
+            Text("Protocol: \(item.resource.protocol)")
+                .foregroundColor(.secondary)
+
+            if let proxyPort = item.resource.proxyPort {
+                Text("Port: \(proxyPort)")
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+
+            if isLoadingTargets {
+                Text("Loading targets...")
+                    .foregroundColor(.secondary)
+            } else if let targets = targets {
+                if targets.isEmpty {
+                    Text("No targets")
+                        .foregroundColor(.secondary)
+                } else {
+                    let tcpPorts = targets
+                        .filter { ($0.method ?? "").lowercased() == "tcp" }
+                        .compactMap { $0.port }
+                    let udpPorts = targets
+                        .filter { ($0.method ?? "").lowercased() == "udp" }
+                        .compactMap { $0.port }
+                    let icmpTargets = targets
+                        .filter { ($0.method ?? "").lowercased() == "icmp" }
+
+                    if !tcpPorts.isEmpty {
+                        Text("TCP: \(tcpPorts.map(String.init).joined(separator: ", "))")
+                            .foregroundColor(.secondary)
+                    }
+                    if !udpPorts.isEmpty {
+                        Text("UDP: \(udpPorts.map(String.init).joined(separator: ", "))")
+                            .foregroundColor(.secondary)
+                    }
+                    if !icmpTargets.isEmpty {
+                        Text("ICMP")
+                            .foregroundColor(.secondary)
+                    }
+                    if tcpPorts.isEmpty && udpPorts.isEmpty && icmpTargets.isEmpty {
+                        ForEach(targets) { target in
+                            Text("\(target.ip):\(target.port ?? 0)")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            isLoadingTargets = true
+            targets = await resourceManager.fetchTargets(for: item.resource.resourceId)
+            isLoadingTargets = false
+        }
+    }
+}
+
 struct ConnectButtonItem: View {
     @ObservedObject var tunnelManager: TunnelManager
     @ObservedObject var onboardingViewModel: MacOnboardingViewModel
@@ -605,7 +700,7 @@ struct ConnectButtonItem: View {
                         onboardingViewModel.hasOpenedOnboardingWindowThisSession = true
                         openWindow(id: "onboarding")
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            NSApplication.shared.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                            NSApplication.shared.windows.first { $0.title == "CNDF-VPN Setup" }?.makeKeyAndOrderFront(nil)
                         }
                         return
                     }

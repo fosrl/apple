@@ -56,7 +56,7 @@ struct AboutContentView: View {
                         
                         Link(destination: URL(string: "https://docs.pangolin.net/about/how-pangolin-works")!) {
                             HStack {
-                                Text("How Pangolin Works")
+                                Text("How CNDF-VPN Works")
                                     .font(.system(size: 13))
                                 Spacer()
                                 Image(systemName: "arrow.up.forward")
@@ -69,33 +69,7 @@ struct AboutContentView: View {
                         Text("Resources")
                     }
                     
-                    Section {
-                        Link(destination: URL(string: "https://pangolin.net/terms-of-service.html")!) {
-                            HStack {
-                                Text("Terms of Service")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Image(systemName: "arrow.up.forward")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .foregroundColor(.accentColor)
-                        
-                        Link(destination: URL(string: "https://pangolin.net/privacy-policy.html")!) {
-                            HStack {
-                                Text("Privacy Policy")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Image(systemName: "arrow.up.forward")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .foregroundColor(.accentColor)
-                    } header: {
-                        Text("Legal")
-                    }
+                    // Legal section will be added when links are available
                 }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)

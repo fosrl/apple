@@ -377,6 +377,40 @@ struct UpdateMetadataResponse: Codable {
     let status: String
 }
 
+// MARK: - Resources
+
+struct Resource: Codable, Identifiable {
+    var id: Int { resourceId }
+    let resourceId: Int
+    let name: String
+    let subdomain: String?
+    let http: Bool
+    let `protocol`: String
+    let proxyPort: Int?
+    let enabled: Bool
+    let sso: Bool?
+    let domainId: String?
+    let niceId: String?
+}
+
+struct ListResourcesResponse: Codable {
+    let resources: [Resource]
+    let pagination: Pagination?
+}
+
+struct Target: Codable, Identifiable {
+    var id: Int { targetId }
+    let targetId: Int
+    let ip: String
+    let port: Int?
+    let method: String?
+    let enabled: Bool?
+}
+
+struct ListTargetsResponse: Codable {
+    let targets: [Target]
+}
+
 // MARK: - Server Info
 
 struct ServerInfo: Codable {

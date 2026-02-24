@@ -10,8 +10,10 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleDisplayName</key>
+	<string>CNDF-VPN</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>CNDF-VPN</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -32,15 +34,15 @@
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://static.pangolin.net/mac-client/appcast.xml</string>
+	<string>https://cndfupdates.blob.core.windows.net/releases/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>it0RcWHf76QE8eC1HVDTy2nP3xi7NrcyZRaW7F7jQtE=</string>
+	<string>M9To2s0ELQ78i67AhaS8Mya2dwvOq+ci5pgnRoasQSM=</string>
 	<key>CFBundleURLTypes</key>
 	<array>
     	<dict>
         	<key>CFBundleURLSchemes</key>
 			<array>
-				<string>pangolin</string>
+				<string>cndf-vpn</string>
 			</array>
 		</dict>
 	</array>

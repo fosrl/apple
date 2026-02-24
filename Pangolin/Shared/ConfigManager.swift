@@ -12,7 +12,7 @@ class ConfigManager: ObservableObject {
     private let defaultPrimaryDNS = "1.1.1.1"
 
     private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
         return OSLog(subsystem: subsystem, category: "ConfigManager")
     }()
 

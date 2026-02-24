@@ -422,28 +422,7 @@ private struct MacOnboardingPrivacyPageContent: View {
 
             Spacer()
 
-            if let termsURL = URL(string: "https://pangolin.net/terms-of-service.html"),
-               let privacyURL = URL(string: "https://pangolin.net/privacy-policy.html") {
-                let attributed: AttributedString = {
-                    var string = AttributedString(
-                        "By continuing, you agree to our Terms of Service and Privacy Policy."
-                    )
-                    if let range = string.range(of: "Terms of Service") {
-                        string[range].link = termsURL
-                    }
-                    if let range = string.range(of: "Privacy Policy") {
-                        string[range].link = privacyURL
-                    }
-                    return string
-                }()
-
-                Text(attributed)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-            }
+            // Legal links will be added when available
             Spacer().frame(minHeight: 16)
         }
     }

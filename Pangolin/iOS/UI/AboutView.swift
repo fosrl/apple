@@ -48,7 +48,7 @@ struct AboutView: View {
                     
                     Link(destination: URL(string: "https://docs.pangolin.net/about/how-pangolin-works")!) {
                         HStack {
-                            Text("How Pangolin Works")
+                            Text("How CNDF-VPN Works")
                             Spacer()
                             Image(systemName: "arrow.up.forward")
                                 .foregroundColor(.secondary)
@@ -59,29 +59,7 @@ struct AboutView: View {
                     Text("Documentation")
                 }
                 
-                Section {
-                    Link(destination: URL(string: "https://pangolin.net/terms-of-service.html")!) {
-                        HStack {
-                            Text("Terms of Service")
-                            Spacer()
-                            Image(systemName: "arrow.up.forward")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        }
-                    }
-                    
-                    Link(destination: URL(string: "https://pangolin.net/privacy-policy.html")!) {
-                        HStack {
-                            Text("Privacy Policy")
-                            Spacer()
-                            Image(systemName: "arrow.up.forward")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        }
-                    }
-                } header: {
-                    Text("Legal")
-                }
+                // Legal section removed for CNDF-VPN rebrand
             }
             .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)

@@ -60,6 +60,7 @@ struct PangolinApp: App {
     @StateObject private var tunnelManager: TunnelManager
     @StateObject private var onboardingStateManager: OnboardingStateManager
     @StateObject private var onboardingViewModel: MacOnboardingViewModel
+    @StateObject private var resourceManager: ResourceManager
 
     private let updaterController: SPUStandardUpdaterController
 
@@ -103,6 +104,8 @@ struct PangolinApp: App {
             accountManager: accountMgr
         )
 
+        let resMgr = ResourceManager(apiClient: client, authManager: authMgr)
+
         _configManager = StateObject(wrappedValue: configMgr)
         _secretManager = StateObject(wrappedValue: secretMgr)
         _accountManager = StateObject(wrappedValue: accountMgr)
@@ -111,6 +114,7 @@ struct PangolinApp: App {
         _tunnelManager = StateObject(wrappedValue: tunnelMgr)
         _onboardingStateManager = StateObject(wrappedValue: onboardingState)
         _onboardingViewModel = StateObject(wrappedValue: onboardingVM)
+        _resourceManager = StateObject(wrappedValue: resMgr)
     }
 
     var body: some Scene {
@@ -122,7 +126,8 @@ struct PangolinApp: App {
                 authManager: authManager,
                 tunnelManager: tunnelManager,
                 updater: updaterController.updater,
-                onboardingViewModel: onboardingViewModel
+                onboardingViewModel: onboardingViewModel,
+                resourceManager: resourceManager
             )
             .onAppear {
                 // Set activation policy to accessory (menu bar only) when not showing onboarding
@@ -167,7 +172,7 @@ struct PangolinApp: App {
         }
 
         // Onboarding Window
-        WindowGroup("Pangolin Setup", id: "onboarding") {
+        WindowGroup("CNDF-VPN Setup", id: "onboarding") {
             MacOnboardingFlowView(viewModel: onboardingViewModel)
                 .handlesExternalEvents(preferring: ["onboarding"], allowing: ["onboarding"])
         }

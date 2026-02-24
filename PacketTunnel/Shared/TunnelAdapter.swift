@@ -77,7 +77,7 @@ private struct IPv6RouteJSON: Codable {
 public class TunnelAdapter {
     private weak var packetTunnelProvider: NEPacketTunnelProvider?
     private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn.PacketTunnel"
         return OSLog(subsystem: subsystem, category: "TunnelAdapter")
     }()
 
@@ -98,12 +98,12 @@ public class TunnelAdapter {
         #if os(iOS)
             let agent: String
             if UIDevice.current.userInterfaceIdiom == .pad {
-                agent = "Pangolin iPadOS"
+                agent = "CNDF-VPN iPadOS"
             } else {
-                agent = "Pangolin iOS"
+                agent = "CNDF-VPN iOS"
             }
         #else
-            let agent = "Pangolin macOS"
+            let agent = "CNDF-VPN macOS"
         #endif
 
         // Use the shared function to get the platform-appropriate socket path
@@ -411,7 +411,7 @@ public class TunnelAdapter {
             "Starting network settings polling (interval: %.1f seconds)", log: logger, type: .debug,
             pollInterval)
 
-        let queue = DispatchQueue(label: "com.pangolin.tunnel.settings-poll", qos: .utility)
+        let queue = DispatchQueue(label: "com.cndf.vpn.tunnel.settings-poll", qos: .utility)
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
         timer.setEventHandler { [weak self] in

@@ -12,7 +12,7 @@
 		907A6C862F05AE620097F387 /* PacketTunneliOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 907A6C7C2F05AE620097F387 /* PacketTunneliOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		907A6C942F05AFE60097F387 /* libpangolin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 907A6C932F05AFE60097F387 /* libpangolin.a */; };
 		90D1973A2EC96BEC00912E68 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90D1911A2EC9248100912E68 /* NetworkExtension.framework */; };
-		90D197442EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		90D197442EC96BEC00912E68 /* com.cndf.vpn.PacketTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 90D197392EC96BEC00912E68 /* com.cndf.vpn.PacketTunnel.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -88,7 +88,7 @@
 			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
 			dstSubfolderSpec = 16;
 			files = (
-				90D197442EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension in Embed System Extensions */,
+				90D197442EC96BEC00912E68 /* com.cndf.vpn.PacketTunnel.systemextension in Embed System Extensions */,
 			);
 			name = "Embed System Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -101,7 +101,7 @@
 		907A6C932F05AFE60097F387 /* libpangolin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libpangolin.a; path = PangolinGo/libpangolin.a; sourceTree = "<group>"; };
 		90BC22B42EBC6C1D0072B44A /* Pangolin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pangolin.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		90D1911A2EC9248100912E68 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
-		90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = net.pangolin.Pangolin.PacketTunnel.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
+		90D197392EC96BEC00912E68 /* com.cndf.vpn.PacketTunnel.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.cndf.vpn.PacketTunnel.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -258,7 +258,7 @@
 			isa = PBXGroup;
 			children = (
 				90BC22B42EBC6C1D0072B44A /* Pangolin.app */,
-				90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */,
+				90D197392EC96BEC00912E68 /* com.cndf.vpn.PacketTunnel.systemextension */,
 				907A6C5E2F05ACAF0097F387 /* PangoliniOS.app */,
 				907A6C7C2F05AE620097F387 /* PacketTunneliOS.appex */,
 			);
@@ -366,7 +366,7 @@
 			packageProductDependencies = (
 			);
 			productName = PacketTunnel;
-			productReference = 90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */;
+			productReference = 90D197392EC96BEC00912E68 /* com.cndf.vpn.PacketTunnel.systemextension */;
 			productType = "com.apple.product-type.system-extension";
 		};
 /* End PBXNativeTarget section */
@@ -543,7 +543,7 @@
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -589,7 +589,7 @@
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -632,7 +632,7 @@
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn.ios.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -675,7 +675,7 @@
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn.ios.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -868,8 +868,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.6.0;
 				OTHER_LDFLAGS = "-lpangolin";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn;
+				PRODUCT_NAME = "CNDF-VPN";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Pangolin Profile 2";
 				REGISTER_APP_GROUPS = YES;
@@ -938,8 +938,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.6.0;
 				OTHER_LDFLAGS = "-lpangolin";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn;
+				PRODUCT_NAME = "CNDF-VPN";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Pangolin Profile 2";
 				REGISTER_APP_GROUPS = YES;
@@ -996,7 +996,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.6.0;
 				OTHER_LDFLAGS = "-lpangolin";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Tunnel Packet Profile 2";
@@ -1053,7 +1053,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.6.0;
 				OTHER_LDFLAGS = "-lpangolin";
-				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cndf.vpn.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "Tunnel Packet Profile 2";

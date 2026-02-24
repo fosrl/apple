@@ -7,7 +7,7 @@ func getSocketPath() -> String {
     #if os(iOS)
     // On iOS, use a path in the app's container directory (accessible in network extensions)
     // Use the app group container if available, otherwise use a temp directory
-    if let appGroupContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.net.pangolin.Pangolin") {
+    if let appGroupContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.cndf.vpn") {
         return appGroupContainer.appendingPathComponent("olm.sock").path
     } else {
         // Fallback to temp directory if app group is not available

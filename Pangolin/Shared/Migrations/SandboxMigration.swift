@@ -6,7 +6,7 @@ import os.log
 /// This migration is needed when upgrading from a sandboxed version to a non-sandboxed version.
 enum SandboxMigration {
     private static let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
         return OSLog(subsystem: subsystem, category: "SandboxMigration")
     }()
 

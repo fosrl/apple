@@ -5,11 +5,11 @@ import Security
 class SecretManager: ObservableObject {
     private let service: String = {
         #if os(iOS)
-        return "Pangolin: pangolin-iOS"
+        return "CNDF-VPN: cndf-vpn-iOS"
         #elseif os(macOS)
-        return "Pangolin: pangolin-macOS"
+        return "CNDF-VPN: cndf-vpn-macOS"
         #else
-        return "Pangolin"
+        return "CNDF-VPN"
         #endif
     }()
 

@@ -23,11 +23,11 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSSystemExtensionUsageDescription</key>
-	<string>Pangolin requires a system extension to provide secure network tunneling capabilities.</string>
+	<string>CNDF-VPN requires a system extension to provide secure network tunneling capabilities.</string>
 	<key>NetworkExtension</key>
 	<dict>
 		<key>NEMachServiceName</key>
-		<string>group.net.pangolin.Pangolin.PacketTunnel</string>
+		<string>group.com.cndf.vpn.PacketTunnel</string>
 		<key>NEProviderClasses</key>
 		<dict>
 			<key>com.apple.networkextension.packet-tunnel</key>

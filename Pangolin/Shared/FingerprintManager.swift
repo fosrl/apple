@@ -20,7 +20,7 @@ class FingerprintManager {
     private var task: Task<Void, Never>?
 
     private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
         return OSLog(subsystem: subsystem, category: "FingerprintManager")
     }()
 
@@ -415,7 +415,7 @@ class FingerprintManager {
 
     #if os(iOS)
         private func getOrCreatePersistentUUID() -> String {
-            let key = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+            let key = Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
             os_log("getOrCreatePersistentUUID() - Key: %{public}@", log: logger, type: .debug, key)
 
             if let existing = KeychainHelper.shared.get(key: key) {

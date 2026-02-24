@@ -34,7 +34,7 @@ class AuthManager: ObservableObject {
     private var deviceAuthTask: Task<Void, Error>?
 
     private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
         return OSLog(subsystem: subsystem, category: "AuthManager")
     }()
 
@@ -145,14 +145,14 @@ class AuthManager: ObservableObject {
                 #if os(iOS)
                     let applicationName: String
                     if UIDevice.current.userInterfaceIdiom == .pad {
-                        applicationName = "Pangolin iPadOS Client"
+                        applicationName = "CNDF-VPN iPadOS Client"
                     } else {
-                        applicationName = "Pangolin iOS Client"
+                        applicationName = "CNDF-VPN iOS Client"
                     }
                 #elseif os(macOS)
-                    let applicationName = "Pangolin macOS Client"
+                    let applicationName = "CNDF-VPN macOS Client"
                 #else
-                    let applicationName = "Pangolin Client"
+                    let applicationName = "CNDF-VPN Client"
                 #endif
 
                 let startResponse = try await loginApiClient.startDeviceAuth(
@@ -171,7 +171,7 @@ class AuthManager: ObservableObject {
 
                 // Show notification with code
                 let content = UNMutableNotificationContent()
-                content.title = "Pangolin Login"
+                content.title = "CNDF-VPN Login"
                 content.body = "Enter code: \(code)"
                 content.sound = .default
 
@@ -737,7 +737,7 @@ class AuthManager: ObservableObject {
                     await MainActor.run {
                         AlertManager.shared.showErrorDialog(
                             NSError(
-                                domain: "Pangolin", code: -1,
+                                domain: "CNDF-VPN", code: -1,
                                 userInfo: [
                                     NSLocalizedDescriptionKey: "Failed to save OLM credentials"
                                 ])

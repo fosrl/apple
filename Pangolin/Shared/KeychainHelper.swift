@@ -62,6 +62,6 @@ final class KeychainHelper {
     // MARK: - Private
 
     private func serviceName() -> String {
-        Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
     }
 }

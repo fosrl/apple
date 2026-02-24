@@ -13,9 +13,9 @@ class TunnelManager: NSObject, ObservableObject {
 
     private var tunnelManager: NETunnelProviderManager?
     #if os(iOS)
-        private let bundleIdentifier = "net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS"
+        private let bundleIdentifier = "com.cndf.vpn.ios.PacketTunnel"
     #else
-        private let bundleIdentifier = "net.pangolin.Pangolin.PacketTunnel"
+        private let bundleIdentifier = "com.cndf.vpn.PacketTunnel"
     #endif
     private var statusObserver: NSObjectProtocol?
     #if os(macOS)
@@ -24,7 +24,7 @@ class TunnelManager: NSObject, ObservableObject {
     #endif
 
     // Version tracking for extension updates
-    private let extensionVersionKey = "net.pangolin.Pangolin.PacketTunnel.lastKnownVersion"
+    private let extensionVersionKey = "com.cndf.vpn.PacketTunnel.lastKnownVersion"
 
     private let configManager: ConfigManager
     private let accountManager: AccountManager
@@ -39,7 +39,7 @@ class TunnelManager: NSObject, ObservableObject {
     let fingerprintManager: FingerprintManager
 
     private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
         return OSLog(subsystem: subsystem, category: "TunnelManager")
     }()
 
@@ -386,10 +386,10 @@ class TunnelManager: NSObject, ObservableObject {
         // Configure the tunnel protocol
         let protocolConfiguration = NETunnelProviderProtocol()
         protocolConfiguration.providerBundleIdentifier = bundleIdentifier
-        protocolConfiguration.serverAddress = "Pangolin"  // Use a descriptive name, not bundle ID
+        protocolConfiguration.serverAddress = "CNDF-VPN"  // Use a descriptive name, not bundle ID
 
         manager.protocolConfiguration = protocolConfiguration
-        manager.localizedDescription = "Pangolin"
+        manager.localizedDescription = "CNDF-VPN"
         manager.isEnabled = true
 
         do {

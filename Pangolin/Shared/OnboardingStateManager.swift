@@ -3,13 +3,13 @@ import Combine
 
 final class OnboardingStateManager: ObservableObject {
     private enum Keys {
-        static let hasSeenWelcome = "net.pangolin.Pangolin.Onboarding.hasSeenWelcome"
+        static let hasSeenWelcome = "com.cndf.vpn.Onboarding.hasSeenWelcome"
         static let hasAcknowledgedPrivacy =
-            "net.pangolin.Pangolin.Onboarding.hasAcknowledgedPrivacy"
+            "com.cndf.vpn.Onboarding.hasAcknowledgedPrivacy"
         static let hasCompletedVPNInstallOnboarding =
-            "net.pangolin.Pangolin.Onboarding.hasCompletedVPNInstallOnboarding"
+            "com.cndf.vpn.Onboarding.hasCompletedVPNInstallOnboarding"
         static let hasCompletedSystemExtensionOnboarding =
-            "net.pangolin.Pangolin.Onboarding.hasCompletedSystemExtensionOnboarding"
+            "com.cndf.vpn.Onboarding.hasCompletedSystemExtensionOnboarding"
     }
 
     private let userDefaults: UserDefaults
@@ -18,7 +18,7 @@ final class OnboardingStateManager: ObservableObject {
         self.userDefaults = userDefaults
     }
 
-    /// Whether the user has seen the initial "Welcome to Pangolin" screen.
+    /// Whether the user has seen the initial "Welcome to CNDF-VPN" screen.
     var hasSeenWelcome: Bool {
         get { userDefaults.bool(forKey: Keys.hasSeenWelcome) }
         set { userDefaults.set(newValue, forKey: Keys.hasSeenWelcome) }

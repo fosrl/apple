@@ -51,7 +51,7 @@ struct PreferencesContentView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Enable Aliases (DNS Override)")
                                     .font(.system(size: 13))
-                                Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a Pangolin resource will be forwarded to your configured Upstream DNS Server.")
+                                Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a CNDF-VPN resource will be forwarded to your configured Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
@@ -70,7 +70,7 @@ struct PreferencesContentView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("DNS Over Tunnel")
                                     .font(.system(size: 13))
-                                Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a Pangolin resource and enter its address as an Upstream DNS Server.")
+                                Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a CNDF-VPN resource and enter its address as an Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }

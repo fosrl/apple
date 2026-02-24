@@ -12,7 +12,7 @@ class NetworkTransitionMonitor {
     private var wasUnsatisfied = false
     
     private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn.PacketTunnel"
         return OSLog(subsystem: subsystem, category: "NetworkTransitionMonitor")
     }()
     

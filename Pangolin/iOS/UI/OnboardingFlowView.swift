@@ -151,13 +151,13 @@ private struct OnboardingWelcomePage: View {
                 .frame(height: 60)
                 .padding(.bottom, 24)
 
-            Text("Welcome to Pangolin")
+            Text("Welcome to CNDF-VPN")
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .padding(.bottom, 8)
 
             Text(
-                "Pangolin securely connects your devices to your private networks, so you can safely access internal apps and resources from anywhere."
+                "CNDF-VPN securely connects your devices to your private networks, so you can safely access internal apps and resources from anywhere."
             )
             .font(.body)
             .foregroundColor(.secondary)
@@ -188,7 +188,7 @@ private struct OnboardingWelcomePage: View {
             // Footer help text (kept above the page indicator)
             if let docsURL = URL(string: "https://docs.pangolin.net/about/how-pangolin-works") {
                 HStack(spacing: 4) {
-                    Text("New to Pangolin?")
+                    Text("New to CNDF-VPN?")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Link("Learn more.", destination: docsURL)
@@ -230,7 +230,7 @@ private struct OnboardingPrivacyPage: View {
                     "Your traffic is end-to-end encrypted and is never readable by us or anyone outside your network."
                 )
                 Text(
-                    "If you're using a self-hosted Pangolin server, all data remains on your server and is never sent to our servers."
+                    "If you're using a self-hosted CNDF-VPN server, all data remains on your server and is never sent to our servers."
                 )
             }
             .font(.body)
@@ -259,33 +259,8 @@ private struct OnboardingPrivacyPage: View {
             .controlSize(.large)
             .padding(.top, 4)
 
-            // Footer help text (kept above the page indicator)
-            if let termsURL = URL(string: "https://pangolin.net/terms-of-service.html"),
-               let privacyURL = URL(string: "https://pangolin.net/privacy-policy.html") {
-                let attributed: AttributedString = {
-                    var string = AttributedString(
-                        "By continuing, you agree to our Terms of Service and Privacy Policy."
-                    )
-                    if let range = string.range(of: "Terms of Service") {
-                        string[range].link = termsURL
-                    }
-                    if let range = string.range(of: "Privacy Policy") {
-                        string[range].link = privacyURL
-                    }
-                    return string
-                }()
-
-                Text(attributed)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                    .padding(.top, 12)
-                    // Extra bottom padding so dots don't overlap the help text
-                    .padding(.bottom, 56)
-            } else {
-                Spacer().frame(height: 56)
-            }
+            // Terms/privacy footer removed for CNDF-VPN rebrand
+            Spacer().frame(height: 56)
         }
     }
 }
@@ -312,7 +287,7 @@ private struct OnboardingInstallVPNPage: View {
                 .padding(.bottom, 8)
 
             Text(
-                "Pangolin needs to add a VPN configuration so it can securely route traffic to devices and services on your private network."
+                "CNDF-VPN needs to add a VPN configuration so it can securely route traffic to devices and services on your private network."
             )
             .font(.body)
             .foregroundColor(.secondary)

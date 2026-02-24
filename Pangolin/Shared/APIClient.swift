@@ -60,13 +60,13 @@ class APIClient: ObservableObject {
         let platform = "Unknown"
         #endif
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
-        return "pangolin-\(platform)-\(version)"
+        return "cndf-vpn-\(platform)-\(version)"
     }
     
     private let session: URLSession
     
     private let logger: OSLog = {
-        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        let subsystem = Bundle.main.bundleIdentifier ?? "com.cndf.vpn"
         return OSLog(subsystem: subsystem, category: "APIClient")
     }()
     
@@ -419,6 +419,25 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    // MARK: - Resources
+
+    func listResources(orgId: String) async throws -> ListResourcesResponse {
+        let (data, response) = try await makeRequest(
+            method: "GET",
+            path: "/org/\(orgId)/resources",
+            queryParams: ["pageSize": "200"]
+        )
+        return try parseResponse(data, response)
+    }
+
+    func listTargets(resourceId: Int) async throws -> ListTargetsResponse {
+        let (data, response) = try await makeRequest(
+            method: "GET",
+            path: "/resource/\(resourceId)/targets"
+        )
+        return try parseResponse(data, response)
+    }
+
     // MARK: - Server Info
     
     func getServerInfo() async throws -> ServerInfo {

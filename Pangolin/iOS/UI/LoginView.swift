@@ -129,7 +129,7 @@ struct LoginView: View {
             }) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Pangolin Cloud")
+                        Text("CNDF-VPN Cloud")
                             .font(.headline)
                         Text("app.pangolin.net")
                             .font(.subheadline)
@@ -174,26 +174,7 @@ struct LoginView: View {
             }
             .buttonStyle(.plain)
 
-            // Terms and Privacy Policy
-            HStack(spacing: 4) {
-                Text("By continuing, you agree to our")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Button("Terms of Service") {
-                    openBrowser(url: "https://pangolin.net/terms-of-service.html")
-                }
-                .font(.caption)
-                .buttonStyle(.plain)
-                Text("and")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Button("Privacy Policy.") {
-                    openBrowser(url: "https://pangolin.net/privacy-policy.html")
-                }
-                .font(.caption)
-                .buttonStyle(.plain)
-            }
-            .padding(.top, 8)
+            // Terms and Privacy Policy (removed for CNDF-VPN rebrand)
         }
     }
 
@@ -213,7 +194,7 @@ struct LoginView: View {
                 }
             } else {
                 VStack(spacing: 8) {
-                    Text("Pangolin Cloud")
+                    Text("CNDF-VPN Cloud")
                         .font(.headline)
                     Text("app.pangolin.net")
                         .font(.body)
@@ -413,7 +394,7 @@ struct LoginView: View {
         
         let session = ASWebAuthenticationSession(
             url: url,
-            callbackURLScheme: "pangolin"
+            callbackURLScheme: "cndf-vpn"
         ) { callbackURL, error in
             // Handle callback if needed (for OAuth flows)
             // For device auth, we just need to show the page, not handle redirects

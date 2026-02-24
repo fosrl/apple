@@ -426,7 +426,7 @@ struct HomeTabView: View {
                         if let docsURL = URL(string: "https://docs.pangolin.net/about/how-pangolin-works") {
                             Link(destination: docsURL) {
                                 HStack {
-                                    Text("How Pangolin Works")
+                                    Text("How CNDF-VPN Works")
                                         .foregroundColor(.primary)
                                     
                                     Spacer()
