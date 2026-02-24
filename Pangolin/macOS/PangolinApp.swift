@@ -140,7 +140,7 @@ struct PangolinApp: App {
         }
 
         // Main Window (Login)
-        WindowGroup("Pangolin", id: "main") {
+        WindowGroup("CNDF-VPN", id: "main") {
             LoginView(
                 authManager: authManager,
                 accountManager: accountManager,
@@ -152,7 +152,7 @@ struct PangolinApp: App {
                 // Ensure window has correct identifier
                 DispatchQueue.main.async {
                     if let window = NSApplication.shared.windows.first(where: {
-                        $0.title == "Pangolin"
+                        $0.title == "CNDF-VPN"
                     }) {
                         window.identifier = NSUserInterfaceItemIdentifier("main")
                     }

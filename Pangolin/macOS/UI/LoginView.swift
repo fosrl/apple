@@ -114,10 +114,10 @@ struct LoginView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 guard NSApp.activationPolicy() != .regular else { return }
                 NSApp.setActivationPolicy(.regular)
-                if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }) {
+                if let window = NSApplication.shared.windows.first(where: { $0.title == "CNDF-VPN" }) {
                     configureWindow(window)
                     let duplicates = NSApplication.shared.windows.filter { w in
-                        (w.identifier?.rawValue == "main" || w.title == "Pangolin") && w != window
+                        (w.identifier?.rawValue == "main" || w.title == "CNDF-VPN") && w != window
                     }
                     for duplicate in duplicates {
                         duplicate.close()

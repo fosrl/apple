@@ -2,13 +2,13 @@
   "fill-specializations" : [
     {
       "value" : {
-        "solid" : "display-p3:0.09412,0.09412,0.10588,1.00000"
+        "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
       }
     },
     {
       "appearance" : "dark",
       "value" : {
-        "solid" : "srgb:0.09412,0.09412,0.10588,1.00000"
+        "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
       }
     }
   ],
@@ -19,13 +19,13 @@
       "layers" : [
         {
           "glass" : false,
-          "image-name" : "pangolin_orange.svg",
-          "name" : "pangolin_orange",
+          "image-name" : "cndf_logo.svg",
+          "name" : "cndf_logo",
           "position" : {
-            "scale" : 0.82,
+            "scale" : 0.85,
             "translation-in-points" : [
-              3,
-              -1
+              0,
+              0
             ]
           }
         }

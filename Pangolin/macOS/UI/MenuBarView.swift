@@ -38,7 +38,7 @@ struct MenuBarView: View {
         Group {
             // When onboarding is needed, show only a minimal menu (don't load full menu)
             if onboardingViewModel.isPresenting {
-                Button("Open Pangolin Setup") {
+                Button("Open CNDF-VPN Setup") {
                     openWindow(id: "onboarding")
                 }
             } else if authManager.isInitializing {
@@ -122,7 +122,7 @@ struct MenuBarView: View {
                 Text("Support")
                     .foregroundColor(.secondary)
 
-                Button("How Pangolin Works") {
+                Button("How CNDF-VPN Works") {
                     openURL("https://docs.pangolin.net/about/how-pangolin-works")
                 }
 
@@ -326,13 +326,13 @@ struct MenuBarView: View {
 
         // Find existing window by identifier or title
         let existingWindow = NSApplication.shared.windows.first { window in
-            window.identifier?.rawValue == "main" || window.title == "Pangolin"
+            window.identifier?.rawValue == "main" || window.title == "CNDF-VPN"
         }
 
         if let window = existingWindow {
             // Window exists - close any duplicates first
             let allMainWindows = NSApplication.shared.windows.filter { w in
-                (w.identifier?.rawValue == "main" || w.title == "Pangolin") && w != window
+                (w.identifier?.rawValue == "main" || w.title == "CNDF-VPN") && w != window
             }
             for duplicateWindow in allMainWindows {
                 duplicateWindow.close()
@@ -373,7 +373,7 @@ struct MenuBarView: View {
             // Use a small delay to ensure the window is created, but check for existence first
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 if let window = NSApplication.shared.windows.first(where: {
-                    $0.identifier?.rawValue == "main" || $0.title == "Pangolin"
+                    $0.identifier?.rawValue == "main" || $0.title == "CNDF-VPN"
                 }) {
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()

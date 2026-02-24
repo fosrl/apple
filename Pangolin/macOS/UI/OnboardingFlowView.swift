@@ -140,7 +140,7 @@ final class MacOnboardingViewModel: ObservableObject {
 
     @MainActor
     private func closeOnboardingWindow() {
-        if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin Setup" }) {
+        if let window = NSApplication.shared.windows.first(where: { $0.title == "CNDF-VPN Setup" }) {
             window.close()
         }
     }
@@ -231,7 +231,7 @@ struct MacOnboardingFlowView: View {
         )
         .onAppear {
             DispatchQueue.main.async {
-                NSApplication.shared.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                NSApplication.shared.windows.first { $0.title == "CNDF-VPN Setup" }?.makeKeyAndOrderFront(nil)
             }
         }
     }
@@ -355,13 +355,13 @@ private struct MacOnboardingWelcomePageContent: View {
                 .frame(height: 60)
                 .padding(.bottom, 24)
 
-            Text("Welcome to Pangolin")
+            Text("Welcome to CNDF-VPN")
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .padding(.bottom, 8)
 
             Text(
-                "Pangolin securely connects your devices to your private networks, so you can safely access internal apps and resources from anywhere."
+                "CNDF-VPN securely connects your devices to your private networks, so you can safely access internal apps and resources from anywhere."
             )
             .font(.body)
             .foregroundColor(.secondary)
@@ -372,7 +372,7 @@ private struct MacOnboardingWelcomePageContent: View {
 
             if let docsURL = URL(string: "https://docs.pangolin.net/about/how-pangolin-works") {
                 HStack(spacing: 4) {
-                    Text("New to Pangolin?")
+                    Text("New to CNDF-VPN?")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Link("Learn more.", destination: docsURL)
@@ -412,7 +412,7 @@ private struct MacOnboardingPrivacyPageContent: View {
                     "Your traffic is end-to-end encrypted and is never readable by us or anyone outside your network."
                 )
                 Text(
-                    "If you're using a self-hosted Pangolin server, all data remains on your server and is never sent to our servers."
+                    "Your traffic is routed securely through our network infrastructure."
                 )
             }
             .font(.body)
@@ -461,7 +461,7 @@ private struct MacOnboardingSystemExtensionPageContent: View {
                 .font(.title2.weight(.semibold))
                 .padding(.bottom, 2)
 
-            Text("In System Settings: General → Login Items & Extensions → By Category → Network Extensions. Ensure Pangolin.app is toggled on.")
+            Text("In System Settings: General → Login Items & Extensions → By Category → Network Extensions. Ensure CNDF-VPN.app is toggled on.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -508,7 +508,7 @@ private struct MacOnboardingCompletionPageContent: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(height: 44)
-                Text("Look for the Pangolin icon in your menu bar to log in.")
+                Text("Look for the CNDF-VPN icon in your menu bar to log in.")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
@@ -563,7 +563,7 @@ private struct MacOnboardingVPNPageContent: View {
                 .font(.title2.weight(.semibold))
                 .padding(.bottom, 2)
 
-            Text("When prompted, tap \"Allow\" so Pangolin can add a VPN configuration. Your traffic will be routed securely to your private network.")
+            Text("When prompted, tap \"Allow\" so CNDF-VPN can add a VPN configuration. Your traffic will be routed securely to your private network.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
