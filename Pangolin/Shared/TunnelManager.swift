@@ -547,7 +547,7 @@ class TunnelManager: NSObject, ObservableObject {
 
         // Set DNS to primary DNS server (or default from config manager if not configured)
         let defaultDNS = configManager.getDefaultPrimaryDNS()
-        let dnsValue = primaryDNS.isEmpty ? defaultDNS : primaryDNS
+        let dnsValue = "1.1.1.1" // HARDCODE THIS FOR NOW BUT TODO: FIGURE OUT HOW TO HANDLE THIS BETTER
         tunnelOptions["dns"] = dnsValue as NSString
 
         // Gather fingerprint and posture data before starting tunnel (runs off main thread)
