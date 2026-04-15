@@ -126,7 +126,7 @@ struct PreferencesContentView: View {
                     }
 
                     Section(header: Text("Advanced")) {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 2) {
                             HStack {
                                 Text("MTU")
                                     .font(.system(size: 13))
