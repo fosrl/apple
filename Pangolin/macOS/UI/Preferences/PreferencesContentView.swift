@@ -4,8 +4,10 @@ struct PreferencesContentView: View {
     @ObservedObject var configManager: ConfigManager
     @State private var showPrimaryDNSModal = false
     @State private var showSecondaryDNSModal = false
+    @State private var showMTUModal = false
     @State private var editingPrimaryDNS = ""
     @State private var editingSecondaryDNS = ""
+    @State private var editingMTU = ""
     
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
@@ -25,6 +27,10 @@ struct PreferencesContentView: View {
     
     private var displaySecondaryDNS: String {
         secondaryDNSServer.isEmpty ? "Not set" : secondaryDNSServer
+    }
+
+    private var tunnelMTUDisplay: String {
+        String(configManager.getTunnelMTU())
     }
 
     private static let docsConfigureClientURL = URL(string: "https://docs.pangolin.net/manage/clients/configure-client")!
@@ -118,6 +124,29 @@ struct PreferencesContentView: View {
                             }
                         }
                     }
+
+                    Section(header: Text("Advanced")) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("MTU")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Text(tunnelMTUDisplay)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.secondary)
+                                Button("Set...") {
+                                    editingMTU = tunnelMTUDisplay
+                                    showMTUModal = true
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+
+                            Text("Your sites must be configured to use the same MTU value.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
@@ -141,6 +170,16 @@ struct PreferencesContentView: View {
                 isPresented: $showSecondaryDNSModal,
                 onSave: { newValue in
                     _ = configManager.setSecondaryDNSServer(newValue)
+                }
+            )
+        }
+        .sheet(isPresented: $showMTUModal) {
+            MTUModalView(
+                title: "MTU:",
+                mtuValue: $editingMTU,
+                isPresented: $showMTUModal,
+                onSave: { newValue in
+                    _ = configManager.setTunnelMTUFromString(newValue)
                 }
             )
         }
