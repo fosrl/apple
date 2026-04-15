@@ -4,8 +4,10 @@ struct PreferencesView: View {
     @ObservedObject var configManager: ConfigManager
     @State private var showPrimaryDNSModal = false
     @State private var showSecondaryDNSModal = false
+    @State private var showMTUModal = false
     @State private var editingPrimaryDNS = ""
     @State private var editingSecondaryDNS = ""
+    @State private var editingMTU = ""
     
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
@@ -25,6 +27,10 @@ struct PreferencesView: View {
     
     private var displaySecondaryDNS: String {
         secondaryDNSServer.isEmpty ? "Not set" : secondaryDNSServer
+    }
+
+    private var tunnelMTUDisplay: String {
+        String(configManager.getTunnelMTU())
     }
     
     private static let docsConfigureClientURL = URL(string: "https://docs.pangolin.net/manage/clients/configure-client")!
@@ -112,6 +118,30 @@ struct PreferencesView: View {
                     .buttonStyle(.plain)
                 }
                 }
+
+                Section(header: Text("Advanced")) {
+                    Button(action: {
+                        editingMTU = tunnelMTUDisplay
+                        showMTUModal = true
+                    }) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("MTU")
+                                    .font(.body)
+                                Text("Your sites must be configured to use the same MTU value.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text(tunnelMTUDisplay)
+                                .foregroundColor(.secondary)
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .navigationTitle("Preferences")
             .navigationBarTitleDisplayMode(.inline)
@@ -132,6 +162,16 @@ struct PreferencesView: View {
                     isPresented: $showSecondaryDNSModal,
                     onSave: { newValue in
                         _ = configManager.setSecondaryDNSServer(newValue)
+                    }
+                )
+            }
+            .sheet(isPresented: $showMTUModal) {
+                MTUModalView(
+                    title: "MTU",
+                    mtuValue: $editingMTU,
+                    isPresented: $showMTUModal,
+                    onSave: { newValue in
+                        _ = configManager.setTunnelMTUFromString(newValue)
                     }
                 )
             }

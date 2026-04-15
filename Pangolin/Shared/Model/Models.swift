@@ -7,6 +7,7 @@ struct Config: Codable {
     var dnsTunnelEnabled: Bool?
     var primaryDNSServer: String?
     var secondaryDNSServer: String?
+    var tunnelMTU: Int?
 }
 
 // MARK: - Account Types

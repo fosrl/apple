@@ -10,6 +10,8 @@ class ConfigManager: ObservableObject {
 
     private let configPath: URL
     private let defaultPrimaryDNS = "1.1.1.1"
+    static let defaultTunnelMTU = 1280
+    private static let tunnelMTURange = 576...65535
 
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
@@ -167,5 +169,36 @@ class ConfigManager: ObservableObject {
         updatedConfig.primaryDNSServer = primary.isEmpty ? nil : primary
         updatedConfig.secondaryDNSServer = secondary.isEmpty ? nil : secondary
         return save(updatedConfig)
+    }
+
+    // MARK: - Advanced / MTU
+
+    func getTunnelMTU() -> Int {
+        if let mtu = config?.tunnelMTU, Self.tunnelMTURange.contains(mtu) {
+            return mtu
+        }
+        return Self.defaultTunnelMTU
+    }
+
+    func setTunnelMTU(_ mtu: Int?) -> Bool {
+        var updatedConfig = config ?? Config()
+        if let mtu {
+            guard Self.tunnelMTURange.contains(mtu) else { return false }
+            updatedConfig.tunnelMTU = mtu
+        } else {
+            updatedConfig.tunnelMTU = nil
+        }
+        return save(updatedConfig)
+    }
+
+    func setTunnelMTUFromString(_ string: String) -> Bool {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return setTunnelMTU(nil)
+        }
+        guard let mtu = Int(trimmed), Self.tunnelMTURange.contains(mtu) else {
+            return false
+        }
+        return setTunnelMTU(mtu)
     }
 }

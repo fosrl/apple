@@ -516,7 +516,7 @@ class TunnelManager: NSObject, ObservableObject {
         tunnelOptions["orgId"] = currentOrg.orgId as NSString
 
         // Tunnel configuration options
-        tunnelOptions["mtu"] = NSNumber(value: 1280)
+        tunnelOptions["mtu"] = NSNumber(value: configManager.getTunnelMTU())
         tunnelOptions["holepunch"] = NSNumber(value: true)
         tunnelOptions["pingIntervalSeconds"] = NSNumber(value: 5)
         tunnelOptions["pingTimeoutSeconds"] = NSNumber(value: 5)
