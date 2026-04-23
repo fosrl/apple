@@ -3,8 +3,8 @@ module github.com/fosrl/apple
 go 1.25.0
 
 require (
-	github.com/fosrl/newt v1.10.3
-	github.com/fosrl/olm v1.4.4
+	github.com/fosrl/newt v1.11.0
+	github.com/fosrl/olm v1.5.0
 )
 
 require (
