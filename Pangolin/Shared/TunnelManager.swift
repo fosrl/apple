@@ -77,6 +77,9 @@ class TunnelManager: NSObject, ObservableObject {
         self.socketManager = SocketManager()
         self.olmStatusManager = OLMStatusManager(socketManager: self.socketManager)
         self.fingerprintManager = FingerprintManager(socketManager: self.socketManager)
+        #if os(macOS)
+            self.fingerprintManager.startCacheRefresh(interval: 1800)
+        #endif
         super.init()
 
         // Observe VPN status changes
@@ -550,9 +553,34 @@ class TunnelManager: NSObject, ObservableObject {
         let dnsValue = "1.1.1.1" // HARDCODE THIS FOR NOW BUT TODO: FIGURE OUT HOW TO HANDLE THIS BETTER
         tunnelOptions["dns"] = dnsValue as NSString
 
-        // Gather fingerprint and posture data before starting tunnel (runs off main thread)
-        let fingerprint = await fingerprintManager.gatherFingerprintInfo()
-        let postures = await fingerprintManager.gatherPostureChecks()
+        #if os(macOS)
+            var fingerprintPosturePair = await fingerprintManager.cachedFingerprintAndPostures()
+            if fingerprintPosturePair != nil {
+                os_log(
+                    "Tunnel connect: using cached fingerprint/posture", log: logger, type: .info)
+            } else {
+                os_log(
+                    "Tunnel connect: cache miss; gathering fingerprint/posture before connect",
+                    log: logger, type: .info)
+                await fingerprintManager.refreshCache()
+                fingerprintPosturePair = await fingerprintManager.cachedFingerprintAndPostures()
+            }
+            guard let (fingerprint, postures) = fingerprintPosturePair else {
+                os_log(
+                    "Missing fingerprint/posture cache after refresh, aborting connection", log: logger,
+                    type: .error)
+                await MainActor.run {
+                    status = .disconnected
+                }
+                return
+            }
+        #else
+            os_log(
+                "Tunnel connect: gathering fingerprint/posture on each connect (iOS, no cache)",
+                log: logger, type: .info)
+            let fingerprint = await fingerprintManager.gatherFingerprintInfo()
+            let postures = await fingerprintManager.gatherPostureChecks()
+        #endif
         
         // Convert Fingerprint to dictionary
         if let fingerprintData = try? JSONEncoder().encode(fingerprint),

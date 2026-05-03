@@ -12,12 +12,36 @@ import os.log
     import UIKit
 #endif
 
+#if os(macOS)
+    private actor FingerprintPostureCache {
+        private var fingerprint: Fingerprint?
+        private var postures: Postures?
+
+        func set(fingerprint: Fingerprint, postures: Postures) {
+            self.fingerprint = fingerprint
+            self.postures = postures
+        }
+
+        func snapshot() -> (Fingerprint, Postures)? {
+            guard let fingerprint, let postures else { return nil }
+            return (fingerprint, postures)
+        }
+    }
+#endif
+
 class FingerprintManager {
     // Set to false to entirely disable interval fingerprint checks
     private let intervalFingerprintCheckEnabled: Bool = true
 
     private let socketManager: SocketManager
-    private var task: Task<Void, Never>?
+
+    #if os(macOS)
+        private var cacheRefreshTask: Task<Void, Never>?
+
+        private let postureCache = FingerprintPostureCache()
+    #endif
+
+    private var metadataPushTask: Task<Void, Never>?
 
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
@@ -28,28 +52,69 @@ class FingerprintManager {
         self.socketManager = socketManager
     }
 
-    func start(interval: TimeInterval = 30) {
-        guard task == nil else { return }
+    deinit {
+        #if os(macOS)
+            cacheRefreshTask?.cancel()
+        #endif
+        metadataPushTask?.cancel()
+    }
+
+    /// Starts periodic in-memory refresh (immediate first run)
+    func startCacheRefresh(interval: TimeInterval = 1800) {
+        #if os(macOS)
+            guard cacheRefreshTask == nil else { return }
+
+            cacheRefreshTask = Task.detached(priority: .utility) {
+                while !Task.isCancelled {
+                    await self.refreshCache()
+                    try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                }
+            }
+        #endif
+    }
+
+    /// Updates in-memory fingerprint/posture cache.
+    func refreshCache() async {
+        #if os(macOS)
+            let fingerprint = await gatherFingerprintInfo()
+            let postures = await gatherPostureChecks()
+            await postureCache.set(fingerprint: fingerprint, postures: postures)
+        #endif
+    }
+
+    /// Snapshot from in-memory cache
+    func cachedFingerprintAndPostures() async -> (Fingerprint, Postures)? {
+        #if os(macOS)
+            return await postureCache.snapshot()
+        #else
+            return nil
+        #endif
+    }
+
+    /// While the tunnel socket is up, periodically push cached fingerprint/posture (macOS).
+    func start(interval: TimeInterval = 1800) {
+        guard metadataPushTask == nil else { return }
         guard intervalFingerprintCheckEnabled else { return }
 
         #if os(iOS)
-            // Don't run background metadata updates on iOS
             return
         #endif
 
-        task = Task.detached(priority: .utility) {
+        metadataPushTask = Task.detached(priority: .utility) {
             while !Task.isCancelled {
                 if await self.socketManager.isRunning() {
                     await self.runUpdateMetadata()
+                    try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                } else {
+                    try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
                 }
-                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
         }
     }
 
     func stop() {
-        task?.cancel()
-        task = nil
+        metadataPushTask?.cancel()
+        metadataPushTask = nil
     }
 
     private func runUpdateMetadata() async {
@@ -57,8 +122,9 @@ class FingerprintManager {
 
         guard await socketManager.isRunning() else { return }
 
-        let fingerprint = await gatherFingerprintInfo()
-        let postures = await gatherPostureChecks()
+        guard let (fingerprint, postures) = await cachedFingerprintAndPostures() else {
+            return
+        }
 
         do {
             _ = try await socketManager.updateMetadata(fingerprint: fingerprint, postures: postures)
