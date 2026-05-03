@@ -30,37 +30,25 @@ import os.log
 #endif
 
 class FingerprintManager {
-    // Set to false to entirely disable interval fingerprint checks
-    private let intervalFingerprintCheckEnabled: Bool = true
-
-    private let socketManager: SocketManager
-
     #if os(macOS)
         private var cacheRefreshTask: Task<Void, Never>?
 
         private let postureCache = FingerprintPostureCache()
     #endif
 
-    private var metadataPushTask: Task<Void, Never>?
-
     private let logger: OSLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
         return OSLog(subsystem: subsystem, category: "FingerprintManager")
     }()
 
-    init(socketManager: SocketManager) {
-        self.socketManager = socketManager
-    }
-
     deinit {
         #if os(macOS)
             cacheRefreshTask?.cancel()
         #endif
-        metadataPushTask?.cancel()
     }
 
     /// Starts periodic in-memory refresh (immediate first run)
-    func startCacheRefresh(interval: TimeInterval = 1800) {
+    func startCacheRefresh(interval: TimeInterval = 3 * 3600) {
         #if os(macOS)
             guard cacheRefreshTask == nil else { return }
 
@@ -89,48 +77,6 @@ class FingerprintManager {
         #else
             return nil
         #endif
-    }
-
-    /// While the tunnel socket is up, periodically push cached fingerprint/posture (macOS).
-    func start(interval: TimeInterval = 1800) {
-        guard metadataPushTask == nil else { return }
-        guard intervalFingerprintCheckEnabled else { return }
-
-        #if os(iOS)
-            return
-        #endif
-
-        metadataPushTask = Task.detached(priority: .utility) {
-            while !Task.isCancelled {
-                if await self.socketManager.isRunning() {
-                    await self.runUpdateMetadata()
-                    try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                } else {
-                    try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-                }
-            }
-        }
-    }
-
-    func stop() {
-        metadataPushTask?.cancel()
-        metadataPushTask = nil
-    }
-
-    private func runUpdateMetadata() async {
-        guard intervalFingerprintCheckEnabled else { return }
-
-        guard await socketManager.isRunning() else { return }
-
-        guard let (fingerprint, postures) = await cachedFingerprintAndPostures() else {
-            return
-        }
-
-        do {
-            _ = try await socketManager.updateMetadata(fingerprint: fingerprint, postures: postures)
-        } catch {
-            os_log("Failed to push fingerprint and posture data state: %{public}@", log: logger, type: .error, error.localizedDescription)
-        }
     }
 
     func gatherFingerprintInfo() async -> Fingerprint {
