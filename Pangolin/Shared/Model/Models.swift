@@ -378,6 +378,91 @@ struct UpdateMetadataResponse: Codable {
     let status: String
 }
 
+// MARK: - User Resources (GET /org/{orgId}/user-resources)
+
+struct UserResource: Codable, Identifiable, Hashable {
+    let resourceId: Int
+    let name: String
+    let domain: String           // e.g. "https://app.example.com"
+    let enabled: Bool
+    let isProtected: Bool        // true if any of SSO / password / pincode / whitelist is enabled
+    let resourceProtocol: String // "http" | "tcp" | "udp" | ...
+    let sso: Bool?
+    let password: Bool?
+    let pincode: Bool?
+    let whitelist: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case resourceId, name, domain, enabled
+        case isProtected = "protected"
+        case resourceProtocol = "protocol"
+        case sso, password, pincode, whitelist
+    }
+
+    var id: Int { resourceId }
+}
+
+struct UserSiteResource: Codable, Identifiable, Hashable {
+    let siteResourceId: Int
+    let name: String
+    let destination: String
+    let mode: String             // "host" | "cidr" | "http"
+    let scheme: String?          // server exposes this under the "protocol" key (maps to siteResources.scheme)
+    let ssl: Bool
+    let fullDomain: String?
+    let enabled: Bool
+    let alias: String?
+    let aliasAddress: String?
+
+    enum CodingKeys: String, CodingKey {
+        case siteResourceId, name, destination, mode
+        case scheme = "protocol"
+        case ssl, fullDomain, enabled, alias, aliasAddress
+    }
+
+    var id: Int { siteResourceId }
+}
+
+struct GetUserResourcesData: Codable {
+    let resources: [UserResource]
+    let siteResources: [UserSiteResource]
+}
+
+// MARK: - Site Resource Detail (GET /org/{orgId}/site-resources)
+// Includes port info. Used to augment the /user-resources response.
+
+struct SiteResourceDetail: Codable, Identifiable, Hashable {
+    let siteResourceId: Int
+    let name: String
+    let mode: String
+    let destination: String
+    let scheme: String?
+    let ssl: Bool
+    let fullDomain: String?
+    let alias: String?
+    let aliasAddress: String?
+    let tcpPortRangeString: String?
+    let udpPortRangeString: String?
+    let disableIcmp: Bool?
+    let enabled: Bool
+    // Site (network) info — present from /org/{orgId}/site-resources. A site resource can
+    // belong to multiple sites; we use the first as primary for grouping/display.
+    let siteIds: [Int]?
+    let siteNames: [String]?
+    let siteNiceIds: [String]?
+    let siteOnlines: [Bool]?
+
+    var id: Int { siteResourceId }
+
+    var primarySiteName: String? { siteNames?.first }
+    var primarySiteOnline: Bool { siteOnlines?.first ?? false }
+}
+
+struct ListAllSiteResourcesData: Codable {
+    let siteResources: [SiteResourceDetail]
+    let pagination: Pagination?
+}
+
 // MARK: - Server Info
 
 struct ServerInfo: Codable {
