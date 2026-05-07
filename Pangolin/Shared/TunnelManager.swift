@@ -76,9 +76,9 @@ class TunnelManager: NSObject, ObservableObject {
         self.authManager = authManager
         self.socketManager = SocketManager()
         self.olmStatusManager = OLMStatusManager(socketManager: self.socketManager)
-        self.fingerprintManager = FingerprintManager(socketManager: self.socketManager)
+        self.fingerprintManager = FingerprintManager()
         #if os(macOS)
-            self.fingerprintManager.startCacheRefresh(interval: 1800)
+            self.fingerprintManager.startCacheRefresh(interval: 3 * 3600)
         #endif
         super.init()
 
@@ -601,8 +601,6 @@ class TunnelManager: NSObject, ObservableObject {
 
             // Update status - will transition from .starting to .registering when extension starts
             await updateConnectionStatus()
-
-            self.fingerprintManager.start()
         } catch {
             os_log(
                 "Error starting tunnel: %{public}@", log: logger, type: .error,
@@ -617,8 +615,6 @@ class TunnelManager: NSObject, ObservableObject {
         guard let manager = tunnelManager else {
             return
         }
-
-        self.fingerprintManager.stop()
 
         // Stop socket polling first
         stopSocketPolling()

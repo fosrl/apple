@@ -28,18 +28,18 @@ if [[ -f "$CONTAINER_PLIST" ]]; then
   done
 fi
 
-# Clear accounts (standard Application Support)
-ACCOUNTS_FILE="$HOME/Library/Application Support/Pangolin/accounts.json"
-if [[ -f "$ACCOUNTS_FILE" ]]; then
-  echo "Removing accounts file (Application Support)..."
-  rm -f "$ACCOUNTS_FILE"
-fi
+# # Clear accounts (standard Application Support)
+# ACCOUNTS_FILE="$HOME/Library/Application Support/Pangolin/accounts.json"
+# if [[ -f "$ACCOUNTS_FILE" ]]; then
+#   echo "Removing accounts file (Application Support)..."
+#   rm -f "$ACCOUNTS_FILE"
+# fi
 
-# Clear accounts (sandboxed container)
-CONTAINER_ACCOUNTS="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Application Support/Pangolin/accounts.json"
-if [[ -f "$CONTAINER_ACCOUNTS" ]]; then
-  echo "Removing accounts file (sandbox container)..."
-  rm -f "$CONTAINER_ACCOUNTS"
-fi
+# # Clear accounts (sandboxed container)
+# CONTAINER_ACCOUNTS="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Application Support/Pangolin/accounts.json"
+# if [[ -f "$CONTAINER_ACCOUNTS" ]]; then
+#   echo "Removing accounts file (sandbox container)..."
+#   rm -f "$CONTAINER_ACCOUNTS"
+# fi
 
 echo "Done. Restart Pangolin to see the onboarding flow again."
