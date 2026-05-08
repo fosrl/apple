@@ -43,6 +43,13 @@ final class MacOnboardingViewModel: ObservableObject {
         hasCompletedSystemExtension = onboardingState.hasCompletedSystemExtensionOnboarding
         vpnInstalled = await tunnelManager.isVPNProfileInstalled()
 
+        // If VPN profile is missing after prior onboarding, treat system extension
+        // onboarding as incomplete so users are routed back through that step first.
+        if !vpnInstalled, hasCompletedSystemExtension {
+            hasCompletedSystemExtension = false
+            onboardingState.hasCompletedSystemExtensionOnboarding = false
+        }
+
         let needsWelcome = !hasSeenWelcome
         let needsPrivacy = !hasAcknowledgedPrivacy
         let needsSystemExtension = !hasCompletedSystemExtension
