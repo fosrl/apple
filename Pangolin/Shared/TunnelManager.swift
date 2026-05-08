@@ -99,6 +99,7 @@ class TunnelManager: NSObject, ObservableObject {
                 // (or taps Connect). Only update status if a configuration already exists,
                 // to avoid showing system prompts on launch.
                 if await hasRegisteredExtension() {
+                    await refreshInstalledSystemExtensionOnLaunch()
                     await ensureExtensionRegistered()
                     await updateConnectionStatus()
                 } else {
@@ -310,6 +311,22 @@ class TunnelManager: NSObject, ObservableObject {
     private func setLastKnownExtensionVersion(_ version: String) {
         UserDefaults.standard.set(version, forKey: extensionVersionKey)
     }
+
+    #if os(macOS)
+        /// If a profile is already installed, submit activation on launch so macOS can
+        /// update/replace the installed system extension if needed.
+        private func refreshInstalledSystemExtensionOnLaunch() async {
+            os_log(
+                "Existing VPN profile detected on launch; triggering system extension activation/update check",
+                log: logger, type: .info)
+            let refreshed = await installSystemExtensionIfNeeded()
+            if !refreshed {
+                os_log(
+                    "System extension refresh on launch did not complete successfully",
+                    log: logger, type: .error)
+            }
+        }
+    #endif
 
     // MARK: - VPN Profile / Extension Helpers
 
