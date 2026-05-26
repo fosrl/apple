@@ -14,6 +14,9 @@ class AuthManager: ObservableObject {
     @Published var currentOrg: Organization?
     @Published var organizations: [Organization] = []
     @Published var isInitializing = true
+    /// Set to true after initialize() runs successfully. Prevents repeated re-init when the
+    /// MenuBarExtra .window popover re-fires onAppear on every open.
+    @Published var hasInitialized = false
     @Published var errorMessage: String?
     @Published var deviceAuthCode: String?
     @Published var deviceAuthLoginURL: String?
@@ -56,8 +59,15 @@ class AuthManager: ObservableObject {
     }
 
     func initialize() async {
+        // Avoid running the full init cycle every time the menu bar popover re-appears.
+        // Logout/session-expired flows reset hasInitialized so initialize() can run again.
+        if hasInitialized { return }
+
         isInitializing = true
-        defer { isInitializing = false }
+        defer {
+            isInitializing = false
+            hasInitialized = true
+        }
         
         isServerDown = false
 
@@ -843,6 +853,8 @@ class AuthManager: ObservableObject {
             errorMessage = nil
             deviceAuthCode = nil
             deviceAuthLoginURL = nil
+            // Allow initialize() to run again on next app/menu activation.
+            hasInitialized = false
         }
     }
 }

@@ -231,36 +231,19 @@ struct MacOnboardingFlowView: View {
         }
         .frame(minWidth: 560, minHeight: 520)
         .background(windowBackgroundColor)
-        .background(
-            OnboardingWindowAccessor { window in
-                configureOnboardingWindow(window)
-            }
-        )
+        // Window-level configuration (styleMask, button visibility) is handled by
+        // AppWindowsController upfront. The OnboardingWindowAccessor +
+        // configureOnboardingWindow logic that used to live here mutated styleMask
+        // synchronously during SwiftUI body evaluation, which on macOS 26 races
+        // with NSHostingView's own layout pass and can crash inside
+        // _postWindowNeedsUpdateConstraints.
         .onAppear {
             DispatchQueue.main.async {
-                NSApplication.shared.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                NSApplication.shared.windows.first {
+                    $0.identifier?.rawValue == "onboarding"
+                }?.makeKeyAndOrderFront(nil)
             }
         }
-    }
-
-    private func configureOnboardingWindow(_ window: NSWindow) {
-        var styleMask = window.styleMask
-        styleMask.remove([.miniaturizable, .resizable])
-        styleMask.insert([.titled, .closable])
-        window.styleMask = styleMask
-        window.styleMask.remove(.resizable)
-
-        if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
-            minimizeButton.isHidden = true
-        }
-        if let zoomButton = window.standardWindowButton(.zoomButton) {
-            zoomButton.isHidden = true
-        }
-        if let closeButton = window.standardWindowButton(.closeButton) {
-            closeButton.isHidden = false
-        }
-
-        window.isMovableByWindowBackground = false
     }
 
     @ViewBuilder
@@ -535,26 +518,6 @@ private struct MacOnboardingCompletionPageContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 8)
-    }
-}
-
-// MARK: - Window configuration (matches LoginView title bar style)
-
-private struct OnboardingWindowAccessor: NSViewRepresentable {
-    var callback: (NSWindow) -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            if let window = view.window { callback(window) }
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if let window = nsView.window { callback(window) }
-        }
     }
 }
 

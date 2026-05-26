@@ -419,8 +419,33 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    // MARK: - Resources
+
+    /// Lists public and site resources accessible to the current user.
+    /// Permission filtering is applied server-side. Port info is NOT included.
+    func listUserResources(orgId: String) async throws -> GetUserResourcesData {
+        let (data, response) = try await makeRequest(
+            method: "GET",
+            path: "/org/\(orgId)/user-resources"
+        )
+        return try parseResponse(data, response)
+    }
+
+    /// Lists detailed site resources for the org, including TCP/UDP port ranges and ICMP flag.
+    /// May return 403 if the user lacks the `listSiteResources` action — callers should treat
+    /// failures as best-effort and degrade gracefully (i.e. fall back to data from /user-resources).
+    func listAllSiteResources(orgId: String, pageSize: Int = 100) async throws -> [SiteResourceDetail] {
+        let (data, response) = try await makeRequest(
+            method: "GET",
+            path: "/org/\(orgId)/site-resources",
+            queryParams: ["pageSize": String(pageSize)]
+        )
+        let wrapped: ListAllSiteResourcesData = try parseResponse(data, response)
+        return wrapped.siteResources
+    }
+
     // MARK: - Server Info
-    
+
     func getServerInfo() async throws -> ServerInfo {
         let (data, response) = try await makeRequest(method: "GET", path: "/server-info")
         return try parseResponse(data, response)

@@ -155,11 +155,13 @@ struct LoginView: View {
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(windowBackgroundColor)
-        .background(
-            WindowAccessor { window in
-                configureWindow(window)
-            }
-        )
+        // Note: window-level configuration (styleMask, identifier, button visibility,
+        // activation policy) is handled by AppWindowsController upfront. We removed
+        // the WindowAccessor + configureWindow + setActivationPolicy logic that used
+        // to live here because it ran synchronously during the SwiftUI view body /
+        // didBecomeKeyNotification, mutating the window's styleMask while AppKit was
+        // mid-layout — which caused a layout-cycle crash on macOS 26 inside
+        // _postWindowNeedsUpdateConstraints.
         .onAppear {
             if authManager.startDeviceAuthImmediately {
                 authManager.startDeviceAuthImmediately = false
@@ -170,28 +172,11 @@ struct LoginView: View {
                     performLogin()
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                guard NSApp.activationPolicy() != .regular else { return }
-                NSApp.setActivationPolicy(.regular)
-                if let window = NSApplication.shared.windows.first(where: { $0.title == "Pangolin" }) {
-                    configureWindow(window)
-                    let duplicates = NSApplication.shared.windows.filter { w in
-                        (w.identifier?.rawValue == "main" || w.title == "Pangolin") && w != window
-                    }
-                    for duplicate in duplicates {
-                        duplicate.close()
-                    }
-                    window.makeKeyAndOrderFront(nil)
-                    window.orderFrontRegardless()
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) {
             notification in
             if let window = notification.object as? NSWindow, window.identifier?.rawValue == "main"
             {
-                configureWindow(window)
                 if authManager.startDeviceAuthImmediately {
                     authManager.startDeviceAuthImmediately = false
                     let hostname = accountManager.activeAccount?.hostname ?? ""
@@ -227,19 +212,10 @@ struct LoginView: View {
             }
         }
         .onDisappear {
-            // Reset state when view disappears
+            // Reset login state when view disappears.
+            // Activation policy is now managed by AppWindowsController via the
+            // window's NSWindowDelegate (windowWillClose).
             resetLoginState()
-            
-            // Hide app from dock when window closes (if no other windows)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                let hasOtherWindows = NSApplication.shared.windows.contains { window in
-                    window.isVisible && (window.identifier?.rawValue == "main" || window.identifier?.rawValue == "preferences")
-                }
-                if !hasOtherWindows {
-                    guard NSApp.activationPolicy() != .accessory else { return }
-                    NSApp.setActivationPolicy(.accessory)
-                }
-            }
         }
     }
 
@@ -499,41 +475,6 @@ struct LoginView: View {
         hasAutoOpenedBrowser = false
     }
 
-    private func configureWindow(_ window: NSWindow) {
-        // Set identifier if not set
-        if window.identifier?.rawValue != "main" {
-            window.identifier = NSUserInterfaceItemIdentifier("main")
-        }
-
-        // Configure window style: remove minimize and maximize, keep close button
-        var styleMask = window.styleMask
-        styleMask.remove([.miniaturizable, .resizable])
-        styleMask.insert([.titled, .closable])
-        window.styleMask = styleMask
-
-        // Ensure resizing is disabled
-        window.styleMask.remove(.resizable)
-
-        // Hide minimize and zoom buttons, keep only close button
-        if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
-            minimizeButton.isHidden = true
-        }
-        if let zoomButton = window.standardWindowButton(.zoomButton) {
-            zoomButton.isHidden = true
-        }
-        if let closeButton = window.standardWindowButton(.closeButton) {
-            closeButton.isHidden = false
-        }
-
-        // Set window to not be resizable
-        window.isMovableByWindowBackground = false
-
-        // Set window size explicitly
-        var frame = window.frame
-        frame.size = NSSize(width: 440, height: 300)
-        window.setContentSize(frame.size)
-    }
-
     private func closeWindow() {
         // Reset login state before closing
         resetLoginState()
@@ -546,25 +487,3 @@ struct LoginView: View {
     }
 }
 
-// Helper view to access NSWindow
-struct WindowAccessor: NSViewRepresentable {
-    var callback: (NSWindow) -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            if let window = view.window {
-                callback(window)
-            }
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if let window = nsView.window {
-                callback(window)
-            }
-        }
-    }
-}
