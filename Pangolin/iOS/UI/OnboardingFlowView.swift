@@ -260,8 +260,8 @@ private struct OnboardingPrivacyPage: View {
             .padding(.top, 4)
 
             // Footer help text (kept above the page indicator)
-            if let termsURL = URL(string: "https://pangolin.net/terms-of-service.html"),
-               let privacyURL = URL(string: "https://pangolin.net/privacy-policy.html") {
+            if let termsURL = URL(string: "https://pangolin.net/tos"),
+               let privacyURL = URL(string: "https://pangolin.net/privacy") {
                 let attributed: AttributedString = {
                     var string = AttributedString(
                         "By continuing, you agree to our Terms of Service and Privacy Policy."

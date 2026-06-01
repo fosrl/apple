@@ -429,8 +429,8 @@ private struct MacOnboardingPrivacyPageContent: View {
 
             Spacer()
 
-            if let termsURL = URL(string: "https://pangolin.net/terms-of-service.html"),
-               let privacyURL = URL(string: "https://pangolin.net/privacy-policy.html") {
+            if let termsURL = URL(string: "https://pangolin.net/tos"),
+               let privacyURL = URL(string: "https://pangolin.net/privacy") {
                 let attributed: AttributedString = {
                     var string = AttributedString(
                         "By continuing, you agree to our Terms of Service and Privacy Policy."

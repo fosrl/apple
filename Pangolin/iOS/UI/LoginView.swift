@@ -180,7 +180,7 @@ struct LoginView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Button("Terms of Service") {
-                    openBrowser(url: "https://pangolin.net/terms-of-service.html")
+                    openBrowser(url: "https://pangolin.net/tos")
                 }
                 .font(.caption)
                 .buttonStyle(.plain)
@@ -188,7 +188,7 @@ struct LoginView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Button("Privacy Policy.") {
-                    openBrowser(url: "https://pangolin.net/privacy-policy.html")
+                    openBrowser(url: "https://pangolin.net/privacy")
                 }
                 .font(.caption)
                 .buttonStyle(.plain)

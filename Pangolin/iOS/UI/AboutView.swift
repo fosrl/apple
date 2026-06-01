@@ -60,7 +60,7 @@ struct AboutView: View {
                 }
                 
                 Section {
-                    Link(destination: URL(string: "https://pangolin.net/terms-of-service.html")!) {
+                    Link(destination: URL(string: "https://pangolin.net/tos")!) {
                         HStack {
                             Text("Terms of Service")
                             Spacer()
@@ -70,7 +70,7 @@ struct AboutView: View {
                         }
                     }
                     
-                    Link(destination: URL(string: "https://pangolin.net/privacy-policy.html")!) {
+                    Link(destination: URL(string: "https://pangolin.net/privacy")!) {
                         HStack {
                             Text("Privacy Policy")
                             Spacer()
