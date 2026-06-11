@@ -137,11 +137,11 @@ struct MenuBarView: View {
                     .foregroundColor(.secondary)
 
                 Button("Terms of Service") {
-                    openURL("https://pangolin.net/terms-of-service.html")
+                    openURL("https://pangolin.net/tos")
                 }
 
                 Button("Privacy Policy") {
-                    openURL("https://pangolin.net/privacy-policy.html")
+                    openURL("https://pangolin.net/privacy")
                 }
 
                 Divider()
