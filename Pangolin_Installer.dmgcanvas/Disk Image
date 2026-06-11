@@ -18,7 +18,7 @@
     ],
     "nameFontSize" : 12,
     "statusBarVisible" : false,
-    "suggestedDiskImageName" : "Fossorial - PIIA (Varun Narravula).dmg",
+    "suggestedDiskImageName" : "Pangolin_Installer_0.8.4.dmg",
     "teamID" : "4668XHFAHF",
     "toolbarVisible" : false,
     "uid" : "knbwdghzqp",
@@ -39,12 +39,12 @@
         "relativeFilePath" : "..\/..\/..\/..\/Applications"
       },
       {
-        "filePath" : "\/Users\/miloschwartz\/Downloads\/Pangolin.app",
+        "filePath" : "\/Users\/miloschwartz\/Downloads\/Pangolin\/Pangolin.app",
         "iconSize" : 100,
         "invisible" : false,
         "isAnAlias" : false,
-        "location" : "{176, 180}",
-        "relativeFilePath" : "..\/..\/Downloads\/Pangolin.app"
+        "location" : "{168, 180}",
+        "relativeFilePath" : "..\/..\/Downloads\/Pangolin\/Pangolin.app"
       }
     ],
     "windowContentWidth" : 600,
