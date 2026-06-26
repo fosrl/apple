@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import UserNotifications
 import os.log
 
 #if os(iOS)
@@ -168,16 +167,6 @@ class AuthManager: ObservableObject {
                     self.deviceAuthCode = code
                     self.deviceAuthLoginURL = loginURL
                 }
-
-                // Show notification with code
-                let content = UNMutableNotificationContent()
-                content.title = "Pangolin Login"
-                content.body = "Enter code: \(code)"
-                content.sound = .default
-
-                let request = UNNotificationRequest(
-                    identifier: UUID().uuidString, content: content, trigger: nil)
-                try await UNUserNotificationCenter.current().add(request)
 
                 // Poll for verification
                 let expiresAt = Date().addingTimeInterval(
