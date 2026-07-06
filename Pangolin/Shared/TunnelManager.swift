@@ -558,17 +558,9 @@ class TunnelManager: NSObject, ObservableObject {
         if !secondaryDNS.isEmpty {
             upstreamDNSServers.append("\(secondaryDNS):53")
         }
-        // If no DNS servers configured, use default from config manager
-        if upstreamDNSServers.isEmpty {
-            let defaultDNS = configManager.getDefaultPrimaryDNS()
-            upstreamDNSServers.append("\(defaultDNS):53")
-        }
+        // If no DNS servers are configured, this stays empty, which tells olm
+        // to leave DNS resolution to the system resolver instead of overriding it.
         tunnelOptions["upstreamDNS"] = upstreamDNSServers as NSArray
-
-        // Set DNS to primary DNS server (or default from config manager if not configured)
-        let defaultDNS = configManager.getDefaultPrimaryDNS()
-        let dnsValue = "1.1.1.1" // HARDCODE THIS FOR NOW BUT TODO: FIGURE OUT HOW TO HANDLE THIS BETTER
-        tunnelOptions["dns"] = dnsValue as NSString
 
         #if os(macOS)
             var fingerprintPosturePair = await fingerprintManager.cachedFingerprintAndPostures()

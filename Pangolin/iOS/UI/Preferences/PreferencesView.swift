@@ -25,8 +25,12 @@ struct PreferencesView: View {
         configManager.getSecondaryDNSServer()
     }
     
+    private var displayPrimaryDNS: String {
+        primaryDNSServer.isEmpty ? "System DNS" : primaryDNSServer
+    }
+
     private var displaySecondaryDNS: String {
-        secondaryDNSServer.isEmpty ? "Not set" : secondaryDNSServer
+        secondaryDNSServer.isEmpty ? "System DNS" : secondaryDNSServer
     }
 
     private var tunnelMTUDisplay: String {
@@ -92,7 +96,7 @@ struct PreferencesView: View {
                         HStack {
                             Text("Primary Upstream DNS Server")
                             Spacer()
-                            Text(primaryDNSServer)
+                            Text(displayPrimaryDNS)
                                 .foregroundColor(.secondary)
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.secondary)

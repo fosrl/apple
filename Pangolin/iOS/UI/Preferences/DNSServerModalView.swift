@@ -25,7 +25,7 @@ struct DNSServerModalView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("DNS Server", text: $editedValue)
+                    TextField("System DNS", text: $editedValue)
                         .autocorrectionDisabled()
                         .autocapitalization(.none)
                         .keyboardType(.numbersAndPunctuation)
@@ -44,11 +44,13 @@ struct DNSServerModalView: View {
                 
                 Section {
                     Button(action: {
-                        editedValue = "1.1.1.1"
+                        editedValue = ""
+                        onSave("")
+                        isPresented = false
                     }) {
                         HStack {
                             Spacer()
-                            Text("Use Default")
+                            Text("Use System DNS")
                             Spacer()
                         }
                     }

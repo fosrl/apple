@@ -118,11 +118,11 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 
 	// Create OLM Config with tunnel parameters
 	tunnelConfig := olmpkg.TunnelConfig{
-		Endpoint:             config.Endpoint,
-		ID:                   config.ID,
-		Secret:               config.Secret,
-		MTU:                  config.MTU,
-		DNS:                  config.DNS,
+		Endpoint: config.Endpoint,
+		ID:       config.ID,
+		Secret:   config.Secret,
+		MTU:      config.MTU,
+		// DNS:                  config.DNS, // this gets pulled dynamically from the host system now
 		Holepunch:            config.Holepunch,
 		PingIntervalDuration: time.Duration(config.PingIntervalSeconds) * time.Second,
 		PingTimeoutDuration:  time.Duration(config.PingTimeoutSeconds) * time.Second,

@@ -30,7 +30,7 @@ struct DNSServerModalView: View {
                     Spacer()
                 }
                 
-                TextField("", text: $editedValue)
+                TextField("System DNS", text: $editedValue)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 13))
                     .padding(.horizontal, 8)
@@ -54,8 +54,10 @@ struct DNSServerModalView: View {
             Divider()
             
             HStack(spacing: 12) {
-                Button("Default") {
-                    editedValue = "1.1.1.1"
+                Button("Use System DNS") {
+                    editedValue = ""
+                    onSave("")
+                    isPresented = false
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)

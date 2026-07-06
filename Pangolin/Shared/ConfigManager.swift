@@ -9,7 +9,6 @@ class ConfigManager: ObservableObject {
     static let defaultHostname = "https://app.pangolin.net"
 
     private let configPath: URL
-    private let defaultPrimaryDNS = "1.1.1.1"
     static let defaultTunnelMTU = 1280
     private static let tunnelMTURange = 576...65535
 
@@ -41,12 +40,8 @@ class ConfigManager: ObservableObject {
         var updatedConfig = config ?? Config()
         var needsSave = false
 
-        // Ensure primary DNS has default value if not set
-        if updatedConfig.primaryDNSServer == nil || updatedConfig.primaryDNSServer?.isEmpty == true
-        {
-            updatedConfig.primaryDNSServer = defaultPrimaryDNS
-            needsSave = true
-        }
+        // Primary and secondary DNS remain nil/empty by default, meaning the
+        // system DNS resolver is used until the user explicitly sets a server.
 
         // Ensure DNS override has default value if not set
         if updatedConfig.dnsOverrideEnabled == nil {
@@ -54,8 +49,6 @@ class ConfigManager: ObservableObject {
             updatedConfig.dnsTunnelEnabled = false
             needsSave = true
         }
-
-        // Secondary DNS can remain nil/empty, no default needed
 
         if needsSave {
             // Update config synchronously during init to avoid async issues
@@ -122,12 +115,8 @@ class ConfigManager: ObservableObject {
     }
 
     func getPrimaryDNSServer() -> String {
-        // Config should always have a value after ensureDNSDefaults, but return default as fallback
-        return config?.primaryDNSServer ?? defaultPrimaryDNS
-    }
-
-    func getDefaultPrimaryDNS() -> String {
-        return defaultPrimaryDNS
+        // Empty means "use the system DNS resolver"
+        return config?.primaryDNSServer ?? ""
     }
 
     func getSecondaryDNSServer() -> String {
