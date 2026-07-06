@@ -245,12 +245,10 @@ public class TunnelAdapter {
             let id = options["id"] as? String,
             let secret = options["secret"] as? String,
             let mtu = (options["mtu"] as? NSNumber)?.intValue,
-            let dns = options["dns"] as? String,
             let holepunch = (options["holepunch"] as? NSNumber)?.boolValue,
             let pingIntervalSeconds = (options["pingIntervalSeconds"] as? NSNumber)?.intValue,
             let userToken: String = options["userToken"] as? String,
             let orgId = options["orgId"] as? String,
-            let upstreamDNS = options["upstreamDNS"] as? [String],
             let overrideDNSValue = (options["overrideDNS"] as? NSNumber)?.boolValue,
             let tunnelDNS = (options["tunnelDNS"] as? NSNumber)?.boolValue,
             let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue
@@ -267,6 +265,7 @@ public class TunnelAdapter {
 
         let fingerprint = (options["fingerprint"]) as? [String: Any] ?? [:]
         let postures = (options["postures"]) as? [String: Any] ?? [:]
+        let upstreamDNS = (options["upstreamDNS"] as? [String]) ?? []
 
         // No custom DNS configured; push a synchronous, best-effort read of the device's
         // real (pre-override) DNS servers directly into olm now, before startTunnel
@@ -284,7 +283,6 @@ public class TunnelAdapter {
             "id": id,
             "secret": secret,
             "mtu": mtu,
-            "dns": dns,
             "holepunch": holepunch,
             "pingIntervalSeconds": pingIntervalSeconds,
             "pingTimeoutSeconds": pingTimeoutSeconds,

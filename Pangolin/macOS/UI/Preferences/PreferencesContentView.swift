@@ -8,7 +8,8 @@ struct PreferencesContentView: View {
     @State private var editingPrimaryDNS = ""
     @State private var editingSecondaryDNS = ""
     @State private var editingMTU = ""
-    
+    @State private var showEnableDNSOverrideAlert = false
+
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
     }
@@ -69,13 +70,15 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { dnsOverrideEnabled },
                                 set: { newValue in
-                                    _ = configManager.setDNSOverrideEnabled(newValue)
+                                    if !configManager.setDNSOverrideEnabled(newValue) {
+                                        showEnableDNSOverrideAlert = true
+                                    }
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
                         }
-                        
+
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("DNS Over Tunnel")
@@ -186,6 +189,11 @@ struct PreferencesContentView: View {
                     _ = configManager.setTunnelMTUFromString(newValue)
                 }
             )
+        }
+        .alert("Upstream DNS Server Required", isPresented: $showEnableDNSOverrideAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Set a Primary or Secondary Upstream DNS Server before enabling Aliases (DNS Override).")
         }
     }
 }
