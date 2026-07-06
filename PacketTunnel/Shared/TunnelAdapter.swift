@@ -268,6 +268,16 @@ public class TunnelAdapter {
         let fingerprint = (options["fingerprint"]) as? [String: Any] ?? [:]
         let postures = (options["postures"]) as? [String: Any] ?? [:]
 
+        // No custom DNS configured; push a synchronous, best-effort read of the device's
+        // real (pre-override) DNS servers directly into olm now, before startTunnel
+        // below, so it doesn't fall back to a hardcoded default DNS server while
+        // waiting for the live NetworkTransitionMonitor callback wired up further down.
+        // Reported via setSystemDNS (not the upstreamDNS config field below) so it stays
+        // live-updatable rather than being treated as an explicit user override.
+        if upstreamDNS.isEmpty {
+            reportSystemDNS(NetworkTransitionMonitor.currentSystemDNSServers())
+        }
+
         // Tunnel configuration
         let config: [String: Any] = [
             "endpoint": endpoint,
@@ -663,10 +673,41 @@ public class TunnelAdapter {
         monitor.onRebindRequired = { [weak self] in
             self?.handleNetworkTransition()
         }
+        monitor.onSystemDNSChanged = { [weak self] servers in
+            self?.reportSystemDNS(servers)
+        }
 
         // Start monitoring
         monitor.start()
         networkTransitionMonitor = monitor
+    }
+
+    /// Pushes observed system DNS servers into olm via PangolinGo.setSystemDNS,
+    /// mirroring the existing rebindSocket() call shape below.
+    private func reportSystemDNS(_ servers: [String]) {
+        guard !servers.isEmpty else { return }
+
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: servers),
+            let jsonString = String(data: jsonData, encoding: .utf8)
+        else {
+            os_log("Failed to serialize system DNS servers to JSON", log: logger, type: .error)
+            return
+        }
+        let jsonCString = jsonString.utf8CString
+
+        let jsonPtr = UnsafeMutablePointer<CChar>.allocate(capacity: jsonCString.count)
+        jsonCString.withUnsafeBufferPointer { buffer in
+            jsonPtr.initialize(from: buffer.baseAddress!, count: buffer.count)
+        }
+        defer { jsonPtr.deallocate() }
+
+        guard let result = PangolinGo.setSystemDNS(jsonPtr) else {
+            os_log("Failed to call Go setSystemDNS function (returned nil)", log: logger, type: .error)
+            return
+        }
+        let message = String(cString: result)
+        result.deallocate()
+        os_log("setSystemDNS result: %{public}@", log: logger, type: .debug, message)
     }
 
     private func stopNetworkTransitionMonitoring() {

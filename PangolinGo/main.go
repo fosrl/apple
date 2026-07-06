@@ -118,11 +118,10 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 
 	// Create OLM Config with tunnel parameters
 	tunnelConfig := olmpkg.TunnelConfig{
-		Endpoint: config.Endpoint,
-		ID:       config.ID,
-		Secret:   config.Secret,
-		MTU:      config.MTU,
-		// DNS:                  config.DNS, // this gets pulled dynamically from the host system now
+		Endpoint:             config.Endpoint,
+		ID:                   config.ID,
+		Secret:               config.Secret,
+		MTU:                  config.MTU,
 		Holepunch:            config.Holepunch,
 		PingIntervalDuration: time.Duration(config.PingIntervalSeconds) * time.Second,
 		PingTimeoutDuration:  time.Duration(config.PingTimeoutSeconds) * time.Second,
@@ -256,6 +255,27 @@ func rebindSocket() *C.char {
 
 	appLogger.Info("Socket rebound successfully")
 	return C.CString("Socket rebound successfully")
+}
+
+// setSystemDNS reports DNS servers observed by the app/extension (via
+// SCDynamicStore on iOS), since olm cannot read the OS's DNS configuration
+// itself on this platform. serversJSON is a JSON array of "host:port"
+// strings, e.g. ["192.168.1.1:53"].
+//
+//export setSystemDNS
+func setSystemDNS(serversJSON *C.char) *C.char {
+	if olm == nil {
+		return C.CString("Error: olm has not been initialized yet!")
+	}
+
+	var servers []string
+	if err := json.Unmarshal([]byte(C.GoString(serversJSON)), &servers); err != nil {
+		appLogger.Error("Failed to parse system DNS JSON: %v", err)
+		return C.CString(fmt.Sprintf("Error: Failed to parse system DNS JSON: %v", err))
+	}
+
+	olm.SetSystemDNS(servers)
+	return C.CString("System DNS updated")
 }
 
 // We need an entry point; it's ok for this to be empty
