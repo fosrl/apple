@@ -8,7 +8,8 @@ struct PreferencesContentView: View {
     @State private var editingPrimaryDNS = ""
     @State private var editingSecondaryDNS = ""
     @State private var editingMTU = ""
-    
+    @State private var showEnableDNSOverrideAlert = false
+
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
     }
@@ -25,8 +26,12 @@ struct PreferencesContentView: View {
         configManager.getSecondaryDNSServer()
     }
     
+    private var displayPrimaryDNS: String {
+        primaryDNSServer.isEmpty ? "System DNS" : primaryDNSServer
+    }
+
     private var displaySecondaryDNS: String {
-        secondaryDNSServer.isEmpty ? "Not set" : secondaryDNSServer
+        secondaryDNSServer.isEmpty ? "System DNS" : secondaryDNSServer
     }
 
     private var tunnelMTUDisplay: String {
@@ -65,13 +70,15 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { dnsOverrideEnabled },
                                 set: { newValue in
-                                    _ = configManager.setDNSOverrideEnabled(newValue)
+                                    if !configManager.setDNSOverrideEnabled(newValue) {
+                                        showEnableDNSOverrideAlert = true
+                                    }
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
                         }
-                        
+
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("DNS Over Tunnel")
@@ -97,7 +104,7 @@ struct PreferencesContentView: View {
                                 Text("Primary Upstream DNS Server")
                                     .font(.system(size: 13))
                                 Spacer()
-                                Text(primaryDNSServer)
+                                Text(displayPrimaryDNS)
                                     .font(.system(size: 13))
                                     .foregroundColor(.secondary)
                                 Button("Set...") {
@@ -182,6 +189,11 @@ struct PreferencesContentView: View {
                     _ = configManager.setTunnelMTUFromString(newValue)
                 }
             )
+        }
+        .alert("Upstream DNS Server Required", isPresented: $showEnableDNSOverrideAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Set a Primary or Secondary Upstream DNS Server before enabling Aliases (DNS Override).")
         }
     }
 }

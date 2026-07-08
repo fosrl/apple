@@ -9,7 +9,6 @@ class ConfigManager: ObservableObject {
     static let defaultHostname = "https://app.pangolin.net"
 
     private let configPath: URL
-    private let defaultPrimaryDNS = "1.1.1.1"
     static let defaultTunnelMTU = 1280
     private static let tunnelMTURange = 576...65535
 
@@ -41,21 +40,23 @@ class ConfigManager: ObservableObject {
         var updatedConfig = config ?? Config()
         var needsSave = false
 
-        // Ensure primary DNS has default value if not set
-        if updatedConfig.primaryDNSServer == nil || updatedConfig.primaryDNSServer?.isEmpty == true
-        {
-            updatedConfig.primaryDNSServer = defaultPrimaryDNS
-            needsSave = true
-        }
-
-        // Ensure DNS override has default value if not set
+        // DNS override defaults to on for both platforms. macOS can fall back to
+        // SCDynamicStore-detected system DNS when left blank (see
+        // NetworkTransitionMonitor), so primary/secondary stay nil/empty there. iOS has no
+        // such fallback, so its primary server is pre-seeded with a real default below instead
+        // of being left blank - see setDNSOverrideEnabled for why that matters.
         if updatedConfig.dnsOverrideEnabled == nil {
             updatedConfig.dnsOverrideEnabled = true
             updatedConfig.dnsTunnelEnabled = false
             needsSave = true
         }
 
-        // Secondary DNS can remain nil/empty, no default needed
+        #if os(iOS)
+            if updatedConfig.primaryDNSServer == nil {
+                updatedConfig.primaryDNSServer = "1.1.1.1"
+                needsSave = true
+            }
+        #endif
 
         if needsSave {
             // Update config synchronously during init to avoid async issues
@@ -117,17 +118,19 @@ class ConfigManager: ObservableObject {
         return config?.dnsOverrideEnabled ?? true
     }
 
+    /// Whether at least one upstream DNS server is configured. Required on iOS before DNS
+    /// override can be turned on (see `setDNSOverrideEnabled`) since it has no automatic
+    /// fallback to the real system DNS to lean on instead, unlike macOS.
+    var hasUpstreamDNSServer: Bool {
+        !getPrimaryDNSServer().isEmpty || !getSecondaryDNSServer().isEmpty
+    }
+
     func getDNSTunnelEnabled() -> Bool {
         return config?.dnsTunnelEnabled ?? false
     }
 
     func getPrimaryDNSServer() -> String {
-        // Config should always have a value after ensureDNSDefaults, but return default as fallback
-        return config?.primaryDNSServer ?? defaultPrimaryDNS
-    }
-
-    func getDefaultPrimaryDNS() -> String {
-        return defaultPrimaryDNS
+        return config?.primaryDNSServer ?? ""
     }
 
     func getSecondaryDNSServer() -> String {
@@ -135,7 +138,17 @@ class ConfigManager: ObservableObject {
         return config?.secondaryDNSServer ?? ""
     }
 
+    /// Enables or disables DNS override. On iOS, requires at least one upstream DNS server to
+    /// already be configured before it can be turned on (see `hasUpstreamDNSServer`) - returns
+    /// false and leaves the setting unchanged if enabling is requested without one. macOS has no
+    /// such requirement: leaving both blank there falls back to SCDynamicStore-detected system
+    /// DNS instead.
     func setDNSOverrideEnabled(_ enabled: Bool) -> Bool {
+        #if os(iOS)
+            if enabled && !hasUpstreamDNSServer {
+                return false
+            }
+        #endif
         var updatedConfig = config ?? Config()
         updatedConfig.dnsOverrideEnabled = enabled
         if !enabled {
@@ -150,19 +163,44 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
 
+    /// Sets the primary upstream DNS server. On iOS, returns false and leaves the setting
+    /// unchanged if clearing it would leave DNS override enabled with no upstream DNS server
+    /// configured at all (see `setDNSOverrideEnabled`).
     func setPrimaryDNSServer(_ server: String) -> Bool {
+        let trimmed: String? = server.isEmpty ? nil : server
+        #if os(iOS)
+            if trimmed == nil, getDNSOverrideEnabled(), getSecondaryDNSServer().isEmpty {
+                return false
+            }
+        #endif
         var updatedConfig = config ?? Config()
-        updatedConfig.primaryDNSServer = server.isEmpty ? nil : server
+        updatedConfig.primaryDNSServer = trimmed
         return save(updatedConfig)
     }
 
+    /// Sets the secondary upstream DNS server. On iOS, returns false and leaves the setting
+    /// unchanged if clearing it would leave DNS override enabled with no upstream DNS server
+    /// configured at all (see `setDNSOverrideEnabled`).
     func setSecondaryDNSServer(_ server: String) -> Bool {
+        let trimmed: String? = server.isEmpty ? nil : server
+        #if os(iOS)
+            if trimmed == nil, getDNSOverrideEnabled(), getPrimaryDNSServer().isEmpty {
+                return false
+            }
+        #endif
         var updatedConfig = config ?? Config()
-        updatedConfig.secondaryDNSServer = server.isEmpty ? nil : server
+        updatedConfig.secondaryDNSServer = trimmed
         return save(updatedConfig)
     }
 
+    /// On iOS, returns false and leaves settings unchanged if overrideEnabled is true but both
+    /// primary and secondary are empty (see `setDNSOverrideEnabled`).
     func setDNSSettings(overrideEnabled: Bool, primary: String, secondary: String) -> Bool {
+        #if os(iOS)
+            if overrideEnabled && primary.isEmpty && secondary.isEmpty {
+                return false
+            }
+        #endif
         var updatedConfig = config ?? Config()
         updatedConfig.dnsOverrideEnabled = overrideEnabled
         updatedConfig.dnsTunnelEnabled = overrideEnabled
