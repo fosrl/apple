@@ -266,6 +266,7 @@ public class TunnelAdapter {
         let fingerprint = (options["fingerprint"]) as? [String: Any] ?? [:]
         let postures = (options["postures"]) as? [String: Any] ?? [:]
         let upstreamDNS = (options["upstreamDNS"] as? [String]) ?? []
+        let matchDomains = (options["matchDomains"] as? [String]) ?? []
 
         // No custom DNS configured; push a synchronous, best-effort read of the device's
         // real (pre-override) DNS servers directly into olm now, before startTunnel
@@ -289,6 +290,7 @@ public class TunnelAdapter {
             "userToken": userToken,
             "orgId": orgId,
             "upstreamDNS": upstreamDNS,
+            "matchDomains": matchDomains,
             "overrideDNS": overrideDNSValue,
             "tunnelDNS": tunnelDNS,
             "fingerprint": fingerprint,

@@ -209,6 +209,22 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
 
+    // MARK: - Match Domains
+
+    /// FQDN wildcard patterns (using * and ? wildcards, e.g. "*.proxy.internal") that olm
+    /// should check against local records/upstream DNS. Queries for domains that don't match
+    /// any pattern are sent directly to the host's system DNS servers instead.
+    func getMatchDomains() -> [String] {
+        return config?.matchDomains ?? []
+    }
+
+    func setMatchDomains(_ domains: [String]) -> Bool {
+        var updatedConfig = config ?? Config()
+        let trimmed = domains.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        updatedConfig.matchDomains = trimmed.isEmpty ? nil : trimmed
+        return save(updatedConfig)
+    }
+
     // MARK: - Advanced / MTU
 
     func getTunnelMTU() -> Int {

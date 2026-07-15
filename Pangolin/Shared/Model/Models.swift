@@ -8,6 +8,11 @@ struct Config: Codable {
     var primaryDNSServer: String?
     var secondaryDNSServer: String?
     var tunnelMTU: Int?
+    /// FQDN wildcard patterns (using * and ? wildcards, e.g. "*.proxy.internal") that olm
+    /// should check against local records/upstream DNS. Queries for domains that don't match
+    /// any pattern are sent directly to the host's system DNS servers instead. Nil/empty means
+    /// match every domain (the feature is disabled).
+    var matchDomains: [String]?
 }
 
 // MARK: - Account Types
