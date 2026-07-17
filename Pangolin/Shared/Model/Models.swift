@@ -13,6 +13,15 @@ struct Config: Codable {
     /// any pattern are sent directly to the host's system DNS servers instead. Nil/empty means
     /// match every domain (the feature is disabled).
     var matchDomains: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case dnsOverrideEnabled
+        case dnsTunnelEnabled
+        case primaryDNSServer
+        case secondaryDNSServer
+        case tunnelMTU
+        case matchDomains = "dnsMatchDomains"
+    }
 }
 
 // MARK: - Account Types
