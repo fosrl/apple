@@ -122,10 +122,9 @@ class APIClient: ObservableObject {
         if let queryParams = queryParams, !queryParams.isEmpty {
             var queryItems: [String] = []
             for (key, value) in queryParams {
-                if let encodedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                   let encodedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                    queryItems.append("\(encodedKey)=\(encodedValue)")
-                }
+                let encodedKey = key.addingFormURLEncoding
+                let encodedValue = value.addingFormURLEncoding
+                queryItems.append("\(encodedKey)=\(encodedValue)")
             }
             if !queryItems.isEmpty {
                 fullURL += "?" + queryItems.joined(separator: "&")
@@ -489,4 +488,12 @@ class APIClient: ObservableObject {
 
 // Helper type for empty responses
 struct EmptyResponse: Codable {}
+
+extension String {
+    var addingFormURLEncoding: String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "+&=?#")
+        return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
+    }
+}
 

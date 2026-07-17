@@ -211,7 +211,7 @@ struct LoginView: View {
                     if !hostname.isEmpty {
                         let codeWithoutHyphen = code.replacingOccurrences(of: "-", with: "")
                         let username = accountManager.activeAccount?.email ?? authManager.currentUser?.username ?? authManager.currentUser?.email ?? ""
-                        let usernameEncoded = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                        let usernameEncoded = username.addingFormURLEncoding
                         let autoOpenURL = "\(hostname)/auth/login/device?code=\(codeWithoutHyphen)&user=\(usernameEncoded)"
                         openBrowser(url: autoOpenURL)
                     }
