@@ -305,6 +305,7 @@ struct SocketPeer: Codable, Equatable {
     let lastSeen: String?
     let endpoint: String?
     let isRelay: Bool?
+    let isLocal: Bool?
 }
 
 struct NetworkSettings: Codable, Equatable {
