@@ -567,6 +567,10 @@ class TunnelManager: NSObject, ObservableObject {
         // means match every domain (the feature is disabled).
         tunnelOptions["matchDomains"] = configManager.getMatchDomains() as NSArray
 
+        // When enabled, tunnel routes are added with a high metric so overlapping
+        // local/connected routes take precedence over the VPN route. Default false.
+        tunnelOptions["preferLocalRoutes"] = NSNumber(value: configManager.getPreferLocalRoutes())
+
         #if os(macOS)
             var fingerprintPosturePair = await fingerprintManager.cachedFingerprintAndPostures()
             if fingerprintPosturePair != nil {
