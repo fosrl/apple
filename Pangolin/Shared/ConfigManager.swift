@@ -225,18 +225,6 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
 
-    // MARK: - Advanced / Routing
-
-    func getPreferLocalRoutes() -> Bool {
-        return config?.preferLocalRoutes ?? false
-    }
-
-    func setPreferLocalRoutes(_ enabled: Bool) -> Bool {
-        var updatedConfig = config ?? Config()
-        updatedConfig.preferLocalRoutes = enabled
-        return save(updatedConfig)
-    }
-
     // MARK: - Advanced / MTU
 
     func getTunnelMTU() -> Int {

@@ -14,11 +14,6 @@ struct Config: Codable {
     /// match every domain (the feature is disabled).
     var matchDomains: [String]?
 
-    /// When enabled, tunnel routes are added with a high metric so overlapping
-    /// local/connected routes take precedence over the VPN route to the same
-    /// destination. Nil/false means off (the default).
-    var preferLocalRoutes: Bool?
-
     enum CodingKeys: String, CodingKey {
         case dnsOverrideEnabled
         case dnsTunnelEnabled
@@ -26,7 +21,6 @@ struct Config: Codable {
         case secondaryDNSServer
         case tunnelMTU
         case matchDomains = "dnsMatchDomains"
-        case preferLocalRoutes
     }
 }
 
