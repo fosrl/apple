@@ -37,6 +37,7 @@ type StartTunnelConfig struct {
 	UserToken           string         `json:"userToken"`
 	OrgID               string         `json:"orgId"`
 	UpstreamDNS         []string       `json:"upstreamDNS"`
+	MatchDomains        []string       `json:"matchDomains"`
 	OverrideDNS         bool           `json:"overrideDNS"`
 	TunnelDNS           bool           `json:"tunnelDNS"`
 	Fingerprint         map[string]any `json:"fingerprint"`
@@ -130,6 +131,7 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 		OverrideDNS:          config.OverrideDNS,
 		TunnelDNS:            config.TunnelDNS,
 		UpstreamDNS:          config.UpstreamDNS,
+		MatchDomains:         config.MatchDomains,
 		OrgID:                config.OrgID,
 		InitialFingerprint:   config.Fingerprint,
 		InitialPostures:      config.Postures,

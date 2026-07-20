@@ -562,6 +562,11 @@ class TunnelManager: NSObject, ObservableObject {
         // to leave DNS resolution to the system resolver instead of overriding it.
         tunnelOptions["upstreamDNS"] = upstreamDNSServers as NSArray
 
+        // FQDN wildcard patterns olm should check against local records/upstream DNS;
+        // non-matching queries go straight to the host's system DNS servers. Empty
+        // means match every domain (the feature is disabled).
+        tunnelOptions["matchDomains"] = configManager.getMatchDomains() as NSArray
+
         #if os(macOS)
             var fingerprintPosturePair = await fingerprintManager.cachedFingerprintAndPostures()
             if fingerprintPosturePair != nil {

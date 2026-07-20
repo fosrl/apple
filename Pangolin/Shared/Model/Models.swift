@@ -8,6 +8,20 @@ struct Config: Codable {
     var primaryDNSServer: String?
     var secondaryDNSServer: String?
     var tunnelMTU: Int?
+    /// FQDN wildcard patterns (using * and ? wildcards, e.g. "*.proxy.internal") that olm
+    /// should check against local records/upstream DNS. Queries for domains that don't match
+    /// any pattern are sent directly to the host's system DNS servers instead. Nil/empty means
+    /// match every domain (the feature is disabled).
+    var matchDomains: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case dnsOverrideEnabled
+        case dnsTunnelEnabled
+        case primaryDNSServer
+        case secondaryDNSServer
+        case tunnelMTU
+        case matchDomains = "dnsMatchDomains"
+    }
 }
 
 // MARK: - Account Types
@@ -300,6 +314,7 @@ struct SocketPeer: Codable, Equatable {
     let lastSeen: String?
     let endpoint: String?
     let isRelay: Bool?
+    let isLocal: Bool?
 }
 
 struct NetworkSettings: Codable, Equatable {
