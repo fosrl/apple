@@ -225,6 +225,23 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
 
+    // MARK: - Update Settings
+
+    /// Optional override for Sparkle automatic update checks. `nil` leaves Sparkle prefs alone.
+    func getAutoUpdateChecksEnabled() -> Bool? {
+        return config?.autoUpdateChecksEnabled
+    }
+
+    /// Optional override for Sparkle automatic download/install. `nil` leaves Sparkle prefs alone.
+    func getAutoDownloadUpdatesEnabled() -> Bool? {
+        return config?.autoDownloadUpdatesEnabled
+    }
+
+    /// Optional override for Sparkle check interval in seconds. `nil` leaves Sparkle prefs alone.
+    func getUpdateCheckIntervalSeconds() -> Int? {
+        return config?.updateCheckIntervalSeconds
+    }
+
     // MARK: - Advanced / MTU
 
     func getTunnelMTU() -> Int {

@@ -13,6 +13,12 @@ struct Config: Codable {
     /// any pattern are sent directly to the host's system DNS servers instead. Nil/empty means
     /// match every domain (the feature is disabled).
     var matchDomains: [String]?
+    /// When set, overrides Sparkle's automatic update check preference.
+    var autoUpdateChecksEnabled: Bool?
+    /// When set, overrides Sparkle's automatic download/install preference.
+    var autoDownloadUpdatesEnabled: Bool?
+    /// When set, overrides Sparkle's scheduled check interval (seconds; minimum 3600).
+    var updateCheckIntervalSeconds: Int?
 
     enum CodingKeys: String, CodingKey {
         case dnsOverrideEnabled
@@ -21,6 +27,9 @@ struct Config: Codable {
         case secondaryDNSServer
         case tunnelMTU
         case matchDomains = "dnsMatchDomains"
+        case autoUpdateChecksEnabled
+        case autoDownloadUpdatesEnabled
+        case updateCheckIntervalSeconds
     }
 }
 

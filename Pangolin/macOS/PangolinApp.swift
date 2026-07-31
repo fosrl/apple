@@ -63,6 +63,13 @@ struct PangolinApp: App {
 
     private let updaterController: SPUStandardUpdaterController
 
+    private static let sparkleMinimumCheckInterval: TimeInterval = 3600
+
+    private static let logger: OSLog = {
+        let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
+        return OSLog(subsystem: subsystem, category: "PangolinApp")
+    }()
+
     init() {
         // Initialize Sparkle updater
         updaterController = SPUStandardUpdaterController(
@@ -70,6 +77,8 @@ struct PangolinApp: App {
         let configMgr = ConfigManager()
         let secretMgr = SecretManager()
         let accountMgr = AccountManager()
+
+        Self.applyUpdateSettings(from: configMgr, to: updaterController.updater)
 
         let activeAccount = accountMgr.activeAccount
 
@@ -111,6 +120,50 @@ struct PangolinApp: App {
         _tunnelManager = StateObject(wrappedValue: tunnelMgr)
         _onboardingStateManager = StateObject(wrappedValue: onboardingState)
         _onboardingViewModel = StateObject(wrappedValue: onboardingVM)
+    }
+
+    /// Applies present pangolin.json update keys to Sparkle. Absent keys leave Sparkle prefs alone.
+    private static func applyUpdateSettings(from configManager: ConfigManager, to updater: SPUUpdater) {
+        var didChangeSchedulerSettings = false
+
+        if let autoChecks = configManager.getAutoUpdateChecksEnabled() {
+            os_log(
+                "Applying config autoUpdateChecksEnabled=%{public}@",
+                log: logger, type: .info,
+                autoChecks ? "true" : "false")
+            updater.automaticallyChecksForUpdates = autoChecks
+            didChangeSchedulerSettings = true
+        }
+
+        if let autoDownload = configManager.getAutoDownloadUpdatesEnabled() {
+            os_log(
+                "Applying config autoDownloadUpdatesEnabled=%{public}@",
+                log: logger, type: .info,
+                autoDownload ? "true" : "false")
+            updater.automaticallyDownloadsUpdates = autoDownload
+        }
+
+        if let intervalSeconds = configManager.getUpdateCheckIntervalSeconds() {
+            var interval = TimeInterval(intervalSeconds)
+            if interval < sparkleMinimumCheckInterval {
+                os_log(
+                    "updateCheckIntervalSeconds=%{public}d is below Sparkle minimum; clamping to %{public}.0f",
+                    log: logger, type: .info,
+                    intervalSeconds, sparkleMinimumCheckInterval)
+                interval = sparkleMinimumCheckInterval
+            } else {
+                os_log(
+                    "Applying config updateCheckIntervalSeconds=%{public}.0f",
+                    log: logger, type: .info,
+                    interval)
+            }
+            updater.updateCheckInterval = interval
+            didChangeSchedulerSettings = true
+        }
+
+        if didChangeSchedulerSettings {
+            updater.resetUpdateCycle()
+        }
     }
 
     var body: some Scene {
