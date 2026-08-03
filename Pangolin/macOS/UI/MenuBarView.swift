@@ -593,7 +593,7 @@ struct ConnectButtonItem: View {
     var openWindow: OpenWindowAction
 
     private var shouldDisableButton: Bool {
-        return tunnelManager.status == .starting
+        tunnelManager.status == .starting && !tunnelManager.isNEConnected
     }
 
     var body: some View {
@@ -616,5 +616,6 @@ struct ConnectButtonItem: View {
             }
         }
         .disabled(shouldDisableButton)
+        .id(tunnelManager.isNEConnected)
     }
 }
