@@ -150,12 +150,17 @@ struct OLMStatusContentView: View {
                         Text("Connection Status")
                     }
                     
-                    // Peers Section
-                    if let peers = status.peers, !peers.isEmpty {
+                    // Peers Section (the exit node, if connected, is shown first as "Pangolin Server")
+                    if status.exitNode != nil || !(status.peers?.isEmpty ?? true) {
                         Section {
-                            ForEach(Array(peers.keys.sorted()), id: \.self) { peerKey in
-                                if let peer = peers[peerKey] {
-                                    PeerRowView(peer: peer)
+                            if let exitNode = status.exitNode {
+                                PeerRowView(name: "Pangolin Server", endpoint: exitNode.endpoint, connected: exitNode.connected)
+                            }
+                            if let peers = status.peers {
+                                ForEach(Array(peers.keys.sorted()), id: \.self) { peerKey in
+                                    if let peer = peers[peerKey] {
+                                        PeerRowView(name: peer.name ?? "Unknown", endpoint: peer.endpoint, connected: peer.connected ?? false)
+                                    }
                                 }
                             }
                         } header: {
@@ -217,38 +222,40 @@ struct OLMStatusContentView: View {
 // MARK: - Peer Row View
 
 struct PeerRowView: View {
-    let peer: SocketPeer
-    
+    let name: String
+    let endpoint: String?
+    let connected: Bool
+
     var body: some View {
         HStack {
             // Peer name
             VStack(alignment: .leading, spacing: 2) {
-                Text(peer.name ?? "Unknown")
+                Text(name)
                     .font(.system(size: 13))
-                if let endpoint = peer.endpoint {
+                if let endpoint = endpoint {
                     Text(endpoint)
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
             // Status indicators
             HStack(spacing: 12) {
                 // Connected status
                 HStack(spacing: 4) {
                     Circle()
-                        .fill((peer.connected ?? false) ? Color.green : Color.gray)
+                        .fill(connected ? Color.green : Color.gray)
                         .frame(width: 8, height: 8)
-                    Text(formatStatus(peer.connected ?? false))
+                    Text(formatStatus(connected))
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
             }
         }
     }
-    
+
     private func formatStatus(_ connected: Bool) -> String {
         return connected ? "Connected" : "Disconnected"
     }

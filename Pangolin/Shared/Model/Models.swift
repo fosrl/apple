@@ -313,6 +313,7 @@ struct SocketStatusResponse: Codable, Equatable {
     let orgId: String?
     let networkSettings: NetworkSettings?
     let error: SocketStatusError?
+    let exitNode: ExitNodeStatus?
 }
 
 struct SocketPeer: Codable, Equatable {
@@ -324,6 +325,15 @@ struct SocketPeer: Codable, Equatable {
     let endpoint: String?
     let isRelay: Bool?
     let isLocal: Bool?
+}
+
+// ExitNodeStatus represents the connectivity status of the client's own exit
+// node connection (used for site resources hosted on the exit node).
+struct ExitNodeStatus: Codable, Equatable {
+    let connected: Bool
+    let rtt: Int64?  // nanoseconds
+    let lastSeen: String?
+    let endpoint: String?
 }
 
 struct NetworkSettings: Codable, Equatable {
