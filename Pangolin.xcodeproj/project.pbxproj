@@ -541,7 +541,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.10.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
@@ -587,7 +587,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.10.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
@@ -630,7 +630,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/PangolinGo",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.10.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
@@ -673,7 +673,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/PangolinGo",
 				);
-				MARKETING_VERSION = 0.11.0;
+				MARKETING_VERSION = 0.10.0;
 				OTHER_LDFLAGS = "$(SRCROOT)/PangolinGo/libpangolin_ios_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=arm64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_arm64.a";
 				"OTHER_LDFLAGS[sdk=iphonesimulator*][arch=x86_64]" = "$(SRCROOT)/PangolinGo/libpangolin_ios_sim_x86_64.a";
