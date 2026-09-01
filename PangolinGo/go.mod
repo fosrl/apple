@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/fosrl/newt v1.16.0
-	github.com/fosrl/olm v1.9.0
+	github.com/fosrl/olm v1.9.1
 )
 
 require (
