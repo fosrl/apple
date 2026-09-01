@@ -76,8 +76,26 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func wake() {
         os_log("Device waking up, setting power mode to normal", log: logger, type: .info)
         setPowerMode(mode: "normal")
+        sweepStaleDNS()
     }
-    
+
+    // Best-effort cleanup of any stale DNS override left behind by a previous
+    // unclean shutdown (e.g. a crashed/killed extension process). wake() is a
+    // reliable place to run this: it's invoked by the OS after every sleep,
+    // which is exactly the trigger reported for this class of bug (see
+    // fosrl/apple#58), and this process still holds the privileges needed to
+    // touch the scutil state store, unlike the containing app. No-op if
+    // nothing is stuck (including on iOS, where there is nothing to sweep).
+    private func sweepStaleDNS() {
+        if let result = PangolinGo.sweepStaleDNS() {
+            let message = String(cString: result)
+            result.deallocate()
+            os_log("sweepStaleDNS returned: %{public}@", log: logger, type: .debug, message)
+        } else {
+            os_log("Failed to call Go sweepStaleDNS function (returned nil)", log: logger, type: .error)
+        }
+    }
+
     private func setPowerMode(mode: String) {
         let modeCString = mode.utf8CString
         let modePtr = UnsafeMutablePointer<CChar>.allocate(capacity: modeCString.count)
