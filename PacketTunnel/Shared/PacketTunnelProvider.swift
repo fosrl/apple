@@ -68,24 +68,56 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     
     override func sleep(completionHandler: @escaping () -> Void) {
-        os_log("Device going to sleep, setting power mode to low", log: logger, type: .info)
-        setPowerMode(mode: "low")
+        #if os(iOS)
+            // Low power mode disconnects the control websocket and throttles
+            // monitoring intervals, which matters on iOS: the extension keeps
+            // running in the background under a tight execution/battery budget,
+            // and idle pings/reconnect attempts would eat into it for no benefit
+            // while the device is asleep or backgrounded.
+            os_log("Device going to sleep, setting power mode to low", log: logger, type: .info)
+            setPowerMode(mode: "low")
+        #else
+            // macOS: leave the control websocket connected through sleep rather
+            // than tearing it down. Real system sleep halts all process timers,
+            // so there's no idle-loop cost to avoid here the way there is on
+            // iOS - and leaving it connected keeps its own dead-connection
+            // detection (read-deadline/pong, see websocket.Client) armed, so
+            // recovery on wake is driven by an actual failed round trip instead
+            // of a fixed timer guessing the network is back. See wake() below.
+            os_log("Device going to sleep (macOS, leaving control connection intact)", log: logger, type: .info)
+        #endif
         completionHandler()
     }
-    
+
     override func wake() {
-        os_log("Device waking up, setting power mode to normal", log: logger, type: .info)
-        setPowerMode(mode: "normal")
+        #if os(iOS)
+            os_log("Device waking up, setting power mode to normal", log: logger, type: .info)
+            setPowerMode(mode: "normal")
+        #else
+            // Nudge the (never-disconnected) control websocket with an immediate
+            // ping rather than forcing a full reconnect: a live connection
+            // confirms itself in one round trip, and a dead one starts
+            // reconnecting right away via the same path a failed scheduled ping
+            // would trigger. See pokeConnection/PokeConnection.
+            os_log("Device waking up, poking control connection", log: logger, type: .info)
+            pokeConnection()
+        #endif
         sweepStaleDNS()
+    }
+
+    private func pokeConnection() {
+        if let result = PangolinGo.pokeConnection() {
+            let message = String(cString: result)
+            result.deallocate()
+            os_log("pokeConnection returned: %{public}@", log: logger, type: .debug, message)
+        } else {
+            os_log("Failed to call Go pokeConnection function (returned nil)", log: logger, type: .error)
+        }
     }
 
     // Best-effort cleanup of any stale DNS override left behind by a previous
     // unclean shutdown (e.g. a crashed/killed extension process). wake() is a
-    // reliable place to run this: it's invoked by the OS after every sleep,
-    // which is exactly the trigger reported for this class of bug (see
-    // fosrl/apple#58), and this process still holds the privileges needed to
-    // touch the scutil state store, unlike the containing app. No-op if
-    // nothing is stuck (including on iOS, where there is nothing to sweep).
+    // reliable place to run this: it's invoked by the OS after every sleep.
     private func sweepStaleDNS() {
         if let result = PangolinGo.sweepStaleDNS() {
             let message = String(cString: result)

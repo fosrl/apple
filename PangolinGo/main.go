@@ -262,9 +262,35 @@ func setPowerMode(mode *C.char) *C.char {
 	}
 
 	modeStr := C.GoString(mode)
-	// olm.SetPowerMode(modeStr)
+	if err := olm.SetPowerMode(modeStr); err != nil {
+		appLogger.Error("Failed to set power mode: %v", err)
+		return C.CString(fmt.Sprintf("Error: %v", err))
+	}
 	appLogger.Info("Power mode set to: %s", modeStr)
 	return C.CString(fmt.Sprintf("Power mode set to: %s", modeStr))
+}
+
+// pokeConnection sends an immediate ping over the control websocket instead
+// of waiting for the next scheduled interval, so a live connection confirms
+// itself in one round trip and a dead one starts reconnecting right away.
+// Intended to be called from a "device woke up" hook (macOS, where sleep no
+// longer tears the websocket down via power mode - see setPowerMode's
+// iOS-only use in PacketTunnelProvider.swift - so recovery needs a nudge
+// tied to a real signal rather than a fixed timer).
+//
+//export pokeConnection
+func pokeConnection() *C.char {
+	tunnelMutex.Lock()
+	running := tunnelRunning
+	tunnelMutex.Unlock()
+
+	if !running {
+		appLogger.Warn("Tunnel is not running")
+		return C.CString("Error: Tunnel not running")
+	}
+
+	olm.PokeConnection()
+	return C.CString("Poked connection")
 }
 
 //export rebindSocket
