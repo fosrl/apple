@@ -640,6 +640,19 @@ class TunnelManager: NSObject, ObservableObject {
         await updateConnectionStatus()
     }
 
+    /// Polls `status` until it reaches a terminal state (`.connected` or `.disconnected`) or
+    /// `timeout` elapses, returning whatever `status` is at that point. `connect()`/`disconnect()`
+    /// only kick off the underlying NE/socket work and return immediately, so callers that need
+    /// the final outcome (e.g. App Intents reporting back to Shortcuts) should await this rather
+    /// than reading `status` right after those calls return.
+    func waitUntilSettled(timeout: TimeInterval = 15) async -> TunnelStatus {
+        let deadline = Date().addingTimeInterval(timeout)
+        while status != .connected && status != .disconnected && Date() < deadline {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        return status
+    }
+
     func switchOrg(orgId: String) async {
         // Only switch if tunnel is connected
         guard isNEConnected else {
