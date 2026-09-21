@@ -58,6 +58,10 @@ class TunnelManager: NSObject, ObservableObject {
     private nonisolated(unsafe) var lastTunnelStatus: TunnelStatus?
     private nonisolated(unsafe) var lastIsNEConnected: Bool = false
 
+    #if os(iOS)
+        private var liveActivityCancellable: AnyCancellable?
+    #endif
+
     /// Socket error codes that indicate session expired; re-auth button should be shown.
     private static let sessionExpiredSocketErrorCodes: Set<String> = [
         "UNAUTHORIZED",
@@ -96,6 +100,15 @@ class TunnelManager: NSObject, ObservableObject {
             }
         }
 
+        #if os(iOS)
+            liveActivityCancellable = $status
+                .removeDuplicates()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] newStatus in
+                    self?.syncLiveActivity(status: newStatus)
+                }
+        #endif
+
         Task {
             #if os(macOS)
                 // Defer system extension and VPN setup until the user completes onboarding
@@ -124,6 +137,9 @@ class TunnelManager: NSObject, ObservableObject {
                         self.isNEConnected = false
                         self.status = .disconnected
                     }
+                }
+                await MainActor.run {
+                    self.reconcileLiveActivityOnLaunch()
                 }
             #endif
         }
@@ -815,6 +831,24 @@ class TunnelManager: NSObject, ObservableObject {
         lastTunnelStatus = nil
         lastIsNEConnected = false
     }
+
+    #if os(iOS)
+        @MainActor
+        private func syncLiveActivity(status: TunnelStatus) {
+            VPNLiveActivityManager.shared.handleStatusChange(
+                status: status,
+                organizationName: authManager.currentOrg?.name
+            )
+        }
+
+        @MainActor
+        private func reconcileLiveActivityOnLaunch() {
+            VPNLiveActivityManager.shared.reconcileOnLaunch(
+                status: status,
+                organizationName: authManager.currentOrg?.name
+            )
+        }
+    #endif
 }
 
 // MARK: - OSSystemExtensionRequestDelegate
