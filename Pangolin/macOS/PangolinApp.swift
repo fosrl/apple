@@ -1,3 +1,4 @@
+import AppIntents
 import AppKit
 import Sparkle
 import SwiftUI
@@ -50,8 +51,15 @@ struct AnimatedLoadingIcon: View {
     }
 }
 
+final class PangolinAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        PangolinAppShortcuts.updateAppShortcutParameters()
+    }
+}
+
 @main
 struct PangolinApp: App {
+    @NSApplicationDelegateAdaptor(PangolinAppDelegate.self) private var appDelegate
     @StateObject private var configManager = ConfigManager()
     @StateObject private var secretManager = SecretManager()
     @StateObject private var accountManager = AccountManager()
@@ -104,6 +112,9 @@ struct PangolinApp: App {
 
         // Set tunnel manager reference in auth manager for org switching
         authMgr.tunnelManager = tunnelMgr
+
+        AppDependencies.shared.configure(
+            tunnelManager: tunnelMgr, authManager: authMgr, accountManager: accountMgr)
 
         let onboardingState = OnboardingStateManager()
         let onboardingVM = MacOnboardingViewModel(

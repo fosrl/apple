@@ -1,7 +1,8 @@
 import AppIntents
 
 struct PangolinAppShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
+    @AppShortcutsBuilder
+    nonisolated static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: ConnectVPNIntent(),
             phrases: [
@@ -52,5 +53,5 @@ struct PangolinAppShortcuts: AppShortcutsProvider {
         )
     }
 
-    static var shortcutTileColor: ShortcutTileColor = .navy
+    nonisolated static var shortcutTileColor: ShortcutTileColor { .navy }
 }

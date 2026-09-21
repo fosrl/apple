@@ -1,6 +1,6 @@
 import AppIntents
 
-struct ConnectVPNIntent: AppIntent {
+nonisolated struct ConnectVPNIntent: AppIntent {
     static var title: LocalizedStringResource = "Connect Pangolin VPN"
     static var description = IntentDescription("Enables the Pangolin VPN connection.")
     static var openAppWhenRun: Bool = false

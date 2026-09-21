@@ -10,7 +10,6 @@
 		9039ACD52ECFB01000FCA982 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 9039ACD42ECFB01000FCA982 /* Sparkle */; };
 		907A6C7D2F05AE620097F387 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90D1911A2EC9248100912E68 /* NetworkExtension.framework */; };
 		907A6C862F05AE620097F387 /* PacketTunneliOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 907A6C7C2F05AE620097F387 /* PacketTunneliOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		907A6C942F05AFE60097F387 /* libpangolin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 907A6C932F05AFE60097F387 /* libpangolin.a */; };
 		90D1973A2EC96BEC00912E68 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90D1911A2EC9248100912E68 /* NetworkExtension.framework */; };
 		90D197442EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 90D197392EC96BEC00912E68 /* net.pangolin.Pangolin.PacketTunnel.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -108,13 +107,6 @@
 		901FF5E22EC7EE9900711D4E /* Exceptions for "Pangolin" folder in "Pangolin" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				iOS/AppIntents/AppDependencies.swift,
-				iOS/AppIntents/ConnectVPNIntent.swift,
-				iOS/AppIntents/DisconnectVPNIntent.swift,
-				iOS/AppIntents/GetVPNStatusIntent.swift,
-				iOS/AppIntents/PangolinAppShortcuts.swift,
-				iOS/AppIntents/PangolinIntentError.swift,
-				iOS/AppIntents/VPNStatusEntity.swift,
 				iOS/Info.plist,
 				iOS/PangolinApp.swift,
 				iOS/UI/AboutView.swift,
@@ -133,13 +125,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Assets.xcassets,
-				iOS/AppIntents/AppDependencies.swift,
-				iOS/AppIntents/ConnectVPNIntent.swift,
-				iOS/AppIntents/DisconnectVPNIntent.swift,
-				iOS/AppIntents/GetVPNStatusIntent.swift,
-				iOS/AppIntents/PangolinAppShortcuts.swift,
-				iOS/AppIntents/PangolinIntentError.swift,
-				iOS/AppIntents/VPNStatusEntity.swift,
 				iOS/PangolinApp.swift,
 				iOS/UI/AboutView.swift,
 				iOS/UI/LoginView.swift,
@@ -151,6 +136,13 @@
 				iOS/UI/StatusView.swift,
 				"pangolin-app-icon.icon",
 				Shared/AccountManager.swift,
+				Shared/AppIntents/AppDependencies.swift,
+				Shared/AppIntents/ConnectVPNIntent.swift,
+				Shared/AppIntents/DisconnectVPNIntent.swift,
+				Shared/AppIntents/GetVPNStatusIntent.swift,
+				Shared/AppIntents/PangolinAppShortcuts.swift,
+				Shared/AppIntents/PangolinIntentError.swift,
+				Shared/AppIntents/VPNStatusEntity.swift,
 				Shared/AlertManager.swift,
 				Shared/APIClient.swift,
 				Shared/AuthManager.swift,

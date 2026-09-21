@@ -1,6 +1,6 @@
 import AppIntents
 
-struct GetVPNStatusIntent: AppIntent {
+nonisolated struct GetVPNStatusIntent: AppIntent {
     static var title: LocalizedStringResource = "Get Pangolin VPN Status"
     static var description = IntentDescription(
         "Returns whether the Pangolin VPN is connected, along with the active organization and server."
