@@ -129,6 +129,7 @@
 				iOS/UI/StatusView.swift,
 				macOS/Info.plist,
 				Shared/LiveActivity/PangolinVPNAttributes.swift,
+				Shared/LiveActivity/TogglePangolinVPNControlIntent.swift,
 				Shared/LiveActivity/VPNLiveActivityManager.swift,
 				Shared/LiveActivity/VPNWidgetStatusStore.swift,
 			);
@@ -165,6 +166,7 @@
 				Shared/IPAddressValidator.swift,
 				Shared/KeychainHelper.swift,
 				Shared/LiveActivity/PangolinVPNAttributes.swift,
+				Shared/LiveActivity/TogglePangolinVPNControlIntent.swift,
 				Shared/LiveActivity/VPNLiveActivityManager.swift,
 				Shared/LiveActivity/VPNWidgetStatusStore.swift,
 				Shared/Model/Models.swift,
@@ -200,7 +202,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				PangolinLiveActivity.entitlements,
 			);
 			target = 90LA01042F1000010097F387 /* PangolinLiveActivity */;
 		};
@@ -208,6 +209,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Shared/LiveActivity/PangolinVPNAttributes.swift,
+				Shared/LiveActivity/TogglePangolinVPNControlIntent.swift,
 				Shared/LiveActivity/VPNWidgetStatusStore.swift,
 			);
 			target = 90LA01042F1000010097F387 /* PangolinLiveActivity */;

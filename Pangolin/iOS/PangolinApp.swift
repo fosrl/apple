@@ -3,6 +3,8 @@ import os.log
 
 @main
 struct PangolinApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     @StateObject private var configManager = ConfigManager()
     @StateObject private var secretManager = SecretManager()
     @StateObject private var accountManager = AccountManager()
@@ -98,7 +100,12 @@ struct PangolinApp: App {
                 Task {
                     await authManager.initialize()
                     await onboardingViewModel.refreshPages()
+                    await performPendingVPNWidgetActionIfNeeded()
                 }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await performPendingVPNWidgetActionIfNeeded() }
             }
             .onOpenURL { url in
                 Task { await handleVPNWidgetURL(url) }
@@ -112,7 +119,17 @@ struct PangolinApp: App {
     @MainActor
     private func handleVPNWidgetURL(_ url: URL) async {
         guard let action = VPNWidgetDeepLink.action(from: url) else { return }
+        await performVPNWidgetAction(action)
+    }
 
+    @MainActor
+    private func performPendingVPNWidgetActionIfNeeded() async {
+        guard let action = VPNWidgetPendingAction.take() else { return }
+        await performVPNWidgetAction(action)
+    }
+
+    @MainActor
+    private func performVPNWidgetAction(_ action: VPNWidgetDeepLink.Action) async {
         await authManager.initialize()
 
         switch action {
@@ -121,6 +138,16 @@ struct PangolinApp: App {
             await tunnelManager.connect()
         case .disconnect:
             await tunnelManager.disconnect()
+        }
+    }
+
+    @MainActor
+    private func performVPNWidgetAction(_ action: VPNWidgetPendingAction) async {
+        switch action {
+        case .connect:
+            await performVPNWidgetAction(VPNWidgetDeepLink.Action.connect)
+        case .disconnect:
+            await performVPNWidgetAction(VPNWidgetDeepLink.Action.disconnect)
         }
     }
 }

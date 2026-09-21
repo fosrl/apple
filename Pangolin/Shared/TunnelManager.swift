@@ -896,6 +896,9 @@ class TunnelManager: NSObject, ObservableObject {
                 serverHostname: serverHostname
             )
             WidgetCenter.shared.reloadTimelines(ofKind: VPNWidgetStatusStore.widgetKind)
+            if #available(iOS 18.0, *) {
+                ControlCenter.shared.reloadControls(ofKind: VPNWidgetStatusStore.controlKind)
+            }
         }
     #endif
 }

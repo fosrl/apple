@@ -9,8 +9,8 @@ struct PangolinVPNWidget: Widget {
             PangolinVPNWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("Pangolin VPN")
-        .description("Connect or disconnect Pangolin VPN.")
+        .configurationDisplayName("Pangolin")
+        .description("Connect or disconnect Pangolin.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }

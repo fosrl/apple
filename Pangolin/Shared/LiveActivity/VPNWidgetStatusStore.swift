@@ -52,10 +52,35 @@ enum VPNWidgetDeepLink {
     }
 }
 
+/// Pending connect/disconnect request from the Control Center toggle.
+/// Written by the control intent; consumed when the app becomes active.
+enum VPNWidgetPendingAction: String, Sendable {
+    case connect
+    case disconnect
+
+    private static let key = "vpnWidget.pendingAction"
+
+    nonisolated private static var defaults: UserDefaults? {
+        UserDefaults(suiteName: VPNWidgetStatusStore.appGroupID)
+    }
+
+    nonisolated static func set(_ action: VPNWidgetPendingAction) {
+        defaults?.set(action.rawValue, forKey: key)
+    }
+
+    /// Returns and clears any pending action.
+    nonisolated static func take() -> VPNWidgetPendingAction? {
+        guard let defaults, let raw = defaults.string(forKey: key) else { return nil }
+        defaults.removeObject(forKey: key)
+        return VPNWidgetPendingAction(rawValue: raw)
+    }
+}
+
 /// Reads/writes VPN status for the Home Screen widget via the shared App Group.
 enum VPNWidgetStatusStore {
     static let appGroupID = "group.net.pangolin.Pangolin"
     static let widgetKind = "net.pangolin.Pangolin.VPNStatusWidget"
+    static let controlKind = "net.pangolin.Pangolin.VPNControl"
 
     private static let statusTextKey = "vpnWidget.statusText"
     private static let isConnectedKey = "vpnWidget.isConnected"
