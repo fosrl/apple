@@ -30,7 +30,7 @@ struct PangolinVPNLiveActivity: Widget {
                 PangolinLiveActivityLogo(size: Self.islandLogoSize)
                     .frame(width: Self.islandSlotSize, height: Self.islandSlotSize)
             } compactTrailing: {
-                ConnectedIndicatorDot(size: 8)
+                Color.clear
                     .frame(width: Self.islandSlotSize, height: Self.islandSlotSize)
             } minimal: {
                 PangolinLiveActivityLogo(size: Self.islandLogoSize)

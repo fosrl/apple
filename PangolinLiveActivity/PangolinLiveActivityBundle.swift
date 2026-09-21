@@ -5,5 +5,6 @@ import WidgetKit
 struct PangolinLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         PangolinVPNLiveActivity()
+        PangolinVPNWidget()
     }
 }

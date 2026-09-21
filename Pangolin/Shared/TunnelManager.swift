@@ -3,6 +3,10 @@ import Foundation
 import NetworkExtension
 import os.log
 
+#if os(iOS)
+    import WidgetKit
+#endif
+
 #if os(macOS)
     import SystemExtensions
 #endif
@@ -60,6 +64,7 @@ class TunnelManager: NSObject, ObservableObject {
 
     #if os(iOS)
         private var liveActivityCancellable: AnyCancellable?
+        private var widgetMetadataCancellables = Set<AnyCancellable>()
     #endif
 
     /// Socket error codes that indicate session expired; re-auth button should be shown.
@@ -106,7 +111,34 @@ class TunnelManager: NSObject, ObservableObject {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] newStatus in
                     self?.syncLiveActivity(status: newStatus)
+                    self?.syncWidgetStatus(status: newStatus)
                 }
+
+            // Org / account can change while tunnel status stays the same; refresh
+            // the widget so cleared selections don't leave stale labels.
+            authManager.$currentOrg
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    self.syncWidgetStatus(status: self.status)
+                }
+                .store(in: &widgetMetadataCancellables)
+
+            authManager.$isAuthenticated
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    self.syncWidgetStatus(status: self.status)
+                }
+                .store(in: &widgetMetadataCancellables)
+
+            accountManager.$store
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    self.syncWidgetStatus(status: self.status)
+                }
+                .store(in: &widgetMetadataCancellables)
         #endif
 
         Task {
@@ -140,6 +172,7 @@ class TunnelManager: NSObject, ObservableObject {
                 }
                 await MainActor.run {
                     self.reconcileLiveActivityOnLaunch()
+                    self.syncWidgetStatus(status: self.status)
                 }
             #endif
         }
@@ -847,6 +880,22 @@ class TunnelManager: NSObject, ObservableObject {
                 status: status,
                 organizationName: authManager.currentOrg?.name
             )
+        }
+
+        @MainActor
+        private func syncWidgetStatus(status: TunnelStatus) {
+            let organizationName =
+                authManager.isAuthenticated ? authManager.currentOrg?.name : nil
+            let serverHostname =
+                authManager.isAuthenticated ? accountManager.activeAccount?.hostname : nil
+            VPNWidgetStatusStore.write(
+                statusText: status.displayText,
+                isConnected: status == .connected,
+                isBusy: status == .starting || status == .registering,
+                organizationName: organizationName,
+                serverHostname: serverHostname
+            )
+            WidgetCenter.shared.reloadTimelines(ofKind: VPNWidgetStatusStore.widgetKind)
         }
     #endif
 }

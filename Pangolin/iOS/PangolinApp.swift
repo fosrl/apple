@@ -100,9 +100,27 @@ struct PangolinApp: App {
                     await onboardingViewModel.refreshPages()
                 }
             }
+            .onOpenURL { url in
+                Task { await handleVPNWidgetURL(url) }
+            }
             .fullScreenCover(isPresented: $onboardingViewModel.isPresenting) {
                 OnboardingFlowView(viewModel: onboardingViewModel)
             }
+        }
+    }
+
+    @MainActor
+    private func handleVPNWidgetURL(_ url: URL) async {
+        guard let action = VPNWidgetDeepLink.action(from: url) else { return }
+
+        await authManager.initialize()
+
+        switch action {
+        case .connect:
+            guard authManager.isAuthenticated, authManager.currentOrg != nil else { return }
+            await tunnelManager.connect()
+        case .disconnect:
+            await tunnelManager.disconnect()
         }
     }
 }
