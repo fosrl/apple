@@ -108,6 +108,13 @@
 		901FF5E22EC7EE9900711D4E /* Exceptions for "Pangolin" folder in "Pangolin" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				iOS/AppIntents/AppDependencies.swift,
+				iOS/AppIntents/ConnectVPNIntent.swift,
+				iOS/AppIntents/DisconnectVPNIntent.swift,
+				iOS/AppIntents/GetVPNStatusIntent.swift,
+				iOS/AppIntents/PangolinAppShortcuts.swift,
+				iOS/AppIntents/PangolinIntentError.swift,
+				iOS/AppIntents/VPNStatusEntity.swift,
 				iOS/Info.plist,
 				iOS/PangolinApp.swift,
 				iOS/UI/AboutView.swift,
@@ -126,6 +133,13 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Assets.xcassets,
+				iOS/AppIntents/AppDependencies.swift,
+				iOS/AppIntents/ConnectVPNIntent.swift,
+				iOS/AppIntents/DisconnectVPNIntent.swift,
+				iOS/AppIntents/GetVPNStatusIntent.swift,
+				iOS/AppIntents/PangolinAppShortcuts.swift,
+				iOS/AppIntents/PangolinIntentError.swift,
+				iOS/AppIntents/VPNStatusEntity.swift,
 				iOS/PangolinApp.swift,
 				iOS/UI/AboutView.swift,
 				iOS/UI/LoginView.swift,
@@ -222,7 +236,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				907A6C942F05AFE60097F387 /* libpangolin.a in Frameworks */,
 				907A6C7D2F05AE620097F387 /* NetworkExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

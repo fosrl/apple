@@ -42,6 +42,11 @@ struct PangolinApp: App {
         // Set tunnel manager reference in auth manager for org switching
         authMgr.tunnelManager = tunnelMgr
 
+        // Expose the manager graph to App Intents (Shortcuts), which run in this
+        // process but outside the SwiftUI view hierarchy.
+        AppDependencies.shared.configure(
+            tunnelManager: tunnelMgr, authManager: authMgr, accountManager: accountMgr)
+
         let onboardingState = OnboardingStateManager()
         let onboardingVM = OnboardingViewModel(
             onboardingState: onboardingState,
