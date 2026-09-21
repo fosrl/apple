@@ -4,6 +4,7 @@ enum PangolinIntentError: Error, CustomLocalizedStringResourceConvertible {
     case notLoggedIn
     case noOrganizationSelected
     case appUnavailable
+    case connectionFailed(String)
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -13,6 +14,8 @@ enum PangolinIntentError: Error, CustomLocalizedStringResourceConvertible {
             return "Please open Pangolin and select an organization first."
         case .appUnavailable:
             return "Pangolin isn't ready yet. Please open the app and try again."
+        case .connectionFailed(let message):
+            return LocalizedStringResource(stringLiteral: message)
         }
     }
 }

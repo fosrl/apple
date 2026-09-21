@@ -10,6 +10,9 @@ import os.log
 class TunnelManager: NSObject, ObservableObject {
     @Published var isNEConnected = false
     @Published var status: TunnelStatus = .disconnected
+    /// Set when a connect attempt fails (socket error, missing config, startVPNTunnel, etc.).
+    /// Cleared at the start of `connect()`. App Intents read this after `waitUntilSettled()`.
+    private(set) var lastConnectionError: String?
 
     private var tunnelManager: NETunnelProviderManager?
     #if os(iOS)
@@ -437,6 +440,7 @@ class TunnelManager: NSObject, ObservableObject {
 
         // Set starting status immediately so UI shows loading state
         await MainActor.run {
+            lastConnectionError = nil
             status = .starting
         }
 
@@ -458,25 +462,19 @@ class TunnelManager: NSObject, ObservableObject {
         // Require an organization to be selected before connecting
         guard let currentOrg = authManager.currentOrg else {
             os_log("No organization selected, aborting connection", log: logger, type: .error)
-            await MainActor.run {
-                status = .disconnected
-                AlertManager.shared.showAlertDialog(
-                    title: "No Organization Selected",
-                    message: "Please select an organization before connecting."
-                )
-            }
+            await failConnect(
+                message: "Please select an organization before connecting.",
+                alertTitle: "No Organization Selected"
+            )
             return
         }
 
         guard let activeAccount = accountManager.activeAccount else {
             os_log("No account selected, aborting connection", log: logger, type: .error)
-            await MainActor.run {
-                status = .disconnected
-                AlertManager.shared.showAlertDialog(
-                    title: "No Account Selected",
-                    message: "Please select one or re-login."
-                )
-            }
+            await failConnect(
+                message: "Please select one or re-login.",
+                alertTitle: "No Account Selected"
+            )
             return
         }
 
@@ -489,9 +487,7 @@ class TunnelManager: NSObject, ObservableObject {
         await ensureExtensionRegistered()
 
         guard let manager = tunnelManager else {
-            await MainActor.run {
-                status = .disconnected
-            }
+            await failConnect(message: "VPN configuration isn't ready.")
             return
         }
 
@@ -583,9 +579,7 @@ class TunnelManager: NSObject, ObservableObject {
                 os_log(
                     "Missing fingerprint/posture cache after refresh, aborting connection", log: logger,
                     type: .error)
-                await MainActor.run {
-                    status = .disconnected
-                }
+                await failConnect(message: "Unable to gather device fingerprint.")
                 return
             }
         #else
@@ -619,9 +613,16 @@ class TunnelManager: NSObject, ObservableObject {
             os_log(
                 "Error starting tunnel: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
-            await MainActor.run {
-                status = .disconnected
-            }
+            await failConnect(message: error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private func failConnect(message: String, alertTitle: String? = nil) {
+        lastConnectionError = message
+        status = .disconnected
+        if let alertTitle {
+            AlertManager.shared.showAlertDialog(title: alertTitle, message: message)
         }
     }
 
@@ -705,6 +706,12 @@ class TunnelManager: NSObject, ObservableObject {
                         // Set flag immediately to prevent duplicate alerts (check-and-set pattern)
                         let shouldShowAlert = !hasShownErrorAlert
                         hasShownErrorAlert = true
+
+                        // Record before disconnect so waitUntilSettled() callers see the
+                        // error rather than a bare .disconnected status.
+                        await MainActor.run {
+                            self.lastConnectionError = error.message
+                        }
 
                         // Stop polling immediately to prevent duplicate alerts
                         self.stopSocketPolling()

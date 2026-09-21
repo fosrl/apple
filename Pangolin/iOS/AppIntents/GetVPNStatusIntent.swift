@@ -6,6 +6,7 @@ struct GetVPNStatusIntent: AppIntent {
         "Returns whether the Pangolin VPN is connected, along with the active organization and server."
     )
     static var openAppWhenRun: Bool = false
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<VPNStatusEntity>
