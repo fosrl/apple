@@ -3,13 +3,22 @@ import AppKit
 
 struct PreferencesWindow: View {
     @ObservedObject var configManager: ConfigManager
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var authManager: AuthManager
     @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var onboardingViewModel: MacOnboardingViewModel
     @State private var selectedSection: PreferencesSection = .preferences
     
     var body: some View {
         NavigationSplitView {
             // Sidebar
-            PreferencesSidebar(selectedSection: $selectedSection)
+            PreferencesSidebar(
+                selectedSection: $selectedSection,
+                accountManager: accountManager,
+                authManager: authManager,
+                tunnelManager: tunnelManager,
+                onboardingViewModel: onboardingViewModel
+            )
         } detail: {
             // Detail view
             PreferencesDetailView(
@@ -152,13 +161,261 @@ struct PreferencesWindow: View {
 
 struct PreferencesSidebar: View {
     @Binding var selectedSection: PreferencesSection
-    
-    var body: some View {
-        List(PreferencesSection.allCases, selection: $selectedSection) { section in
-            Label(section.rawValue, systemImage: section.icon)
-                .tag(section)
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var authManager: AuthManager
+    @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var onboardingViewModel: MacOnboardingViewModel
+    @Environment(\.openWindow) private var openWindow
+
+    private var tunnelStatus: TunnelStatus {
+        tunnelManager.status
+    }
+
+    /// WireGuard: switch is on when activating/active OR on-demand is engaged.
+    private var isToggleOn: Bool {
+        switch tunnelStatus {
+        case .starting, .registering, .connected:
+            return true
+        case .disconnected:
+            return tunnelManager.isOnDemandEnabled
         }
-        .navigationSplitViewColumnWidth(min: 200, ideal: 200)
+    }
+
+    private var isInIntermediateState: Bool {
+        switch tunnelStatus {
+        case .starting, .registering:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var shouldDisableToggle: Bool {
+        if tunnelManager.hasOnDemandRules { return false }
+        return tunnelStatus == .starting
+    }
+
+    private var toggleBinding: Binding<Bool> {
+        Binding(
+            get: { isToggleOn },
+            set: { newValue in
+                guard newValue != isToggleOn else { return }
+                performToggle(to: newValue)
+            }
+        )
+    }
+
+    private func performToggle(to newValue: Bool) {
+        guard !authManager.sessionExpired else { return }
+        if shouldDisableToggle { return }
+        Task { @MainActor in
+            if newValue {
+                await onboardingViewModel.refreshPages()
+                if onboardingViewModel.isPresenting {
+                    onboardingViewModel.hasOpenedOnboardingWindowThisSession = true
+                    openWindow(id: "onboarding")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        NSApplication.shared.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                    }
+                    return
+                }
+                await tunnelManager.connect()
+            } else {
+                await tunnelManager.disconnect()
+            }
+        }
+    }
+
+    private var showsConnectionToggle: Bool {
+        authManager.isAuthenticated
+            && accountManager.activeAccount != nil
+            && !authManager.sessionExpired
+            && !authManager.isInitializing
+    }
+
+    /// Yellow when on-demand engaged but not connected; green otherwise when on.
+    private var toggleTint: Color {
+        if tunnelManager.isOnDemandEnabled && !isInIntermediateState && tunnelStatus != .connected {
+            return .yellow
+        }
+        return .green
+    }
+
+    private var onDemandCaption: String? {
+        guard tunnelManager.hasOnDemandRules else { return nil }
+        return tunnelManager.isOnDemandEnabled ? "On-Demand Enabled" : "On-Demand Disabled"
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            List(PreferencesSection.allCases, selection: $selectedSection) { section in
+                Label(section.rawValue, systemImage: section.icon)
+                    .tag(section)
+            }
+
+            Group {
+                if showsConnectionToggle {
+                    Button {
+                        performToggle(to: !isToggleOn)
+                    } label: {
+                        connectionToggle
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(shouldDisableToggle)
+                } else {
+                    sidebarFooter
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
+            .padding(.top, 4)
+        }
+        .navigationSplitViewColumnWidth(min: 205, ideal: 205)
+    }
+
+    @ViewBuilder
+    private var sidebarFooter: some View {
+        if authManager.isInitializing {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Loading...")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if authManager.isAuthenticated, accountManager.activeAccount != nil, authManager.sessionExpired {
+            HStack(spacing: 10) {
+                Image(systemName: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .frame(width: 36, height: 22)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Account Locked")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Button("Log In") {
+                        authManager.startDeviceAuthImmediately = true
+                        openLoginWindow()
+                    }
+                    .buttonStyle(.link)
+                    .disabled(authManager.isDeviceAuthInProgress)
+                }
+                Spacer(minLength: 0)
+            }
+        } else {
+            Button("Login") {
+                openLoginWindow()
+            }
+            .frame(maxWidth: .infinity)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+    }
+
+    private var connectionToggle: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Toggle("", isOn: toggleBinding)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .controlSize(.mini)
+                .tint(toggleTint)
+                .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(tunnelStatus.displayText)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    if isInIntermediateState {
+                        ProgressView()
+                            .controlSize(.mini)
+                    }
+                }
+
+                if let onDemandCaption {
+                    Text(onDemandCaption)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func openLoginWindow() {
+        DispatchQueue.main.async {
+            guard NSApp.activationPolicy() != .regular else { return }
+            NSApp.setActivationPolicy(.regular)
+        }
+
+        let existingWindow = NSApplication.shared.windows.first { window in
+            window.identifier?.rawValue == "main" || window.title == "Pangolin"
+        }
+
+        if let window = existingWindow {
+            let allMainWindows = NSApplication.shared.windows.filter { w in
+                (w.identifier?.rawValue == "main" || w.title == "Pangolin") && w != window
+            }
+            for duplicateWindow in allMainWindows {
+                duplicateWindow.close()
+            }
+
+            var styleMask = window.styleMask
+            styleMask.remove([.miniaturizable, .resizable])
+            styleMask.insert([.titled, .closable])
+            window.styleMask = styleMask
+
+            if let minimizeButton = window.standardWindowButton(.miniaturizeButton) {
+                minimizeButton.isHidden = true
+            }
+            if let zoomButton = window.standardWindowButton(.zoomButton) {
+                zoomButton.isHidden = true
+            }
+            if let closeButton = window.standardWindowButton(.closeButton) {
+                closeButton.isHidden = false
+            }
+
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
+
+            if window.identifier?.rawValue != "main" {
+                window.identifier = NSUserInterfaceItemIdentifier("main")
+            }
+        } else {
+            openWindow(id: "main")
+            NSApp.activate(ignoringOtherApps: true)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if let window = NSApplication.shared.windows.first(where: {
+                    $0.identifier?.rawValue == "main" || $0.title == "Pangolin"
+                }) {
+                    window.makeKeyAndOrderFront(nil)
+                    window.orderFrontRegardless()
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+        }
     }
 }
 
