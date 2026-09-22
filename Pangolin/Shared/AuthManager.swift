@@ -81,6 +81,7 @@ class AuthManager: ObservableObject {
             if healthCheckFailed {
                 // Server is down, but show last known user info
                 isServerDown = true
+                restoreCachedOrganization(from: activeAccount)
                 // Keep showing the last known user if we have it
                 if currentUser == nil {
                     // Try to load user from stored account info
@@ -327,6 +328,16 @@ class AuthManager: ObservableObject {
         sessionExpired = true
     }
 
+    /// Restores `currentOrg` from the locally cached account org ID when the server is unreachable.
+    private func restoreCachedOrganization(from account: Account) {
+        guard !account.orgId.isEmpty else { return }
+        let cached = Organization(orgId: account.orgId, name: account.orgId, isOwner: nil)
+        currentOrg = cached
+        if organizations.isEmpty {
+            organizations = [cached]
+        }
+    }
+
     private func ensureOrgIsSelected(preferredOrgId: String? = nil) async throws -> String {
         guard let userId = currentUser?.userId else {
             return ""
@@ -387,6 +398,12 @@ class AuthManager: ObservableObject {
                 // Current org no longer exists, clear selection
                 currentOrg = nil
                 accountManager.setUserOrganization(userId: userId, orgId: "")
+            } else if let cachedOrgId = accountManager.activeAccount?.orgId,
+                !cachedOrgId.isEmpty,
+                let matched = newOrgs.first(where: { $0.orgId == cachedOrgId })
+            {
+                // Restore selection from cached account org after offline startup
+                currentOrg = matched
             }
 
             // Update organizations list
@@ -468,6 +485,7 @@ class AuthManager: ObservableObject {
             // Server is down, show message but keep account switched
             isServerDown = true
             errorMessage = "The server appears to be down."
+            restoreCachedOrganization(from: accountToSwitchTo)
             // currentUser is already cleared above, so UI will show account email
             return
         }

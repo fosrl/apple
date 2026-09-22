@@ -245,8 +245,8 @@
 			exceptions = (
 				901FF5E22EC7EE9900711D4E /* Exceptions for "Pangolin" folder in "Pangolin" target */,
 				907A6C6C2F05ADBB0097F387 /* Exceptions for "Pangolin" folder in "PangoliniOS" target */,
-				90LA010D2F1000010097F387 /* Exceptions for "Pangolin" folder in "PangolinLiveActivity" target */,
 				90PT010E2F1000020097F387 /* Exceptions for "Pangolin" folder in "PacketTunneliOS" target */,
+				90LA010D2F1000010097F387 /* Exceptions for "Pangolin" folder in "PangolinLiveActivity" target */,
 			);
 			path = Pangolin;
 			sourceTree = "<group>";

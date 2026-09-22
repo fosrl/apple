@@ -554,18 +554,18 @@ class TunnelManager: NSObject, ObservableObject {
         }
 
         // Require an organization to be selected before connecting
-        guard let currentOrg = authManager.currentOrg else {
+        guard authManager.currentOrg != nil else {
             os_log("No organization selected, aborting connection", log: logger, type: .error)
-            await failConnect(
+            failConnect(
                 message: "Please select an organization before connecting.",
                 alertTitle: "No Organization Selected"
             )
             return
         }
 
-        guard let activeAccount = accountManager.activeAccount else {
+        guard accountManager.activeAccount != nil else {
             os_log("No account selected, aborting connection", log: logger, type: .error)
-            await failConnect(
+            failConnect(
                 message: "Please select one or re-login.",
                 alertTitle: "No Account Selected"
             )
@@ -581,7 +581,7 @@ class TunnelManager: NSObject, ObservableObject {
         await ensureExtensionRegistered()
 
         guard let manager = tunnelManager else {
-            await failConnect(message: "VPN configuration isn't ready.")
+            failConnect(message: "VPN configuration isn't ready.")
             return
         }
 
@@ -602,7 +602,7 @@ class TunnelManager: NSObject, ObservableObject {
         // when the tunnel starts, not from the app side
 
         guard let tunnelOptions = await buildTunnelOptions() else {
-            await failConnect(message: "Unable to gather tunnel configuration.")
+            failConnect(message: "Unable to gather tunnel configuration.")
             return
         }
 
@@ -637,7 +637,7 @@ class TunnelManager: NSObject, ObservableObject {
             os_log(
                 "Error starting tunnel: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
-            await failConnect(message: error.localizedDescription)
+            failConnect(message: error.localizedDescription)
         }
     }
 

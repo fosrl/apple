@@ -249,10 +249,7 @@ struct PangolinApp: App {
         WindowGroup("Preferences", id: "preferences") {
             PreferencesWindow(
                 configManager: configManager,
-                accountManager: accountManager,
-                authManager: authManager,
-                tunnelManager: tunnelManager,
-                onboardingViewModel: onboardingViewModel
+                tunnelManager: tunnelManager
             )
             .handlesExternalEvents(preferring: ["preferences"], allowing: ["preferences"])
         }
