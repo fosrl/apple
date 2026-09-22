@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PreferencesContentView: View {
     @ObservedObject var configManager: ConfigManager
+    @ObservedObject var tunnelManager: TunnelManager
     @State private var showPrimaryDNSModal = false
     @State private var showSecondaryDNSModal = false
     @State private var showMTUModal = false
@@ -131,6 +132,11 @@ struct PreferencesContentView: View {
                             }
                         }
                     }
+
+                    OnDemandActivationSection(
+                        configManager: configManager,
+                        tunnelManager: tunnelManager
+                    )
 
                     Section(header: Text("Advanced")) {
                         VStack(alignment: .leading, spacing: 2) {

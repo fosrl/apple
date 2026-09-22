@@ -14,6 +14,10 @@ import os.log
 class TunnelManager: NSObject, ObservableObject {
     @Published var isNEConnected = false
     @Published var status: TunnelStatus = .disconnected
+    /// Mirrors WireGuard `isActivateOnDemandEnabled` (isOnDemandEnabled && isEnabled).
+    @Published var isOnDemandEnabled = false
+    /// True when the NE profile has on-demand rules configured (prefs), whether or not engaged.
+    @Published var hasOnDemandRules = false
     /// Set when a connect attempt fails (socket error, missing config, startVPNTunnel, etc.).
     /// Cleared at the start of `connect()`. App Intents read this after `waitUntilSettled()`.
     private(set) var lastConnectionError: String?
@@ -190,9 +194,13 @@ class TunnelManager: NSObject, ObservableObject {
         guard let manager = tunnelManager else {
             isNEConnected = false
             status = .disconnected
+            isOnDemandEnabled = false
+            hasOnDemandRules = false
             stopSocketPolling()
             return
         }
+
+        syncOnDemandState(from: manager)
 
         let vpnStatus = manager.connection.status
 
@@ -237,8 +245,17 @@ class TunnelManager: NSObject, ObservableObject {
         }
 
         os_log(
-            "VPN Status changed: %{public}@ (VPN status: %d)", log: logger, type: .debug,
-            status.displayText, vpnStatus.rawValue)
+            "VPN Status changed: %{public}@ (VPN status: %d, onDemand=%{public}d rules=%{public}d)",
+            log: logger, type: .debug,
+            status.displayText, vpnStatus.rawValue,
+            isOnDemandEnabled ? 1 : 0, hasOnDemandRules ? 1 : 0)
+    }
+
+    /// WireGuard-equivalent: engaged = isOnDemandEnabled && isEnabled; has rules = non-empty onDemandRules.
+    @MainActor
+    private func syncOnDemandState(from manager: NETunnelProviderManager) {
+        isOnDemandEnabled = manager.isOnDemandEnabled && manager.isEnabled
+        hasOnDemandRules = !(manager.onDemandRules ?? []).isEmpty
     }
 
     #if os(macOS)
@@ -487,10 +504,17 @@ class TunnelManager: NSObject, ObservableObject {
         // Clear error alert flag for new connection attempt
         hasShownErrorAlert = false
 
-        // Set starting status immediately so UI shows loading state
+        // WireGuard: with on-demand rules, Connect only engages isOnDemandEnabled (no
+        // startVPNTunnel). Skip synthetic .starting so the toggle goes yellow immediately
+        // when the current path does not match the rules.
+        let onDemandOption = configManager.onDemandOptionFromConfig()
+        let engageOnDemandOnly = onDemandOption != .off
+
         await MainActor.run {
             lastConnectionError = nil
-            status = .starting
+            if !engageOnDemandOnly {
+                status = .starting
+            }
         }
 
         // Check if tunnel is already running by querying the socket
@@ -556,44 +580,92 @@ class TunnelManager: NSObject, ObservableObject {
         // Note: Go startTunnel is called from within the PacketTunnelProvider system extension
         // when the tunnel starts, not from the app side
 
-        // Build options dictionary from config and secrets
+        guard let tunnelOptions = await buildTunnelOptions() else {
+            await failConnect(message: "Unable to gather tunnel configuration.")
+            return
+        }
+
+        do {
+            try persistTunnelStartConfig(tunnelOptions, on: manager)
+
+            onDemandOption.apply(on: manager)
+
+            if engageOnDemandOnly {
+                // WireGuard setOnDemandEnabled(true): engage only; OS starts if rules match.
+                manager.isEnabled = true
+                manager.isOnDemandEnabled = true
+                try await manager.saveToPreferences()
+                try await manager.loadFromPreferences()
+                os_log(
+                    "Connect: on-demand engaged (isOnDemandEnabled=1); OS starts if rules match",
+                    log: logger, type: .info)
+                await updateConnectionStatus()
+            } else {
+                manager.isOnDemandEnabled = false
+                try await manager.saveToPreferences()
+                try await manager.loadFromPreferences()
+
+                var startOptions = tunnelOptions
+                if let json = encodeTunnelOptionsAsJSONString(tunnelOptions) {
+                    startOptions[Self.tunnelStartConfigJSONKey] = json as NSString
+                }
+                try manager.connection.startVPNTunnel(options: startOptions)
+                await updateConnectionStatus()
+            }
+        } catch {
+            os_log(
+                "Error starting tunnel: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
+            await failConnect(message: error.localizedDescription)
+        }
+    }
+
+    /// Builds the options dictionary passed to the packet tunnel (and stored on
+    /// `providerConfiguration` for on-demand starts). Returns nil when required
+    /// account/org/fingerprint data is missing.
+    private func buildTunnelOptions() async -> [String: NSObject]? {
+        guard let currentOrg = authManager.currentOrg else {
+            return nil
+        }
+        guard let activeAccount = accountManager.activeAccount else {
+            return nil
+        }
+
         var tunnelOptions: [String: NSObject] = [:]
 
-        // Get endpoint from config
-        let endpoint = activeAccount.hostname
-        tunnelOptions["endpoint"] = endpoint as NSString
+        tunnelOptions["endpoint"] = activeAccount.hostname as NSString
 
         let userId = authManager.currentUser?.userId ?? activeAccount.userId
-        // Get OLM credentials from secret manager for the current user
         if let olmId = secretManager.getOlmId(userId: userId) {
             tunnelOptions["id"] = olmId as NSString
         }
         if let olmSecret = secretManager.getOlmSecret(userId: userId) {
             tunnelOptions["secret"] = olmSecret as NSString
         }
-
-        // Get session token from secret manager
         if let userToken = secretManager.getSessionToken(userId: userId) {
             tunnelOptions["userToken"] = userToken as NSString
         }
 
-        // Get orgId from current organization
+        // Required for on-demand starts; refuse incomplete configs.
+        guard tunnelOptions["id"] != nil, tunnelOptions["secret"] != nil,
+            tunnelOptions["userToken"] != nil
+        else {
+            os_log(
+                "buildTunnelOptions: missing OLM credentials or session token",
+                log: logger, type: .error)
+            return nil
+        }
+
         tunnelOptions["orgId"] = currentOrg.orgId as NSString
 
-        // Tunnel configuration options
         tunnelOptions["mtu"] = NSNumber(value: configManager.getTunnelMTU())
         tunnelOptions["holepunch"] = NSNumber(value: true)
         tunnelOptions["pingIntervalSeconds"] = NSNumber(value: 5)
         tunnelOptions["pingTimeoutSeconds"] = NSNumber(value: 5)
 
-        // DNS override settings from config
-        let dnsOverrideEnabled = configManager.getDNSOverrideEnabled()
-        tunnelOptions["overrideDNS"] = NSNumber(value: dnsOverrideEnabled)
+        tunnelOptions["overrideDNS"] = NSNumber(value: configManager.getDNSOverrideEnabled())
+        tunnelOptions["tunnelDNS"] = NSNumber(value: configManager.getDNSTunnelEnabled())
 
-        let dnsTunnelEnabled = configManager.getDNSTunnelEnabled()
-        tunnelOptions["tunnelDNS"] = NSNumber(value: dnsTunnelEnabled)
-
-        // Build upstream DNS servers array with :53 appended
         var upstreamDNSServers: [String] = []
         let primaryDNS = configManager.getPrimaryDNSServer()
         if !primaryDNS.isEmpty {
@@ -603,13 +675,7 @@ class TunnelManager: NSObject, ObservableObject {
         if !secondaryDNS.isEmpty {
             upstreamDNSServers.append("\(secondaryDNS):53")
         }
-        // If no DNS servers are configured, this stays empty, which tells olm
-        // to leave DNS resolution to the system resolver instead of overriding it.
         tunnelOptions["upstreamDNS"] = upstreamDNSServers as NSArray
-
-        // FQDN wildcard patterns olm should check against local records/upstream DNS;
-        // non-matching queries go straight to the host's system DNS servers. Empty
-        // means match every domain (the feature is disabled).
         tunnelOptions["matchDomains"] = configManager.getMatchDomains() as NSArray
 
         #if os(macOS)
@@ -626,10 +692,8 @@ class TunnelManager: NSObject, ObservableObject {
             }
             guard let (fingerprint, postures) = fingerprintPosturePair else {
                 os_log(
-                    "Missing fingerprint/posture cache after refresh, aborting connection", log: logger,
-                    type: .error)
-                await failConnect(message: "Unable to gather device fingerprint.")
-                return
+                    "Missing fingerprint/posture cache after refresh", log: logger, type: .error)
+                return nil
             }
         #else
             os_log(
@@ -638,31 +702,171 @@ class TunnelManager: NSObject, ObservableObject {
             let fingerprint = await fingerprintManager.gatherFingerprintInfo()
             let postures = await fingerprintManager.gatherPostureChecks()
         #endif
-        
-        // Convert Fingerprint to dictionary
+
         if let fingerprintData = try? JSONEncoder().encode(fingerprint),
-           let fingerprintDict = try? JSONSerialization.jsonObject(with: fingerprintData) as? [String: Any] {
+            let fingerprintDict = try? JSONSerialization.jsonObject(with: fingerprintData)
+                as? [String: Any]
+        {
             tunnelOptions["fingerprint"] = fingerprintDict as NSDictionary
         }
-        
-        // Convert Postures to dictionary
+
         if let posturesData = try? JSONEncoder().encode(postures),
-           let posturesDict = try? JSONSerialization.jsonObject(with: posturesData) as? [String: Any] {
+            let posturesDict = try? JSONSerialization.jsonObject(with: posturesData)
+                as? [String: Any]
+        {
             tunnelOptions["postures"] = posturesDict as NSDictionary
         }
 
-        do {
-            // Start with options
-            try manager.connection.startVPNTunnel(
-                options: tunnelOptions.isEmpty ? nil : tunnelOptions)
+        return tunnelOptions
+    }
 
-            // Update status - will transition from .starting to .registering when extension starts
+    /// Key for the JSON start-config blob in `NETunnelProviderProtocol.providerConfiguration`.
+    static let tunnelStartConfigJSONKey = "tunnelStartConfigJSON"
+
+    private func encodeTunnelOptionsAsJSONString(_ options: [String: NSObject]) -> String? {
+        var plist: [String: Any] = [:]
+        for (key, value) in options {
+            plist[key] = value
+        }
+        guard JSONSerialization.isValidJSONObject(plist),
+            let data = try? JSONSerialization.data(withJSONObject: plist),
+            let string = String(data: data, encoding: .utf8)
+        else {
+            return nil
+        }
+        return string
+    }
+
+    /// Writes a single plist-safe JSON string into providerConfiguration for on-demand starts.
+    private func persistTunnelStartConfig(
+        _ options: [String: NSObject], on manager: NETunnelProviderManager
+    ) throws {
+        guard let protocolConfig = manager.protocolConfiguration as? NETunnelProviderProtocol else {
+            throw NSError(
+                domain: "TunnelManager", code: -1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "VPN protocol configuration is missing"
+                ])
+        }
+        guard let json = encodeTunnelOptionsAsJSONString(options) else {
+            throw NSError(
+                domain: "TunnelManager", code: -2,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to encode tunnel start config as JSON"
+                ])
+        }
+        protocolConfig.providerConfiguration = [Self.tunnelStartConfigJSONKey: json]
+        manager.protocolConfiguration = protocolConfig
+        os_log(
+            "Persisted tunnelStartConfigJSON (%{public}d bytes)",
+            log: logger, type: .info, json.utf8.count)
+    }
+
+    /// Rebuilds and saves the on-demand start blob when Always On is configured.
+    /// Call on connect (via connect path), launch, and foreground.
+    func refreshProviderConfigurationIfOnDemandEnabled() async {
+        guard configManager.onDemandOptionFromConfig() != .off else { return }
+
+        await ensureExtensionRegistered()
+        guard let manager = tunnelManager else {
+            os_log(
+                "refreshProviderConfiguration: VPN configuration isn't ready",
+                log: logger, type: .info)
+            return
+        }
+
+        guard let tunnelOptions = await buildTunnelOptions() else {
+            os_log(
+                "refreshProviderConfiguration: could not build tunnel options",
+                log: logger, type: .info)
+            return
+        }
+
+        do {
+            try persistTunnelStartConfig(tunnelOptions, on: manager)
+            try await manager.saveToPreferences()
+            try await manager.loadFromPreferences()
+            let hasBlob =
+                ((manager.protocolConfiguration as? NETunnelProviderProtocol)?
+                    .providerConfiguration?[Self.tunnelStartConfigJSONKey] as? String) != nil
+            os_log(
+                "refreshProviderConfiguration: saved blob present=%{public}d",
+                log: logger, type: .info, hasBlob ? 1 : 0)
+        } catch {
+            os_log(
+                "refreshProviderConfiguration failed: %{public}@",
+                log: logger, type: .error, error.localizedDescription)
+        }
+    }
+
+    /// Applies on-demand *rules* from Config (WireGuard-style). Does **not** engage
+    /// `isOnDemandEnabled` — Connect does that. Persists the start-config blob when
+    /// rules are non-off so a later OS start can succeed.
+    /// - Parameter option: When provided, used instead of re-reading Config (avoids races
+    ///   with async UI → config → apply pipelines).
+    func updateOnDemandSettings(option: ActivateOnDemandOption? = nil) async {
+        await ensureExtensionRegistered()
+
+        guard let manager = tunnelManager else {
+            os_log("updateOnDemandSettings: VPN configuration isn't ready", log: logger, type: .error)
+            return
+        }
+
+        let onDemandOption = option ?? configManager.onDemandOptionFromConfig()
+        let hasRules = onDemandOption != .off
+        os_log(
+            "On-demand rules: %{public}@",
+            log: logger, type: .info,
+            hasRules ? "saving (not engaging)" : "clearing")
+
+        if hasRules {
+            // Require a complete start blob before saving rules so Connect can engage safely.
+            guard let tunnelOptions = await buildTunnelOptions() else {
+                os_log(
+                    "On-demand rules not saved: tunnel options unavailable (not signed in?)",
+                    log: logger, type: .error)
+                return
+            }
+
+            do {
+                try persistTunnelStartConfig(tunnelOptions, on: manager)
+            } catch {
+                os_log(
+                    "On-demand rules not saved: %{public}@",
+                    log: logger, type: .error, error.localizedDescription)
+                return
+            }
+
+            // apply() sets rules and keeps isOnDemandEnabled = (rules != nil) && existing.
+            onDemandOption.apply(on: manager)
+            manager.isEnabled = true
+        } else {
+            ActivateOnDemandOption.off.apply(on: manager)
+            manager.isOnDemandEnabled = false
+            manager.onDemandRules = nil
+        }
+
+        do {
+            try await manager.saveToPreferences()
+            try await manager.loadFromPreferences()
+
+            let hasBlob =
+                ((manager.protocolConfiguration as? NETunnelProviderProtocol)?
+                    .providerConfiguration?[Self.tunnelStartConfigJSONKey] as? String) != nil
+
+            os_log(
+                "On-demand rules saved: hasRules=%{public}d rules=%{public}d isOnDemandEnabled=%{public}d blob=%{public}d",
+                log: logger, type: .info,
+                hasRules ? 1 : 0,
+                manager.onDemandRules?.count ?? 0,
+                manager.isOnDemandEnabled ? 1 : 0,
+                hasBlob ? 1 : 0)
+
             await updateConnectionStatus()
         } catch {
             os_log(
-                "Error starting tunnel: %{public}@", log: logger, type: .error,
+                "Error saving on-demand settings: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
-            await failConnect(message: error.localizedDescription)
         }
     }
 
@@ -682,6 +886,20 @@ class TunnelManager: NSObject, ObservableObject {
 
         // Stop socket polling first
         stopSocketPolling()
+
+        // Disable on-demand so the OS does not immediately reconnect after a manual disconnect.
+        // Preference values (rules) are left intact in Config.
+        if manager.isOnDemandEnabled {
+            manager.isOnDemandEnabled = false
+            do {
+                try await manager.saveToPreferences()
+                try await manager.loadFromPreferences()
+            } catch {
+                os_log(
+                    "Error disabling on-demand on disconnect: %{public}@", log: logger, type: .error,
+                    error.localizedDescription)
+            }
+        }
 
         // Note: Go stopTunnel is called from within the PacketTunnelProvider system extension
         // when the tunnel stops, not from the app side

@@ -43,7 +43,7 @@ struct MainView: View {
                 }
             .tag(TabSelection.status)
             
-            PreferencesView(configManager: configManager)
+            PreferencesView(configManager: configManager, tunnelManager: tunnelManager)
                 .tabItem {
                     Label("Preferences", systemImage: "gearshape.fill")
                 }
@@ -99,14 +99,24 @@ struct HomeTabView: View {
     private var tunnelStatus: TunnelStatus {
         tunnelManager.status
     }
-    
+
+    /// WireGuard: switch is on when activating/active OR on-demand is engaged.
+    private var isToggleOn: Bool {
+        switch tunnelStatus {
+        case .starting, .registering, .connected:
+            return true
+        case .disconnected:
+            return tunnelManager.isOnDemandEnabled
+        }
+    }
+
     private var toggleBinding: Binding<Bool> {
         Binding(
-            get: { tunnelManager.isNEConnected },
+            get: { isToggleOn },
             set: { newValue in
                 guard !authManager.sessionExpired else { return }
-                // Only prevent interaction when starting (not when registering)
-                guard tunnelStatus != .starting else { return }
+                // WireGuard: with on-demand rules the switch stays interactive in all states.
+                if tunnelStatus == .starting && !tunnelManager.hasOnDemandRules { return }
                 Task {
                     if newValue {
                         await tunnelManager.connect()
@@ -117,7 +127,7 @@ struct HomeTabView: View {
             }
         )
     }
-    
+
     private var isInIntermediateState: Bool {
         // Used for showing loading animation - include both starting and registering
         switch tunnelStatus {
@@ -127,18 +137,35 @@ struct HomeTabView: View {
             return false
         }
     }
-    
+
+    /// Yellow when on-demand engaged but not connected; green otherwise when on.
+    private var toggleTint: Color {
+        if tunnelManager.isOnDemandEnabled && !isInIntermediateState && tunnelStatus != .connected {
+            return Color(uiColor: .systemYellow)
+        }
+        return Color(uiColor: .systemGreen)
+    }
+
     private var statusColor: Color {
         switch tunnelStatus {
         case .connected:
             return .green
-        case .disconnected:
-            return .gray
         case .starting, .registering:
             return .orange
+        case .disconnected:
+            return tunnelManager.isOnDemandEnabled ? Color(uiColor: .systemYellow) : .gray
         }
     }
-    
+
+    private var statusLabel: String {
+        tunnelStatus.displayText
+    }
+
+    /// Shown on the same line as status when on-demand rules are configured.
+    private var onDemandCaption: String? {
+        guard tunnelManager.hasOnDemandRules else { return nil }
+        return tunnelManager.isOnDemandEnabled ? "On-Demand Enabled" : "On-Demand Disabled"
+    }
     
     var body: some View {
         NavigationStack {
@@ -204,45 +231,53 @@ struct HomeTabView: View {
                             .cornerRadius(24)
                         } else {
                             Button(action: {
-                                guard tunnelStatus != .starting else { return }
+                                // WireGuard: with on-demand rules the control stays interactive while activating.
+                                if tunnelStatus == .starting && !tunnelManager.hasOnDemandRules { return }
                                 Task {
-                                    if tunnelManager.isNEConnected {
+                                    if isToggleOn {
                                         await tunnelManager.disconnect()
                                     } else {
                                         await tunnelManager.connect()
                                     }
                                 }
                             }) {
-                                VStack(spacing: 16) {
+                                VStack(spacing: 8) {
                                     HStack(spacing: 12) {
                                         Circle()
                                             .fill(statusColor)
                                             .frame(width: 12, height: 12)
-                                        
-                                        HStack(spacing: 8) {
-                                            Text(tunnelStatus.displayText)
-                                                .font(.headline)
-                                                .foregroundColor(.primary)
-                                            
-                                            if isInIntermediateState {
-                                                ProgressView()
-                                                    .scaleEffect(0.8)
-                                                    .id("loading-progress")
-                                            }
+
+                                        Text(statusLabel)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+
+                                        if isInIntermediateState {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                                .id("loading-progress")
                                         }
-                                        
-                                        Spacer()
-                                        
+
+                                        Spacer(minLength: 8)
+
                                         Toggle("", isOn: toggleBinding)
-                                            .tint(.accentColor)
+                                            .tint(toggleTint)
                                             .allowsHitTesting(false)
+                                    }
+
+                                    if let onDemandCaption {
+                                        Text(onDemandCaption)
+                                            .font(.system(size: 13))
+                                            .foregroundColor(.secondary)
+                                            .multilineTextAlignment(.center)
+                                            .frame(maxWidth: .infinity)
                                     }
                                 }
                                 .padding()
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                             }
-                            .disabled(tunnelStatus == .starting)
+                            .disabled(tunnelStatus == .starting && !tunnelManager.hasOnDemandRules)
                             .buttonStyle(.plain)
                             .background(Color(.systemGray6))
                             .cornerRadius(24)

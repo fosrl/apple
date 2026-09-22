@@ -34,6 +34,17 @@ struct MenuBarView: View {
         self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
     }
 
+    /// Status + on-demand caption for the menu bar.
+    private var menuStatusLabel: String {
+        var text = tunnelManager.status.displayText
+        if tunnelManager.hasOnDemandRules {
+            text += tunnelManager.isOnDemandEnabled
+                ? " · On-Demand Enabled"
+                : " · On-Demand Disabled"
+        }
+        return text
+    }
+
     var body: some View {
         Group {
             // When onboarding is needed, show only a minimal menu (don't load full menu)
@@ -76,7 +87,7 @@ struct MenuBarView: View {
                             }
                             .disabled(authManager.isDeviceAuthInProgress)
                         } else {
-                            Text(tunnelManager.status.displayText)
+                            Text(menuStatusLabel)
                                 .foregroundColor(.secondary)
                             ConnectButtonItem(
                                 tunnelManager: tunnelManager,
@@ -593,13 +604,34 @@ struct ConnectButtonItem: View {
     var openWindow: OpenWindowAction
 
     private var shouldDisableButton: Bool {
-        tunnelManager.status == .starting && !tunnelManager.isNEConnected
+        // WireGuard keeps the control enabled when on-demand rules exist.
+        if tunnelManager.hasOnDemandRules { return false }
+        return tunnelManager.status == .starting && !tunnelManager.isNEConnected
+    }
+
+    /// WireGuard macOS toggle labels.
+    private var buttonTitle: String {
+        if tunnelManager.hasOnDemandRules {
+            if tunnelManager.isOnDemandEnabled {
+                if tunnelManager.status == .connected || tunnelManager.isNEConnected {
+                    return "Disable On-Demand and Deactivate"
+                }
+                return "Disable On-Demand"
+            }
+            return "Enable On-Demand"
+        }
+        return tunnelManager.isNEConnected ? "Disconnect" : "Connect"
     }
 
     var body: some View {
-        Button(tunnelManager.isNEConnected ? "Disconnect" : "Connect") {
+        Button(buttonTitle) {
             Task { @MainActor in
-                if !tunnelManager.isNEConnected {
+                let isOn =
+                    tunnelManager.isOnDemandEnabled
+                    || tunnelManager.isNEConnected
+                    || tunnelManager.status == .starting
+                    || tunnelManager.status == .registering
+                if !isOn {
                     await onboardingViewModel.refreshPages()
                     if onboardingViewModel.isPresenting {
                         onboardingViewModel.hasOpenedOnboardingWindowThisSession = true
@@ -616,6 +648,6 @@ struct ConnectButtonItem: View {
             }
         }
         .disabled(shouldDisableButton)
-        .id(tunnelManager.isNEConnected)
+        .id("\(tunnelManager.isNEConnected)-\(tunnelManager.isOnDemandEnabled)-\(tunnelManager.hasOnDemandRules)")
     }
 }

@@ -174,7 +174,10 @@ struct PreferencesDetailView: View {
         Group {
             switch selectedSection {
             case .preferences:
-                PreferencesContentView(configManager: configManager)
+                PreferencesContentView(
+                    configManager: configManager,
+                    tunnelManager: tunnelManager
+                )
             case .olmStatus:
                 OLMStatusContentView(olmStatusManager: tunnelManager.olmStatusManager)
             case .about:

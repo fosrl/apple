@@ -197,6 +197,12 @@ struct PangolinApp: App {
 
                 Task {
                     await authManager.initialize()
+                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                Task {
+                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
                 }
             }
         } label: {

@@ -2,9 +2,10 @@ import SwiftUI
 
 struct MTUModalView: View {
     let title: String
-    @Binding var mtuValue: String
-    @Binding var isPresented: Bool
+    let initialValue: String
     let onSave: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
     @State private var editedValue: String
     @State private var showValidationError = false
     @FocusState private var isTextFieldFocused: Bool
@@ -20,72 +21,68 @@ struct MTUModalView: View {
         return Self.mtuRange.contains(mtu)
     }
 
-    init(title: String, mtuValue: Binding<String>, isPresented: Binding<Bool>, onSave: @escaping (String) -> Void) {
+    init(title: String, initialValue: String, onSave: @escaping (String) -> Void) {
         self.title = title
-        self._mtuValue = mtuValue
-        self._isPresented = isPresented
+        self.initialValue = initialValue
         self.onSave = onSave
-        self._editedValue = State(initialValue: mtuValue.wrappedValue)
+        self._editedValue = State(initialValue: initialValue)
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("MTU", text: $editedValue)
-                        .autocorrectionDisabled()
-                        .autocapitalization(.none)
-                        .keyboardType(.numberPad)
-                        .focused($isTextFieldFocused)
-                } footer: {
-                    if showValidationError && !trimmedValue.isEmpty && !isValidMTU(trimmedValue) {
-                        Text("Enter an integer between 576 and 65535 (e.g., 1280)")
-                            .font(.caption)
-                            .foregroundColor(.red)
+        Form {
+            Section {
+                TextField("MTU", text: $editedValue)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.numberPad)
+                    .focused($isTextFieldFocused)
+            } footer: {
+                if showValidationError && !trimmedValue.isEmpty && !isValidMTU(trimmedValue) {
+                    Text("Enter an integer between 576 and 65535 (e.g., 1280)")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                } else {
+                    Text("Enter an integer between 576 and 65535 (e.g., 1280)")
+                        .font(.caption)
+                }
+            }
+            .onChange(of: editedValue) { _, _ in showValidationError = false }
+
+            Section {
+                Button {
+                    editedValue = String(ConfigManager.defaultTunnelMTU)
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("Use Default")
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    if trimmedValue.isEmpty || isValidMTU(trimmedValue) {
+                        onSave(trimmedValue)
+                        dismiss()
                     } else {
-                        Text("Enter an integer between 576 and 65535 (e.g., 1280)")
-                            .font(.caption)
+                        showValidationError = true
                     }
                 }
-                .onChange(of: editedValue) { _, _ in showValidationError = false }
-
-                Section {
-                    Button(action: {
-                        editedValue = String(ConfigManager.defaultTunnelMTU)
-                    }) {
-                        HStack {
-                            Spacer()
-                            Text("Use Default")
-                            Spacer()
-                        }
-                    }
-                }
+                .fontWeight(.semibold)
             }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        if trimmedValue.isEmpty || isValidMTU(trimmedValue) {
-                            onSave(trimmedValue)
-                            isPresented = false
-                        } else {
-                            showValidationError = true
-                        }
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isTextFieldFocused = true
-                }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isTextFieldFocused = true
             }
         }
     }

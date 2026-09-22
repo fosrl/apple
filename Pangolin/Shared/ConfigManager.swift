@@ -99,8 +99,14 @@ class ConfigManager: ObservableObject {
             let data = try encoder.encode(config)
             try data.write(to: configPath)
 
-            DispatchQueue.main.async {
+            // Prefer an immediate update when already on the main thread so
+            // subsequent reads in the same call stack see fresh values.
+            if Thread.isMainThread {
                 self.config = config
+            } else {
+                DispatchQueue.main.async {
+                    self.config = config
+                }
             }
 
             return true
@@ -240,6 +246,37 @@ class ConfigManager: ObservableObject {
     /// Optional override for Sparkle check interval in seconds. `nil` leaves Sparkle prefs alone.
     func getUpdateCheckIntervalSeconds() -> Int? {
         return config?.updateCheckIntervalSeconds
+    }
+
+    // MARK: - On-Demand Activation
+
+    func getOnDemandNonWiFiEnabled() -> Bool {
+        config?.onDemandNonWiFiEnabled ?? false
+    }
+
+    func getOnDemandWiFiEnabled() -> Bool {
+        config?.onDemandWiFiEnabled ?? false
+    }
+
+    func getOnDemandSSIDOption() -> OnDemandSSIDOptionKind {
+        config?.onDemandSSIDOption ?? .any
+    }
+
+    func getOnDemandSSIDs() -> [String] {
+        config?.onDemandSSIDs ?? []
+    }
+
+    func onDemandOptionFromConfig() -> ActivateOnDemandOption {
+        ActivateOnDemandViewModel(from: config).toOnDemandOption()
+    }
+
+    /// Persists on-demand UI state from the view model and returns the resulting option.
+    @discardableResult
+    func setOnDemandSettings(from viewModel: ActivateOnDemandViewModel) -> ActivateOnDemandOption {
+        var updatedConfig = config ?? Config()
+        viewModel.apply(to: &updatedConfig)
+        _ = save(updatedConfig)
+        return viewModel.toOnDemandOption()
     }
 
     // MARK: - Advanced / MTU

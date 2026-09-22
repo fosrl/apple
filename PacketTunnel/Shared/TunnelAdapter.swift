@@ -231,7 +231,7 @@ public class TunnelAdapter {
                 type: .default)
         }
 
-        // Get values from options (passed through from TunnelManager)
+        // Get values from options (passed through from TunnelManager or on-demand JSON blob)
         guard let options = options else {
             let error = NSError(
                 domain: "TunnelAdapter", code: -1,
@@ -241,32 +241,47 @@ public class TunnelAdapter {
             return
         }
 
-        guard let endpoint = options["endpoint"] as? String,
-            let id = options["id"] as? String,
-            let secret = options["secret"] as? String,
-            let mtu = (options["mtu"] as? NSNumber)?.intValue,
-            let holepunch = (options["holepunch"] as? NSNumber)?.boolValue,
-            let pingIntervalSeconds = (options["pingIntervalSeconds"] as? NSNumber)?.intValue,
-            let userToken: String = options["userToken"] as? String,
-            let orgId = options["orgId"] as? String,
-            let overrideDNSValue = (options["overrideDNS"] as? NSNumber)?.boolValue,
-            let tunnelDNS = (options["tunnelDNS"] as? NSNumber)?.boolValue,
-            let pingTimeoutSeconds = (options["pingTimeoutSeconds"] as? NSNumber)?.intValue
+        let endpoint = Self.stringValue(options, "endpoint")
+        let id = Self.stringValue(options, "id")
+        let secret = Self.stringValue(options, "secret")
+        let mtu = Self.intValue(options, "mtu")
+        let holepunch = Self.boolValue(options, "holepunch")
+        let pingIntervalSeconds = Self.intValue(options, "pingIntervalSeconds")
+        let userToken = Self.stringValue(options, "userToken")
+        let orgId = Self.stringValue(options, "orgId")
+        let overrideDNSValue = Self.boolValue(options, "overrideDNS")
+        let tunnelDNS = Self.boolValue(options, "tunnelDNS")
+        let pingTimeoutSeconds = Self.intValue(options, "pingTimeoutSeconds")
+
+        guard let endpoint, let id, let secret, let mtu, let holepunch,
+            let pingIntervalSeconds, let userToken, let orgId, let overrideDNSValue,
+            let tunnelDNS, let pingTimeoutSeconds
         else {
+            let required = [
+                "endpoint", "id", "secret", "mtu", "holepunch", "pingIntervalSeconds",
+                "userToken", "orgId", "overrideDNS", "tunnelDNS", "pingTimeoutSeconds",
+            ]
+            let present = required.map { key -> String in
+                let value = options[key]
+                let typeName = value.map { String(describing: type(of: $0)) } ?? "nil"
+                return "\(key)=\(typeName)"
+            }.joined(separator: ", ")
             let error = NSError(
                 domain: "TunnelAdapter", code: -1,
                 userInfo: [
                     NSLocalizedDescriptionKey: "Required tunnel configuration options are missing"
                 ])
-            os_log("Required tunnel configuration options are missing", log: logger, type: .error)
+            os_log(
+                "Required tunnel configuration options are missing (%{public}@)",
+                log: logger, type: .error, present)
             completionHandler(error)
             return
         }
 
-        let fingerprint = (options["fingerprint"]) as? [String: Any] ?? [:]
-        let postures = (options["postures"]) as? [String: Any] ?? [:]
-        let upstreamDNS = (options["upstreamDNS"] as? [String]) ?? []
-        let matchDomains = (options["matchDomains"] as? [String]) ?? []
+        let fingerprint = Self.dictionaryValue(options, "fingerprint") ?? [:]
+        let postures = Self.dictionaryValue(options, "postures") ?? [:]
+        let upstreamDNS = Self.stringArrayValue(options, "upstreamDNS") ?? []
+        let matchDomains = Self.stringArrayValue(options, "matchDomains") ?? []
 
         // No custom DNS configured; push a synchronous, best-effort read of the device's
         // real (pre-override) DNS servers directly into olm now, before startTunnel
@@ -732,5 +747,56 @@ public class TunnelAdapter {
         } else {
             os_log("Successfully rebound socket after network transition: %{public}@", log: logger, type: .info, message)
         }
+    }
+
+    // MARK: - Options coercion (app startVPNTunnel + on-demand JSON blob)
+
+    private static func stringValue(_ options: [String: NSObject], _ key: String) -> String? {
+        if let string = options[key] as? String { return string }
+        if let string = options[key] as? NSString { return string as String }
+        return nil
+    }
+
+    private static func intValue(_ options: [String: NSObject], _ key: String) -> Int? {
+        if let number = options[key] as? NSNumber { return number.intValue }
+        if let int = options[key] as? Int { return int }
+        if let string = stringValue(options, key), let int = Int(string) { return int }
+        return nil
+    }
+
+    private static func boolValue(_ options: [String: NSObject], _ key: String) -> Bool? {
+        if let number = options[key] as? NSNumber { return number.boolValue }
+        if let bool = options[key] as? Bool { return bool }
+        return nil
+    }
+
+    private static func dictionaryValue(
+        _ options: [String: NSObject], _ key: String
+    ) -> [String: Any]? {
+        if let dict = options[key] as? [String: Any] { return dict }
+        if let dict = options[key] as? NSDictionary {
+            var result: [String: Any] = [:]
+            for (k, v) in dict {
+                if let stringKey = k as? String {
+                    result[stringKey] = v
+                }
+            }
+            return result
+        }
+        return nil
+    }
+
+    private static func stringArrayValue(
+        _ options: [String: NSObject], _ key: String
+    ) -> [String]? {
+        if let array = options[key] as? [String] { return array }
+        if let array = options[key] as? NSArray {
+            return array.compactMap { element in
+                if let string = element as? String { return string }
+                if let string = element as? NSString { return string as String }
+                return nil
+            }
+        }
+        return nil
     }
 }

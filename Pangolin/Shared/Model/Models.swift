@@ -20,6 +20,15 @@ struct Config: Codable {
     /// When set, overrides Sparkle's scheduled check interval (seconds; minimum 3600).
     var updateCheckIntervalSeconds: Int?
 
+    /// On-demand: connect on cellular (iOS) or ethernet (macOS).
+    var onDemandNonWiFiEnabled: Bool?
+    /// On-demand: connect on Wi-Fi.
+    var onDemandWiFiEnabled: Bool?
+    /// On-demand SSID filter mode when Wi-Fi is enabled.
+    var onDemandSSIDOption: OnDemandSSIDOptionKind?
+    /// SSIDs for only/except modes.
+    var onDemandSSIDs: [String]?
+
     enum CodingKeys: String, CodingKey {
         case dnsOverrideEnabled
         case dnsTunnelEnabled
@@ -30,6 +39,10 @@ struct Config: Codable {
         case autoUpdateChecksEnabled
         case autoDownloadUpdatesEnabled
         case updateCheckIntervalSeconds
+        case onDemandNonWiFiEnabled
+        case onDemandWiFiEnabled
+        case onDemandSSIDOption
+        case onDemandSSIDs
     }
 }
 

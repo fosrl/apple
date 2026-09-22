@@ -100,12 +100,16 @@ struct PangolinApp: App {
                 Task {
                     await authManager.initialize()
                     await onboardingViewModel.refreshPages()
+                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
                     await performPendingVPNWidgetActionIfNeeded()
                 }
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
-                Task { await performPendingVPNWidgetActionIfNeeded() }
+                Task {
+                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+                    await performPendingVPNWidgetActionIfNeeded()
+                }
             }
             .onOpenURL { url in
                 Task { await handleVPNWidgetURL(url) }

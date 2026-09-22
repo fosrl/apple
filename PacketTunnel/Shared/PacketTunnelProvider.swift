@@ -16,24 +16,27 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         super.init()
     }
     
+    private static let tunnelStartConfigJSONKey = "tunnelStartConfigJSON"
+
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         os_log("startTunnel called with options: %{public}@", log: logger, type: .debug, options?.description ?? "nil")
-                
-        // Validate that options are provided
-        guard let options = options, !options.isEmpty else {
+
+        guard let resolvedOptions = resolveStartOptions(options) else {
             let error = NSError(domain: "PacketTunnelProvider", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "Tunnel options are required but were not provided"
             ])
-            os_log("Tunnel start failed: options not provided", log: logger, type: .error)
+            os_log(
+                "Tunnel start failed: could not resolve app options or tunnelStartConfigJSON",
+                log: logger, type: .error)
             completionHandler(error)
             return
         }
-        
+
         // Initialize the tunnel adapter
         tunnelAdapter = TunnelAdapter(with: self)
 
         // Use the tunnel adapter to start the tunnel and discover the file descriptor
-        tunnelAdapter?.start(options: options) { [weak self] (error: Error?) in
+        tunnelAdapter?.start(options: resolvedOptions) { [weak self] (error: Error?) in
             if let error = error {
                 os_log("Tunnel start failed: %{public}@", log: self?.logger ?? .default, type: .error, error.localizedDescription)
             } else {
@@ -41,6 +44,101 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             }
             completionHandler(error)
         }
+    }
+
+    /// Resolves tunnel start options from either:
+    /// - App `startVPNTunnel` flat options (`endpoint`, `id`, …), or
+    /// - JSON blob in options (`tunnelStartConfigJSON`), iOS `VendorData`, or
+    ///   `protocolConfiguration.providerConfiguration`.
+    ///
+    /// iOS on-demand does **not** pass nil options — it passes a system dict with
+    /// `is-on-demand` and wraps providerConfiguration under `VendorData`.
+    private func resolveStartOptions(_ options: [String: NSObject]?) -> [String: NSObject]? {
+        let jsonString =
+            Self.extractTunnelStartConfigJSON(from: options)
+            ?? Self.extractTunnelStartConfigJSON(
+                fromProviderConfiguration:
+                    (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration)
+        let decodedFromJSON = jsonString.flatMap { Self.decodeTunnelStartConfigJSON($0) }
+
+        let hasFlatAppOptions =
+            options.map {
+                Self.stringValue($0, "endpoint") != nil && Self.stringValue($0, "id") != nil
+                    && Self.stringValue($0, "secret") != nil
+            } ?? false
+
+        // Prefer flat app options when present (explicit startVPNTunnel).
+        if let options, hasFlatAppOptions {
+            os_log(
+                "Tunnel start: app-initiated (flat options, %{public}d keys)",
+                log: logger, type: .info, options.count)
+            return options
+        }
+
+        // On-demand / Always On / fallback: decoded JSON blob.
+        if let decodedFromJSON {
+            let onDemand = options?["is-on-demand"] != nil
+            os_log(
+                "Tunnel start: %{public}@ (decoded tunnelStartConfigJSON, %{public}d keys)",
+                log: logger, type: .info,
+                onDemand ? "on-demand / Always On" : "JSON fallback",
+                decodedFromJSON.count)
+            return decodedFromJSON
+        }
+
+        os_log(
+            "Tunnel start: resolve failed (flat=%{public}d json=%{public}d optionKeys=%{public}@)",
+            log: logger, type: .error,
+            hasFlatAppOptions ? 1 : 0,
+            decodedFromJSON != nil ? 1 : 0,
+            options?.keys.sorted().joined(separator: ",") ?? "nil")
+        return nil
+    }
+
+    private static func extractTunnelStartConfigJSON(from options: [String: NSObject]?)
+        -> String?
+    {
+        guard let options else { return nil }
+        if let json = stringValue(options, tunnelStartConfigJSONKey) {
+            return json
+        }
+        // iOS on-demand wraps providerConfiguration as VendorData (NSDictionary).
+        if let vendor = options["VendorData"] as? NSDictionary {
+            if let json = vendor[tunnelStartConfigJSONKey] as? String {
+                return json
+            }
+            if let json = vendor[tunnelStartConfigJSONKey] as? NSString {
+                return json as String
+            }
+        }
+        return nil
+    }
+
+    private static func extractTunnelStartConfigJSON(
+        fromProviderConfiguration providerConfiguration: [String: Any]?
+    ) -> String? {
+        providerConfiguration?[tunnelStartConfigJSONKey] as? String
+    }
+
+    private static func decodeTunnelStartConfigJSON(_ json: String) -> [String: NSObject]? {
+        guard let data = json.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return nil
+        }
+        var converted: [String: NSObject] = [:]
+        for (key, value) in object {
+            if let object = value as? NSObject {
+                converted[key] = object
+            }
+        }
+        return converted.isEmpty ? nil : converted
+    }
+
+    private static func stringValue(_ options: [String: NSObject], _ key: String) -> String? {
+        if let string = options[key] as? String { return string }
+        if let string = options[key] as? NSString { return string as String }
+        return nil
     }
     
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {

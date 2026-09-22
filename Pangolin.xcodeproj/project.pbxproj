@@ -175,7 +175,11 @@
 				Shared/SecretManager.swift,
 				Shared/SocketManager.swift,
 				Shared/SocketPath.swift,
+				Shared/Tunnel/ActivateOnDemandOption.swift,
+				Shared/Tunnel/ActivateOnDemandViewModel.swift,
 				Shared/TunnelManager.swift,
+				Shared/UI/OnDemandActivationSection.swift,
+				Shared/UI/OnDemandSSIDEditView.swift,
 			);
 			target = 907A6C5D2F05ACAF0097F387 /* PangoliniOS */;
 		};
