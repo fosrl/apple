@@ -36,11 +36,25 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         tunnelAdapter = TunnelAdapter(with: self)
 
         // Use the tunnel adapter to start the tunnel and discover the file descriptor
-        tunnelAdapter?.start(options: resolvedOptions) { [weak self] (error: Error?) in
+            tunnelAdapter?.start(options: resolvedOptions) { [weak self] (error: Error?) in
             if let error = error {
                 os_log("Tunnel start failed: %{public}@", log: self?.logger ?? .default, type: .error, error.localizedDescription)
+                #if os(iOS)
+                VPNWidgetStatusStore.publishFromTunnelExtension(
+                    isConnected: false,
+                    isBusy: false
+                )
+                #endif
             } else {
                 os_log("Tunnel start completed successfully", log: self?.logger ?? .default, type: .info)
+                #if os(iOS)
+                let endpoint = Self.stringValue(resolvedOptions, "endpoint")
+                VPNWidgetStatusStore.publishFromTunnelExtension(
+                    isConnected: true,
+                    isBusy: false,
+                    serverHostname: endpoint
+                )
+                #endif
             }
             completionHandler(error)
         }
@@ -150,6 +164,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         } else {
             os_log("Tunnel stopped successfully", log: logger, type: .info)
         }
+
+        #if os(iOS)
+        VPNWidgetStatusStore.publishFromTunnelExtension(
+            isConnected: false,
+            isBusy: false
+        )
+        #endif
         
         completionHandler()
         

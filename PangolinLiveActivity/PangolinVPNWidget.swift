@@ -28,9 +28,9 @@ struct PangolinVPNWidgetProvider: TimelineProvider {
                 statusText: "Connected",
                 isConnected: true,
                 isBusy: false,
+                isOnDemandEnabled: false,
                 organizationName: "Acme Corp",
                 serverHostname: "pangolin.example.com",
-                connectedAt: Date().addingTimeInterval(-3600),
                 updatedAt: Date()
             )
         )
@@ -76,9 +76,9 @@ struct PangolinVPNWidgetView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.snapshot.statusText)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
 
                 if let org = entry.snapshot.organizationName, !org.isEmpty {
                     Text(org)
@@ -106,14 +106,10 @@ struct PangolinVPNWidgetView: View {
                         HStack(spacing: 6) {
                             statusDot
                             Text(entry.snapshot.statusText)
-                                .font(.headline)
+                                .font(.subheadline.weight(.semibold))
                                 .lineLimit(1)
-                        }
-                        if entry.snapshot.isConnected, let connectedAt = entry.snapshot.connectedAt {
-                            Text(timerInterval: connectedAt...Date.distantFuture, countsDown: false)
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
+                                .minimumScaleFactor(0.65)
+                                .layoutPriority(1)
                         }
                     }
                     Spacer(minLength: 0)
@@ -169,9 +165,19 @@ struct PangolinVPNWidgetView: View {
 
     private var statusDot: some View {
         Circle()
-            .fill(entry.snapshot.isConnected ? Color.green : Color.secondary.opacity(0.45))
+            .fill(statusDotColor)
             .frame(width: 8, height: 8)
             .accessibilityLabel(entry.snapshot.statusText)
+    }
+
+    private var statusDotColor: Color {
+        if entry.snapshot.isConnected {
+            return .green
+        }
+        if entry.snapshot.isOnDemandEnabled {
+            return .yellow
+        }
+        return Color.secondary.opacity(0.45)
     }
 
     private func detailRow(label: String, value: String) -> some View {

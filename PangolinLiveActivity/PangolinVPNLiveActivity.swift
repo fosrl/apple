@@ -19,12 +19,6 @@ struct PangolinVPNLiveActivity: Widget {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
-                DynamicIslandExpandedRegion(.trailing) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 36))
-                        .foregroundStyle(.green)
-                        .symbolRenderingMode(.hierarchical)
-                }
             } compactLeading: {
                 // Same footprint as minimal so compact↔minimal morphs don't reflow the logo.
                 PangolinLiveActivityLogo(size: Self.islandLogoSize)
@@ -106,13 +100,6 @@ private struct LockScreenLiveActivityView: View {
                     Text(context.state.statusText)
                         .font(.headline)
                     Spacer()
-                    Text(
-                        timerInterval: context.state.connectedAt...Date.distantFuture,
-                        countsDown: false
-                    )
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
                 }
 
                 Text(context.attributes.organizationName)

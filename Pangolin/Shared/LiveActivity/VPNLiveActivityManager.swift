@@ -9,7 +9,6 @@
         static let shared = VPNLiveActivityManager()
 
         private var activity: Activity<PangolinVPNAttributes>?
-        private var connectedAt: Date?
         private var resignObserver: NSObjectProtocol?
         private var activeObserver: NSObjectProtocol?
         /// Org to use once we're allowed to start (typically after leaving the foreground).
@@ -88,9 +87,6 @@
         private func adoptExistingActivityIfNeeded() {
             guard activity == nil else { return }
             activity = Activity<PangolinVPNAttributes>.activities.first
-            if let existing = activity {
-                connectedAt = existing.content.state.connectedAt
-            }
         }
 
         private func startPendingIfNeeded() {
@@ -115,12 +111,9 @@
                 return
             }
 
-            let startDate = Date()
-            connectedAt = startDate
             let attributes = PangolinVPNAttributes(organizationName: organizationName)
             let state = PangolinVPNAttributes.ContentState(
-                statusText: TunnelStatus.connected.displayText,
-                connectedAt: startDate
+                statusText: TunnelStatus.connected.displayText
             )
 
             do {
@@ -147,7 +140,6 @@
         }
 
         private func endActivity() {
-            connectedAt = nil
             adoptExistingActivityIfNeeded()
             let activities: [Activity<PangolinVPNAttributes>]
             if let activity {
@@ -160,8 +152,7 @@
             guard !activities.isEmpty else { return }
 
             let finalState = PangolinVPNAttributes.ContentState(
-                statusText: TunnelStatus.disconnected.displayText,
-                connectedAt: Date()
+                statusText: TunnelStatus.disconnected.displayText
             )
 
             Task {

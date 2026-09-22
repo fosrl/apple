@@ -101,6 +101,7 @@ struct PangolinApp: App {
                     await authManager.initialize()
                     await onboardingViewModel.refreshPages()
                     await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+                    await tunnelManager.updateConnectionStatusForWidget()
                     await performPendingVPNWidgetActionIfNeeded()
                 }
             }
@@ -108,6 +109,7 @@ struct PangolinApp: App {
                 guard phase == .active else { return }
                 Task {
                     await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+                    await tunnelManager.updateConnectionStatusForWidget()
                     await performPendingVPNWidgetActionIfNeeded()
                 }
             }

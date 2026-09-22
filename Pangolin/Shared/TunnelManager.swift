@@ -118,6 +118,16 @@ class TunnelManager: NSObject, ObservableObject {
                     self?.syncWidgetStatus(status: newStatus)
                 }
 
+            // On-demand engage can leave TunnelStatus at .disconnected; still refresh widget.
+            $isOnDemandEnabled
+                .combineLatest($hasOnDemandRules)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _, _ in
+                    guard let self else { return }
+                    self.syncWidgetStatus(status: self.status)
+                }
+                .store(in: &widgetMetadataCancellables)
+
             // Org / account can change while tunnel status stays the same; refresh
             // the widget so cleared selections don't leave stale labels.
             authManager.$currentOrg
@@ -187,6 +197,17 @@ class TunnelManager: NSObject, ObservableObject {
             NotificationCenter.default.removeObserver(observer)
         }
         stopSocketPolling()
+    }
+
+    /// Re-reads NE VPN + on-demand state and pushes the widget snapshot.
+    /// Call when the app becomes active so background on-demand changes are reflected.
+    func updateConnectionStatusForWidget() async {
+        await updateConnectionStatus()
+        #if os(iOS)
+        await MainActor.run {
+            syncWidgetStatus(status: status)
+        }
+        #endif
     }
 
     @MainActor
@@ -1106,17 +1127,25 @@ class TunnelManager: NSObject, ObservableObject {
                 authManager.isAuthenticated ? authManager.currentOrg?.name : nil
             let serverHostname =
                 authManager.isAuthenticated ? accountManager.activeAccount?.hostname : nil
+
+            let statusText: String
+            if hasOnDemandRules && isOnDemandEnabled && status == .disconnected {
+                statusText = "On-Demand Enabled"
+            } else if hasOnDemandRules && !isOnDemandEnabled && status == .disconnected {
+                statusText = "On-Demand Disabled"
+            } else {
+                statusText = status.displayText
+            }
+
             VPNWidgetStatusStore.write(
-                statusText: status.displayText,
+                statusText: statusText,
                 isConnected: status == .connected,
                 isBusy: status == .starting || status == .registering,
+                isOnDemandEnabled: isOnDemandEnabled,
                 organizationName: organizationName,
                 serverHostname: serverHostname
             )
-            WidgetCenter.shared.reloadTimelines(ofKind: VPNWidgetStatusStore.widgetKind)
-            if #available(iOS 18.0, *) {
-                ControlCenter.shared.reloadControls(ofKind: VPNWidgetStatusStore.controlKind)
-            }
+            VPNWidgetStatusStore.reloadTimelines()
         }
     #endif
 }

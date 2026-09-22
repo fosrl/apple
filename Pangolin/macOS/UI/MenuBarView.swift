@@ -614,7 +614,7 @@ struct ConnectButtonItem: View {
         if tunnelManager.hasOnDemandRules {
             if tunnelManager.isOnDemandEnabled {
                 if tunnelManager.status == .connected || tunnelManager.isNEConnected {
-                    return "Disable On-Demand and Deactivate"
+                    return "Disable On-Demand and Disconnect"
                 }
                 return "Disable On-Demand"
             }

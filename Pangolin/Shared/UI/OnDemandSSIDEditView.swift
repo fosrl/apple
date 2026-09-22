@@ -59,6 +59,18 @@ struct OnDemandSSIDEditView: View {
     @ViewBuilder
     private var formContent: some View {
         Form {
+            #if os(macOS)
+            Section {
+                Picker(selection: $viewModel.ssidOption) {
+                    ForEach(OnDemandSSIDOptionKind.allCases, id: \.self) { kind in
+                        Text(kind.localizedUIString).tag(kind)
+                    }
+                } label: {
+                    Text("Matching")
+                }
+                .pickerStyle(.menu)
+            }
+            #else
             Section {
                 ForEach(OnDemandSSIDOptionKind.allCases, id: \.self) { kind in
                     Button {
@@ -77,11 +89,23 @@ struct OnDemandSSIDEditView: View {
                     .foregroundColor(.primary)
                 }
             }
+            #endif
 
             if viewModel.ssidOption != .any {
                 Section(header: Text("SSIDs")) {
-                    ForEach(Array(viewModel.selectedSSIDs.enumerated()), id: \.offset) { index, ssid in
-                        TextField("SSID", text: bindingForSSID(at: index))
+                    ForEach(Array(viewModel.selectedSSIDs.enumerated()), id: \.offset) { index, _ in
+                        HStack(spacing: 12) {
+                            TextField("SSID", text: bindingForSSID(at: index))
+                            Button {
+                                deleteSSID(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.red)
+                                    .imageScale(.large)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove SSID")
+                        }
                     }
                     .onDelete(perform: deleteSSIDs)
 
@@ -96,10 +120,16 @@ struct OnDemandSSIDEditView: View {
                     HStack {
                         TextField("Add new", text: $newSSID)
                             .onSubmit(addNewSSID)
-                        Button("Add") {
+                        Button {
                             addNewSSID()
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(.green)
+                                .imageScale(.large)
                         }
+                        .buttonStyle(.borderless)
                         .disabled(newSSID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityLabel("Add SSID")
                     }
                 }
             }
@@ -124,6 +154,11 @@ struct OnDemandSSIDEditView: View {
 
     private func deleteSSIDs(at offsets: IndexSet) {
         viewModel.selectedSSIDs.remove(atOffsets: offsets)
+    }
+
+    private func deleteSSID(at index: Int) {
+        guard viewModel.selectedSSIDs.indices.contains(index) else { return }
+        viewModel.selectedSSIDs.remove(at: index)
     }
 
     private func addNewSSID() {

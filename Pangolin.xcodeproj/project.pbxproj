@@ -218,6 +218,13 @@
 			);
 			target = 90LA01042F1000010097F387 /* PangolinLiveActivity */;
 		};
+		90PT010E2F1000020097F387 /* Exceptions for "Pangolin" folder in "PacketTunneliOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Shared/LiveActivity/VPNWidgetStatusStore.swift,
+			);
+			target = 907A6C7B2F05AE620097F387 /* PacketTunneliOS */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
@@ -239,6 +246,7 @@
 				901FF5E22EC7EE9900711D4E /* Exceptions for "Pangolin" folder in "Pangolin" target */,
 				907A6C6C2F05ADBB0097F387 /* Exceptions for "Pangolin" folder in "PangoliniOS" target */,
 				90LA010D2F1000010097F387 /* Exceptions for "Pangolin" folder in "PangolinLiveActivity" target */,
+				90PT010E2F1000020097F387 /* Exceptions for "Pangolin" folder in "PacketTunneliOS" target */,
 			);
 			path = Pangolin;
 			sourceTree = "<group>";

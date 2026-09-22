@@ -1,27 +1,32 @@
 import Foundation
 
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
+
 /// Snapshot of VPN status mirrored into the App Group for the Home Screen widget.
 struct VPNWidgetStatusSnapshot: Equatable, Sendable {
     var statusText: String
     var isConnected: Bool
     /// True while connecting / registering — widget shows Disconnect.
     var isBusy: Bool
+    /// On-demand rules are engaged (may be idle if path does not match).
+    var isOnDemandEnabled: Bool
     var organizationName: String?
     var serverHostname: String?
-    var connectedAt: Date?
     var updatedAt: Date
 
     var showsDisconnectButton: Bool {
-        isConnected || isBusy
+        isConnected || isBusy || isOnDemandEnabled
     }
 
     static let empty = VPNWidgetStatusSnapshot(
         statusText: "Disconnected",
         isConnected: false,
         isBusy: false,
+        isOnDemandEnabled: false,
         organizationName: nil,
         serverHostname: nil,
-        connectedAt: nil,
         updatedAt: .distantPast
     )
 }
@@ -85,6 +90,7 @@ enum VPNWidgetStatusStore {
     private static let statusTextKey = "vpnWidget.statusText"
     private static let isConnectedKey = "vpnWidget.isConnected"
     private static let isBusyKey = "vpnWidget.isBusy"
+    private static let isOnDemandEnabledKey = "vpnWidget.isOnDemandEnabled"
     private static let organizationNameKey = "vpnWidget.organizationName"
     private static let serverHostnameKey = "vpnWidget.serverHostname"
     private static let connectedAtKey = "vpnWidget.connectedAt"
@@ -98,6 +104,7 @@ enum VPNWidgetStatusStore {
         statusText: String,
         isConnected: Bool,
         isBusy: Bool,
+        isOnDemandEnabled: Bool,
         organizationName: String?,
         serverHostname: String?
     ) {
@@ -105,18 +112,50 @@ enum VPNWidgetStatusStore {
         defaults.set(statusText, forKey: statusTextKey)
         defaults.set(isConnected, forKey: isConnectedKey)
         defaults.set(isBusy, forKey: isBusyKey)
+        defaults.set(isOnDemandEnabled, forKey: isOnDemandEnabledKey)
         setOptionalString(organizationName, forKey: organizationNameKey, in: defaults)
         setOptionalString(displayHostname(from: serverHostname), forKey: serverHostnameKey, in: defaults)
-
-        if isConnected {
-            if defaults.object(forKey: connectedAtKey) == nil {
-                defaults.set(Date().timeIntervalSince1970, forKey: connectedAtKey)
-            }
-        } else {
-            defaults.removeObject(forKey: connectedAtKey)
-        }
-
+        // Drop legacy connected-at; duration is no longer shown.
+        defaults.removeObject(forKey: connectedAtKey)
         defaults.set(Date().timeIntervalSince1970, forKey: updatedAtKey)
+    }
+
+    /// Called from the packet tunnel when the OS starts/stops the VPN (including on-demand).
+    /// Preserves org/hostname and on-demand engagement when not explicitly overridden.
+    static func publishFromTunnelExtension(
+        isConnected: Bool,
+        isBusy: Bool,
+        serverHostname: String? = nil
+    ) {
+        let existing = read()
+        let statusText: String
+        if isConnected {
+            statusText = "Connected"
+        } else if isBusy {
+            statusText = "Starting"
+        } else if existing.isOnDemandEnabled {
+            statusText = "On-Demand Enabled"
+        } else {
+            statusText = "Disconnected"
+        }
+        write(
+            statusText: statusText,
+            isConnected: isConnected,
+            isBusy: isBusy,
+            isOnDemandEnabled: existing.isOnDemandEnabled,
+            organizationName: existing.organizationName,
+            serverHostname: serverHostname ?? existing.serverHostname
+        )
+        reloadTimelines()
+    }
+
+    static func reloadTimelines() {
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
+        if #available(iOS 18.0, *) {
+            ControlCenter.shared.reloadControls(ofKind: controlKind)
+        }
+        #endif
     }
 
     /// Strips `http(s)://` and trailing slashes so the widget shows just the host.
@@ -145,19 +184,13 @@ enum VPNWidgetStatusStore {
         } else {
             updatedAt = .distantPast
         }
-        let connectedAt: Date?
-        if defaults.object(forKey: connectedAtKey) != nil {
-            connectedAt = Date(timeIntervalSince1970: defaults.double(forKey: connectedAtKey))
-        } else {
-            connectedAt = nil
-        }
         return VPNWidgetStatusSnapshot(
             statusText: defaults.string(forKey: statusTextKey) ?? "Disconnected",
             isConnected: defaults.bool(forKey: isConnectedKey),
             isBusy: defaults.bool(forKey: isBusyKey),
+            isOnDemandEnabled: defaults.bool(forKey: isOnDemandEnabledKey),
             organizationName: defaults.string(forKey: organizationNameKey),
             serverHostname: displayHostname(from: defaults.string(forKey: serverHostnameKey)),
-            connectedAt: connectedAt,
             updatedAt: updatedAt
         )
     }
