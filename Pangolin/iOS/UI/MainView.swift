@@ -18,7 +18,10 @@ struct MainView: View {
     @State private var showLoginView = false
     @State private var startDeviceAuthImmediately = false
     @State private var selectedTab: TabSelection = .home
-    
+    @Environment(\.scenePhase) private var scenePhase
+    /// Last OLM error already presented, so foregrounding does not alert again.
+    @State private var presentedConnectionError: String?
+
     var body: some View {
         TabView(selection: $selectedTab) {
             HomeTabView(
@@ -80,6 +83,28 @@ struct MainView: View {
                 startDeviceAuthImmediately: $startDeviceAuthImmediately
             )
         }
+        .onAppear {
+            presentConnectionErrorIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                presentConnectionErrorIfNeeded()
+            }
+        }
+        .onChange(of: tunnelManager.connectionErrorMessage) { _, message in
+            if message == nil {
+                presentedConnectionError = nil
+            }
+            presentConnectionErrorIfNeeded()
+        }
+    }
+
+    private func presentConnectionErrorIfNeeded() {
+        guard scenePhase == .active else { return }
+        guard let message = tunnelManager.connectionErrorMessage, !message.isEmpty else { return }
+        guard presentedConnectionError != message else { return }
+        presentedConnectionError = message
+        AlertManager.shared.showAlertDialog(title: "Connection Error", message: message)
     }
 }
 
@@ -355,8 +380,7 @@ struct HomeTabView: View {
                                 .buttonStyle(.plain)
                             }
                             
-                            // Organization section (hidden when session expired)
-                            if !authManager.sessionExpired, let org = authManager.currentOrg {
+                            if let org = authManager.currentOrg {
                                 VStack(alignment: .leading, spacing: 12) {
                                     // Organization section header
                                     Text("Organization")
@@ -580,6 +604,9 @@ struct AccountManagementView: View {
     }
     
     private var shouldDisableAccountButton: Bool {
+        if !tunnelManager.isNEConnected && tunnelManager.status != .starting {
+            return false
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true
@@ -722,6 +749,9 @@ struct OrganizationPickerView: View {
     }
     
     private var shouldDisableOrgButtons: Bool {
+        if !tunnelManager.isNEConnected && tunnelManager.status != .starting {
+            return false
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true

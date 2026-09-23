@@ -25,7 +25,7 @@ struct PreferencesWindow: View {
         .onAppear {
             handleWindowAppear()
         }
-        .onChange(of: selectedSection) { _ in
+        .onChange(of: selectedSection) {
             updateWindowTitle()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
@@ -46,22 +46,42 @@ struct PreferencesWindow: View {
     }
     
     private func handleWindowAppear() {
-        // Show app in dock when window appears
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            guard NSApp.activationPolicy() != .regular else { return }
-            NSApp.setActivationPolicy(.regular)
-            
-            // Ensure window identifier is set and close duplicates
-            if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
-                configureWindow(window)
-                
-                // Close any other windows with the same identifier
-                let duplicates = NSApplication.shared.windows.filter { w in
-                    w.identifier?.rawValue == "preferences" && w != window
-                }
-                for duplicate in duplicates {
-                    duplicate.close()
-                }
+            showAppInDock()
+            closeDuplicatePreferencesWindows()
+        }
+        // Launch hides the Dock icon shortly after this window is restored.
+        // Re-apply once that has run, if the window is still open.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard isPreferencesWindowShown() else { return }
+            showAppInDock()
+        }
+    }
+
+    private func showAppInDock() {
+        guard NSApp.activationPolicy() != .regular else { return }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func isPreferencesWindowShown() -> Bool {
+        NSApplication.shared.windows.contains { window in
+            let isShown = window.isVisible || window.isMiniaturized
+            guard isShown else { return false }
+            if window.identifier?.rawValue == "preferences" { return true }
+            return PreferencesSection.allCases.contains { $0.rawValue == window.title }
+        }
+    }
+
+    private func closeDuplicatePreferencesWindows() {
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
+            configureWindow(window)
+
+            let duplicates = NSApplication.shared.windows.filter { w in
+                w.identifier?.rawValue == "preferences" && w != window
+            }
+            for duplicate in duplicates {
+                duplicate.close()
             }
         }
     }
@@ -110,8 +130,9 @@ struct PreferencesWindow: View {
     
     private func updateWindowTitle() {
         if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
-            window.title = selectedSection.rawValue
-        }
+        window.title = selectedSection.rawValue
+        window.titlebarSeparatorStyle = selectedSection == .olmStatus ? .none : .automatic
+    }
     }
     
     private func hideMenuBarItems() {

@@ -107,6 +107,7 @@ class AuthManager: ObservableObject {
                     sessionExpired = true
                     isAuthenticated = true
                     errorMessage = "Session expired. Please sign in again."
+                    restoreCachedOrganization(from: activeAccount)
                 } else {
                     isAuthenticated = false
                 }
@@ -322,19 +323,32 @@ class AuthManager: ObservableObject {
 
         // Fetch server info
         await fetchServerInfo()
+
+        // Session and org exist now. Rewrite the on-demand start blob so a later
+        // system start does not keep the previous account's config.
+        if let tunnelManager {
+            await ensureOlmCredentials(userId: user.userId)
+            await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+        }
     }
 
     func markSessionExpiredFromConnection() {
         sessionExpired = true
+        if let account = accountManager.activeAccount {
+            restoreCachedOrganization(from: account)
+        }
     }
 
-    /// Restores `currentOrg` from the locally cached account org ID when the server is unreachable.
+    /// Restores `currentOrg` from the locally cached account org ID when the server is unreachable
+    /// or the session is expired. Keeps a known display name when the id already matches.
     private func restoreCachedOrganization(from account: Account) {
         guard !account.orgId.isEmpty else { return }
-        let cached = Organization(orgId: account.orgId, name: account.orgId, isOwner: nil)
-        currentOrg = cached
-        if organizations.isEmpty {
-            organizations = [cached]
+        if currentOrg?.orgId != account.orgId {
+            currentOrg = Organization(orgId: account.orgId, name: account.orgId, isOwner: nil)
+        }
+        guard let currentOrg, currentOrg.orgId == account.orgId else { return }
+        if !organizations.contains(where: { $0.orgId == account.orgId }) {
+            organizations.append(currentOrg)
         }
     }
 
@@ -506,18 +520,15 @@ class AuthManager: ObservableObject {
                 errorMessage = "Failed to fetch user information: \(error.errorDescription ?? error.localizedDescription)"
             }
             currentUser = nil
-            currentOrg = nil
-            organizations = []
+            restoreCachedOrganization(from: accountToSwitchTo)
         } catch {
             // Error fetching user, but keep account switched
             os_log(
                 "Error fetching user when switching accounts: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
             errorMessage = "Failed to fetch user information: \(error.localizedDescription)"
-            // Clear current user/org since we can't fetch them for this account
             currentUser = nil
-            currentOrg = nil
-            organizations = []
+            restoreCachedOrganization(from: accountToSwitchTo)
         }
 
         // Try to select organization (non-fatal if it fails)
@@ -533,6 +544,7 @@ class AuthManager: ObservableObject {
                 error.localizedDescription)
             selectedOrgId = accountToSwitchTo.orgId
             accountManager.setUserOrganization(userId: userId, orgId: selectedOrgId)
+            restoreCachedOrganization(from: accountToSwitchTo)
         }
         
         // Fetch server info (non-fatal if it fails)

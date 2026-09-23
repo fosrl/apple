@@ -241,8 +241,10 @@ struct MenuBarView: View {
             menuOpenCount += 1
         }
         .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) {
-            _ in
-            // Also handle menu open logic when menu begins tracking (menu is opening)
+            notification in
+            // This fires for every menu, including the app menu next to the Apple logo.
+            // Refreshing orgs there republishes state and SwiftUI closes that menu.
+            guard let menu = notification.object as? NSMenu, !Self.isApplicationMenu(menu) else { return }
             if authManager.isAuthenticated {
                 Task {
                     await handleMenuOpen()
@@ -257,7 +259,24 @@ struct MenuBarView: View {
         }
     }
 
+    /// True for the menu bar next to the Apple logo and any of its submenus.
+    private static func isApplicationMenu(_ menu: NSMenu) -> Bool {
+        guard let mainMenu = NSApp.mainMenu else { return false }
+        if menu === mainMenu { return true }
+
+        var pending = mainMenu.items.compactMap(\.submenu)
+        while let current = pending.popLast() {
+            if current === menu { return true }
+            pending.append(contentsOf: current.items.compactMap(\.submenu))
+        }
+        return false
+    }
+
     private func handleMenuOpen() async {
+        // Accessory menu bar apps often never become active, so didBecomeActive
+        // does not refresh the on-demand start blob. Opening the menu does.
+        await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+
         // Check server health first
         var healthCheckFailed = false
         do {
@@ -458,6 +477,9 @@ struct OrganizationsMenu: View {
     }
 
     private var shouldDisableOrgButtons: Bool {
+        if !tunnelManager.isNEConnected && tunnelManager.status != .starting {
+            return false
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true
@@ -529,6 +551,9 @@ struct AccountsMenu: View {
     }
 
     private var shouldDisableAccountButton: Bool {
+        if !tunnelManager.isNEConnected && tunnelManager.status != .starting {
+            return false
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true

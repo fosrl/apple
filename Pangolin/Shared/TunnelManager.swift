@@ -21,6 +21,9 @@ class TunnelManager: NSObject, ObservableObject {
     /// Set when a connect attempt fails (socket error, missing config, startVPNTunnel, etc.).
     /// Cleared at the start of `connect()`. App Intents read this after `waitUntilSettled()`.
     private(set) var lastConnectionError: String?
+    /// OLM failure on the status socket while on-demand leaves the tunnel running.
+    /// Cleared when registration succeeds, or when the user connects or disconnects.
+    @Published var connectionErrorMessage: String?
 
     private var tunnelManager: NETunnelProviderManager?
     #if os(iOS)
@@ -249,6 +252,10 @@ class TunnelManager: NSObject, ObservableObject {
             if !isPollingSocket && !hasShownErrorAlert {
                 startSocketPolling()
                 status = .registering
+            } else if hasShownErrorAlert, status == .registering {
+                // A previous OLM failure already ended registration. Don't leave the
+                // UI in .registering, which keeps Log In and org controls disabled.
+                status = .disconnected
             }
         case .reasserting:
             // Extension is reasserting, keep current state
@@ -533,6 +540,7 @@ class TunnelManager: NSObject, ObservableObject {
 
         await MainActor.run {
             lastConnectionError = nil
+            connectionErrorMessage = nil
             if !engageOnDemandOnly {
                 status = .starting
             }
@@ -759,10 +767,15 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     /// Writes a single plist-safe JSON string into providerConfiguration for on-demand starts.
+    /// Uses a copy of the protocol. Assigning the existing instance back does not mark the
+    /// manager dirty, so `saveToPreferences` keeps the previous blob. Connect still saved
+    /// because it also changes on-demand fields.
     private func persistTunnelStartConfig(
         _ options: [String: NSObject], on manager: NETunnelProviderManager
     ) throws {
-        guard let protocolConfig = manager.protocolConfiguration as? NETunnelProviderProtocol else {
+        guard let existing = manager.protocolConfiguration as? NETunnelProviderProtocol,
+            let protocolConfig = existing.copy() as? NETunnelProviderProtocol
+        else {
             throw NSError(
                 domain: "TunnelManager", code: -1,
                 userInfo: [
@@ -805,6 +818,7 @@ class TunnelManager: NSObject, ObservableObject {
 
         do {
             try persistTunnelStartConfig(tunnelOptions, on: manager)
+            configManager.onDemandOptionFromConfig().apply(on: manager)
             try await manager.saveToPreferences()
             try await manager.loadFromPreferences()
             let hasBlob =
@@ -901,6 +915,10 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     func disconnect() async {
+        await MainActor.run {
+            connectionErrorMessage = nil
+        }
+
         guard let manager = tunnelManager else {
             return
         }
@@ -989,20 +1007,17 @@ class TunnelManager: NSObject, ObservableObject {
                         break
                     }
 
-                    // Check for errors before registration - if error exists and not yet registered, disconnect and show alert
+                    // Error before registration. Stop the extension and turn off
+                    // always-on so the OS does not start it again.
                     if let error = socketStatus.error, socketStatus.registered != true {
-                        // Set flag immediately to prevent duplicate alerts (check-and-set pattern)
                         let shouldShowAlert = !hasShownErrorAlert
                         hasShownErrorAlert = true
 
-                        // Record before disconnect so waitUntilSettled() callers see the
+                        // Record before teardown so waitUntilSettled() callers see the
                         // error rather than a bare .disconnected status.
                         await MainActor.run {
                             self.lastConnectionError = error.message
                         }
-
-                        // Stop polling immediately to prevent duplicate alerts
-                        self.stopSocketPolling()
 
                         if shouldShowAlert {
                             os_log(
@@ -1012,20 +1027,11 @@ class TunnelManager: NSObject, ObservableObject {
                                 error.code,
                                 error.message)
 
-                            // Surface the error before disconnecting so it is not dropped
-                            // if the tunnel teardown races the UI.
                             #if os(macOS)
                             await AlertManager.shared.showConnectionErrorNotification(
                                 title: "Connection Error",
                                 message: error.message
                             )
-                            #else
-                            await MainActor.run {
-                                AlertManager.shared.showAlertDialog(
-                                    title: "Connection Error",
-                                    message: error.message
-                                )
-                            }
                             #endif
                         }
 
@@ -1035,43 +1041,59 @@ class TunnelManager: NSObject, ObservableObject {
                             }
                         }
 
+                        self.stopSocketPolling()
+
+                        // disconnect() disables isOnDemandEnabled before stopping the tunnel.
                         await self.disconnect()
 
-                        // Immediately set status to disconnected
+                        // disconnect() clears the message. Put it back so iOS can show it
+                        // the next time the app is opened.
                         await MainActor.run {
+                            self.connectionErrorMessage = error.message
                             self.status = .disconnected
                         }
                         break
-                    }
-
-                    // Determine the new tunnel status based on socket response
-                    let newStatus: TunnelStatus
-                    if socketStatus.connected && socketStatus.registered == true {
-                        newStatus = .connected
                     } else {
-                        newStatus = .registering
-                    }
-
-                    // Only update if status actually changed
-                    let statusChanged = lastTunnelStatus != newStatus
-                    let needsNEUpdate = !lastIsNEConnected
-
-                    if statusChanged || needsNEUpdate {
-                        lastTunnelStatus = newStatus
-                        if needsNEUpdate {
-                            lastIsNEConnected = true
+                        if socketStatus.error == nil, socketStatus.registered == true {
+                            hasShownErrorAlert = false
+                            await MainActor.run {
+                                if self.connectionErrorMessage != nil {
+                                    self.connectionErrorMessage = nil
+                                }
+                            }
                         }
 
-                        await MainActor.run {
-                            if statusChanged {
-                                self.status = newStatus
-                                os_log(
-                                    "Tunnel status changed to: %{public}@", log: self.logger,
-                                    type: .debug, newStatus.displayText)
-                            }
+                        // Determine the new tunnel status based on socket response
+                        let newStatus: TunnelStatus
+                        if socketStatus.connected && socketStatus.registered == true {
+                            newStatus = .connected
+                        } else {
+                            newStatus = .registering
+                        }
 
-                            if needsNEUpdate {
-                                self.isNEConnected = true
+                        // Only update if status actually changed
+                        let statusChanged = lastTunnelStatus != newStatus
+                        let needsNEUpdate = !lastIsNEConnected
+
+                        if statusChanged || needsNEUpdate {
+                            let applied = await MainActor.run { () -> Bool in
+                                guard self.providerIsRunning() else { return false }
+                                if statusChanged {
+                                    self.status = newStatus
+                                    os_log(
+                                        "Tunnel status changed to: %{public}@", log: self.logger,
+                                        type: .debug, newStatus.displayText)
+                                }
+                                if needsNEUpdate {
+                                    self.isNEConnected = true
+                                }
+                                return true
+                            }
+                            if applied {
+                                lastTunnelStatus = newStatus
+                                if needsNEUpdate {
+                                    lastIsNEConnected = true
+                                }
                             }
                         }
                     }
@@ -1099,6 +1121,18 @@ class TunnelManager: NSObject, ObservableObject {
                 // Wait before next poll
                 try? await Task.sleep(nanoseconds: UInt64(self.socketPollInterval * 1_000_000_000))
             }
+        }
+    }
+
+    /// True while NetworkExtension still has the provider up. Poll results must not
+    /// move the UI back to `.registering` after the user stops the extension.
+    private func providerIsRunning() -> Bool {
+        guard let manager = tunnelManager else { return false }
+        switch manager.connection.status {
+        case .connected, .connecting, .reasserting:
+            return true
+        default:
+            return false
         }
     }
 

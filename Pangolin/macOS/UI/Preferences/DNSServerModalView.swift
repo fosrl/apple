@@ -37,7 +37,7 @@ struct DNSServerModalView: View {
                     .padding(.vertical, 6)
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(4)
-                    .onChange(of: editedValue) { _ in showValidationError = false }
+                    .onChange(of: editedValue) { showValidationError = false }
                 
                 if showValidationError && !trimmedValue.isEmpty && !IPAddressValidator.isValid(trimmedValue) {
                     Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")

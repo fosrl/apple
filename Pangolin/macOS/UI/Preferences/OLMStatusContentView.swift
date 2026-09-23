@@ -8,7 +8,8 @@ enum DisplayMode: String, CaseIterable {
 
 struct OLMStatusContentView: View {
     @ObservedObject var olmStatusManager: OLMStatusManager
-    @State private var displayMode: DisplayMode = .formatted
+    @AppStorage("net.pangolin.Pangolin.statusDisplayMode") private var displayMode: DisplayMode = .formatted
+    @State private var showCopyConfirmation = false
     
     // Computed property to format socket status as JSON
     private var statusJSON: String? {
@@ -24,28 +25,63 @@ struct OLMStatusContentView: View {
         }
         return jsonString
     }
+
+    private var displayedJSON: String {
+        statusJSON ?? Self.placeholderJSON
+    }
+
+    private static let placeholderJSON = """
+    {
+      "connected": false
+    }
+    """
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Mode selector
-            Picker("", selection: $displayMode) {
-                ForEach(DisplayMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+        ScrollView {
+            Form {
+                Section {
+                    Picker(selection: $displayMode) {
+                        ForEach(DisplayMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    } label: {
+                        Text("Display Mode")
+                    }
+                    .pickerStyle(.menu)
+                } header: {
+                    Text("View")
+                }
+
+                if displayMode == .json {
+                    jsonContent
+                } else {
+                    formattedContent
                 }
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-            
-            // Content based on mode
-            if displayMode == .json {
-                jsonView
-            } else {
-                formattedView
-            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .toolbar {
+            if displayMode == .json {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(displayedJSON, forType: .string)
+                        showCopyConfirmation = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            showCopyConfirmation = false
+                        }
+                    }) {
+                        if showCopyConfirmation {
+                            Label("Copied", systemImage: "checkmark")
+                        } else {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                    }
+                }
+            }
+        }
         .onAppear {
             // Start separate polling for live updates when view appears
             olmStatusManager.startPolling()
@@ -58,149 +94,117 @@ struct OLMStatusContentView: View {
     
     // MARK: - JSON View
     
-    private var jsonView: some View {
-        ScrollView {
-            if let json = statusJSON {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(json)
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                }
-            } else {
-                Form {
-                    Section {
-                        HStack {
-                            Text("Status")
-                                .font(.system(size: 13))
-                            Spacer()
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color.gray)
-                                    .frame(width: 8, height: 8)
-                                Text("Disconnected")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } header: {
-                        Text("Connection Status")
-                    }
-                }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-            }
+    private var jsonContent: some View {
+        Section {
+            Text(displayedJSON)
+                .font(.system(.body, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } header: {
+            Text("JSON")
         }
     }
     
     // MARK: - Formatted View
     
-    private var formattedView: some View {
-        ScrollView {
-            if let status = olmStatusManager.socketStatus {
-                Form {
-                    // Overall Status Section
-                    Section {
-                        HStack {
-                            Text("Agent")
-                                .font(.system(size: 13))
-                            Spacer()
-                            Text(status.agent ?? "Unknown")
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        if let version = status.version {
-                            HStack {
-                                Text("Version")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Text(version)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        HStack {
-                            Text("Status")
-                                .font(.system(size: 13))
-                            Spacer()
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(status.connected ? Color.green : Color.gray)
-                                    .frame(width: 8, height: 8)
-                                Text(formatStatus(connected: status.connected, registered: status.registered))
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        if let orgId = status.orgId {
-                            HStack {
-                                Text("Organization")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Text(orgId)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } header: {
-                        Text("Connection Status")
-                    }
-                    
-                    // Peers Section (the exit node, if connected, is shown first as "Pangolin Server")
-                    if status.exitNode != nil || !(status.peers?.isEmpty ?? true) {
-                        Section {
-                            if let exitNode = status.exitNode {
-                                PeerRowView(name: "Pangolin Server", endpoint: exitNode.endpoint, connected: exitNode.connected)
-                            }
-                            if let peers = status.peers {
-                                ForEach(Array(peers.keys.sorted()), id: \.self) { peerKey in
-                                    if let peer = peers[peerKey] {
-                                        PeerRowView(name: peer.name ?? "Unknown", endpoint: peer.endpoint, connected: peer.connected ?? false)
-                                    }
-                                }
-                            }
-                        } header: {
-                            Text("Sites")
-                        }
-                    } else {
-                        Section {
-                            Text("No sites connected")
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
-                        } header: {
-                            Text("Sites")
-                        }
+    @ViewBuilder
+    private var formattedContent: some View {
+        if let status = olmStatusManager.socketStatus {
+            Section {
+                HStack {
+                    Text("Agent")
+                        .font(.system(size: 13))
+                    Spacer()
+                    Text(status.agent ?? "Unknown")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+
+                if let version = status.version {
+                    HStack {
+                        Text("Version")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Text(version)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
                     }
                 }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-            } else {
-                Form {
-                    Section {
-                        HStack {
-                            Text("Status")
-                                .font(.system(size: 13))
-                            Spacer()
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color.gray)
-                                    .frame(width: 8, height: 8)
-                                Text("Disconnected")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } header: {
-                        Text("Connection Status")
+
+                HStack {
+                    Text("Status")
+                        .font(.system(size: 13))
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(status.connected ? Color.green : Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text(formatStatus(connected: status.connected, registered: status.registered))
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
                     }
                 }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
+
+                if let orgId = status.orgId {
+                    HStack {
+                        Text("Organization")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Text(orgId)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            } header: {
+                Text("Connection Status")
             }
+
+            if status.exitNode != nil || !(status.peers?.isEmpty ?? true) {
+                Section {
+                    if let exitNode = status.exitNode {
+                        PeerRowView(name: "Pangolin Server", endpoint: exitNode.endpoint, connected: exitNode.connected)
+                    }
+                    if let peers = status.peers {
+                        ForEach(Array(peers.keys.sorted()), id: \.self) { peerKey in
+                            if let peer = peers[peerKey] {
+                                PeerRowView(name: peer.name ?? "Unknown", endpoint: peer.endpoint, connected: peer.connected ?? false)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Sites")
+                }
+            } else {
+                Section {
+                    Text("No sites connected")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                } header: {
+                    Text("Sites")
+                }
+            }
+        } else {
+            disconnectedSection
+        }
+    }
+
+    private var disconnectedSection: some View {
+        Section {
+            HStack {
+                Text("Status")
+                    .font(.system(size: 13))
+                Spacer()
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.gray)
+                        .frame(width: 8, height: 8)
+                    Text("Disconnected")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+            }
+        } header: {
+            Text("Connection Status")
         }
     }
     
