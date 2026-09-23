@@ -2,6 +2,7 @@ import AppIntents
 import AppKit
 import Sparkle
 import SwiftUI
+import UserNotifications
 import os.log
 
 #if os(macOS)
@@ -51,9 +52,17 @@ struct AnimatedLoadingIcon: View {
     }
 }
 
-final class PangolinAppDelegate: NSObject, NSApplicationDelegate {
+final class PangolinAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UNUserNotificationCenter.current().delegate = self
         PangolinAppShortcuts.updateAppShortcutParameters()
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 }
 

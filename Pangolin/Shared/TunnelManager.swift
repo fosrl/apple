@@ -1012,13 +1012,21 @@ class TunnelManager: NSObject, ObservableObject {
                                 error.code,
                                 error.message)
 
-                            // Show alert before disconnecting to avoid any async issues
+                            // Surface the error before disconnecting so it is not dropped
+                            // if the tunnel teardown races the UI.
+                            #if os(macOS)
+                            await AlertManager.shared.showConnectionErrorNotification(
+                                title: "Connection Error",
+                                message: error.message
+                            )
+                            #else
                             await MainActor.run {
                                 AlertManager.shared.showAlertDialog(
                                     title: "Connection Error",
                                     message: error.message
                                 )
                             }
+                            #endif
                         }
 
                         if Self.sessionExpiredSocketErrorCodes.contains(error.code) {
