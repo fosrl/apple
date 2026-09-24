@@ -92,15 +92,23 @@ private struct LockScreenLiveActivityView: View {
     let context: ActivityViewContext<PangolinVPNAttributes>
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             PangolinLiveActivityLogo(size: 40)
 
-            HStack(spacing: 6) {
-                ConnectedIndicatorDot(size: 8)
-                Text(context.state.statusText)
-                    .font(.headline)
-                Spacer()
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Pangolin Status")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    ConnectedIndicatorDot(size: 8)
+                    Text(context.state.statusText)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                }
             }
+
+            Spacer(minLength: 0)
         }
         .padding(16)
     }

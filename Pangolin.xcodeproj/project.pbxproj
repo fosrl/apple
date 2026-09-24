@@ -180,6 +180,7 @@
 				Shared/TunnelManager.swift,
 				Shared/UI/OnDemandActivationSection.swift,
 				Shared/UI/OnDemandSSIDEditView.swift,
+				Shared/UI/SiteStatusSheet.swift,
 			);
 			target = 907A6C5D2F05ACAF0097F387 /* PangoliniOS */;
 		};

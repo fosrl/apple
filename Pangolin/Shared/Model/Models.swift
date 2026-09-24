@@ -349,6 +349,58 @@ struct ExitNodeStatus: Codable, Equatable {
     let endpoint: String?
 }
 
+struct SiteStatusItem: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let connected: Bool
+    let endpoint: String?
+    let lastSeen: String?
+    /// "Local", "Relay", or "Direct". Nil when the status payload has no connection flags.
+    let connection: String?
+
+    static func list(from status: SocketStatusResponse) -> [SiteStatusItem] {
+        var items: [SiteStatusItem] = []
+        if let exitNode = status.exitNode {
+            items.append(
+                SiteStatusItem(
+                    id: "exit-node",
+                    name: "Pangolin Server",
+                    connected: exitNode.connected,
+                    endpoint: exitNode.endpoint,
+                    lastSeen: exitNode.lastSeen,
+                    connection: nil
+                )
+            )
+        }
+        if let peers = status.peers {
+            for key in peers.keys.sorted() {
+                guard let peer = peers[key] else { continue }
+                items.append(
+                    SiteStatusItem(
+                        id: key,
+                        name: peer.name ?? "Unknown",
+                        connected: peer.connected ?? false,
+                        endpoint: peer.endpoint,
+                        lastSeen: peer.lastSeen,
+                        connection: connectionLabel(isLocal: peer.isLocal, isRelay: peer.isRelay)
+                    )
+                )
+            }
+        }
+        return items
+    }
+
+    static func connectionLabel(isLocal: Bool?, isRelay: Bool?) -> String {
+        if isLocal == true {
+            return "Local"
+        }
+        if isRelay == true {
+            return "Relay"
+        }
+        return "Direct"
+    }
+}
+
 struct NetworkSettings: Codable, Equatable {
     let tunnelRemoteAddress: String?
     let mtu: Int?

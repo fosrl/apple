@@ -10,6 +10,7 @@ struct StatusView: View {
     @ObservedObject var olmStatusManager: OLMStatusManager
     @AppStorage("net.pangolin.Pangolin.statusDisplayMode") private var displayMode: DisplayMode = .formatted
     @State private var showCopyConfirmation = false
+    @State private var selectedSiteID: String?
     
     // Computed property to format socket status as JSON
     private var statusJSON: String? {
@@ -85,7 +86,23 @@ struct StatusView: View {
             .onDisappear {
                 olmStatusManager.stopPolling()
             }
+            .sheet(isPresented: siteSheetPresented) {
+                if let selectedSiteID {
+                    SiteStatusSheet(siteID: selectedSiteID, olmStatusManager: olmStatusManager)
+                }
+            }
         }
+    }
+
+    private var siteSheetPresented: Binding<Bool> {
+        Binding(
+            get: { selectedSiteID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    selectedSiteID = nil
+                }
+            }
+        )
     }
     
     // MARK: - JSON View
@@ -147,16 +164,12 @@ struct StatusView: View {
                 Text("Connection Status")
             }
 
-            if status.exitNode != nil || !(status.peers?.isEmpty ?? true) {
+            let sites = SiteStatusItem.list(from: status)
+            if !sites.isEmpty {
                 Section {
-                    if let exitNode = status.exitNode {
-                        PeerRowView(name: "Pangolin Server", endpoint: exitNode.endpoint, connected: exitNode.connected)
-                    }
-                    if let peers = status.peers {
-                        ForEach(Array(peers.keys.sorted()), id: \.self) { peerKey in
-                            if let peer = peers[peerKey] {
-                                PeerRowView(name: peer.name ?? "Unknown", endpoint: peer.endpoint, connected: peer.connected ?? false)
-                            }
+                    ForEach(sites) { site in
+                        SiteStatusRow(site: site) {
+                            selectedSiteID = site.id
                         }
                     }
                 } header: {
@@ -205,45 +218,5 @@ struct StatusView: View {
         } else {
             return "Disconnected"
         }
-    }
-}
-
-// MARK: - Peer Row View
-
-struct PeerRowView: View {
-    let name: String
-    let endpoint: String?
-    let connected: Bool
-
-    var body: some View {
-        HStack {
-            // Peer name
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                if let endpoint = endpoint {
-                    Text(endpoint)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Status indicators
-            HStack(spacing: 12) {
-                // Connected status
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(connected ? Color.green : Color.gray)
-                        .frame(width: 8, height: 8)
-                    Text(formatStatus(connected))
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-    }
-
-    private func formatStatus(_ connected: Bool) -> String {
-        return connected ? "Connected" : "Disconnected"
     }
 }
