@@ -9,7 +9,7 @@ struct PangolinVPNControl: ControlWidget {
             provider: PangolinVPNControlValueProvider()
         ) { isOn in
             ControlWidgetToggle(
-                "Pangolin",
+                "Connect Pangolin",
                 isOn: isOn,
                 action: TogglePangolinVPNControlIntent()
             ) { isOn in
@@ -19,7 +19,7 @@ struct PangolinVPNControl: ControlWidget {
                 )
             }
         }
-        .displayName("Pangolin")
+        .displayName("Connect Pangolin")
         .description("Connect or disconnect Pangolin.")
     }
 }

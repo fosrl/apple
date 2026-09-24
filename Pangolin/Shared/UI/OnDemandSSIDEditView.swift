@@ -1,28 +1,17 @@
-import NetworkExtension
 import SwiftUI
-
-#if os(macOS)
-import CoreWLAN
-#endif
 
 struct OnDemandSSIDEditView: View {
     @ObservedObject var viewModel: ActivateOnDemandViewModel
-    var connectedSSID: String?
     var onSave: () -> Void
     var onDismiss: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var newSSID = ""
-    @State private var resolvedConnectedSSID: String?
-
-    private var effectiveConnectedSSID: String? {
-        resolvedConnectedSSID ?? connectedSSID
-    }
 
     var body: some View {
         #if os(iOS)
         formContent
-            .navigationTitle("SSIDs")
+            .navigationTitle("Wi-Fi Networks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -31,10 +20,9 @@ struct OnDemandSSIDEditView: View {
                     }
                 }
             }
-            .onAppear { refreshConnectedSSIDIfNeeded() }
         #else
         VStack(alignment: .leading, spacing: 16) {
-            Text("SSIDs")
+            Text("Wi-Fi Networks")
                 .font(.headline)
             formContent
             HStack {
@@ -52,7 +40,6 @@ struct OnDemandSSIDEditView: View {
         }
         .padding(20)
         .frame(minWidth: 360, minHeight: 320)
-        .onAppear { refreshConnectedSSIDIfNeeded() }
         #endif
     }
 
@@ -92,10 +79,10 @@ struct OnDemandSSIDEditView: View {
             #endif
 
             if viewModel.ssidOption != .any {
-                Section(header: Text("SSIDs")) {
+                Section(header: Text("Wi-Fi Networks")) {
                     ForEach(Array(viewModel.selectedSSIDs.enumerated()), id: \.offset) { index, _ in
                         HStack(spacing: 12) {
-                            TextField("SSID", text: bindingForSSID(at: index))
+                            TextField("Wi-Fi Network", text: bindingForSSID(at: index))
                             Button {
                                 deleteSSID(at: index)
                             } label: {
@@ -104,18 +91,10 @@ struct OnDemandSSIDEditView: View {
                                     .imageScale(.large)
                             }
                             .buttonStyle(.borderless)
-                            .accessibilityLabel("Remove SSID")
+                            .accessibilityLabel("Remove Wi-Fi Network")
                         }
                     }
                     .onDelete(perform: deleteSSIDs)
-
-                    if let effectiveConnectedSSID,
-                        !viewModel.selectedSSIDs.contains(effectiveConnectedSSID)
-                    {
-                        Button("Add connected: \(effectiveConnectedSSID)") {
-                            viewModel.selectedSSIDs.append(effectiveConnectedSSID)
-                        }
-                    }
 
                     HStack {
                         TextField("Add new", text: $newSSID)
@@ -129,7 +108,7 @@ struct OnDemandSSIDEditView: View {
                         }
                         .buttonStyle(.borderless)
                         .disabled(newSSID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .accessibilityLabel("Add SSID")
+                        .accessibilityLabel("Add Wi-Fi Network")
                     }
                 }
             }
@@ -177,21 +156,6 @@ struct OnDemandSSIDEditView: View {
         dismiss()
         #else
         onDismiss?()
-        #endif
-    }
-
-    private func refreshConnectedSSIDIfNeeded() {
-        guard resolvedConnectedSSID == nil else { return }
-        #if os(iOS)
-        if #available(iOS 14.0, *) {
-            NEHotspotNetwork.fetchCurrent { network in
-                DispatchQueue.main.async {
-                    resolvedConnectedSSID = network?.ssid
-                }
-            }
-        }
-        #elseif os(macOS)
-        resolvedConnectedSSID = CWWiFiClient.shared().interface()?.ssid()
         #endif
     }
 }

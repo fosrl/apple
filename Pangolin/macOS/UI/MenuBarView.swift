@@ -34,15 +34,9 @@ struct MenuBarView: View {
         self.checkForUpdatesViewModel = CheckForUpdatesViewModel(updater: updater)
     }
 
-    /// Status + on-demand caption for the menu bar.
+    /// Tunnel status caption for the menu bar dropdown.
     private var menuStatusLabel: String {
-        var text = tunnelManager.status.displayText
-        if tunnelManager.hasOnDemandRules {
-            text += tunnelManager.isOnDemandEnabled
-                ? " · On-Demand Enabled"
-                : " · On-Demand Disabled"
-        }
-        return text
+        "Status: \(tunnelManager.status.displayText)"
     }
 
     var body: some View {
@@ -100,6 +94,8 @@ struct MenuBarView: View {
                 }
 
                 if accountManager.accounts.count > 0 {
+                    Text("Account")
+                        .foregroundColor(.secondary)
                     AccountsMenu(
                         authManager: authManager,
                         accountManager: accountManager,
@@ -120,12 +116,18 @@ struct MenuBarView: View {
                 }
 
                 if authManager.isAuthenticated && !isLoggedOut {
+                    Text("Organization")
+                        .foregroundColor(.secondary)
                     OrganizationsMenu(authManager: authManager, tunnelManager: tunnelManager)
                 }
 
             }
 
             Divider()
+
+            Button("Preferences") {
+                openPreferencesWindow()
+            }
 
             // More submenu
             Menu("More") {
@@ -165,10 +167,6 @@ struct MenuBarView: View {
 
                 Button("Check for Updates", action: updater.checkForUpdates)
                     .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
-
-                Button("Preferences") {
-                    openPreferencesWindow()
-                }
             }
 
             Divider()

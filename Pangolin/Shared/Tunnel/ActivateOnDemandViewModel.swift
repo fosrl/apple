@@ -8,9 +8,9 @@ enum OnDemandSSIDOptionKind: String, Codable, CaseIterable {
 
     var localizedUIString: String {
         switch self {
-        case .any: return "Any SSID"
-        case .only: return "Only these SSIDs"
-        case .except: return "Except these SSIDs"
+        case .any: return "Any Wi-Fi Network"
+        case .only: return "Only these Wi-Fi Networks"
+        case .except: return "Except these Wi-Fi Networks"
         }
     }
 }
@@ -28,7 +28,7 @@ final class ActivateOnDemandViewModel: ObservableObject {
     #endif
 
     static let wiFiInterfaceLabel = "Wi-Fi"
-    static let ssidsLabel = "SSIDs"
+    static let ssidsLabel = "Wi-Fi Networks"
 
     init() {}
 
@@ -78,13 +78,13 @@ final class ActivateOnDemandViewModel: ObservableObject {
         guard isWiFiInterfaceEnabled else { return "" }
         switch ssidOption {
         case .any:
-            return "Any SSID"
+            return "Any Wi-Fi Network"
         case .only:
             let count = selectedSSIDs.count
-            return count == 1 ? "Only 1 SSID" : "Only \(count) SSIDs"
+            return count == 1 ? "Only 1 Wi-Fi Network" : "Only \(count) Wi-Fi Networks"
         case .except:
             let count = selectedSSIDs.count
-            return count == 1 ? "Except 1 SSID" : "Except \(count) SSIDs"
+            return count == 1 ? "Except 1 Wi-Fi Network" : "Except \(count) Wi-Fi Networks"
         }
     }
 

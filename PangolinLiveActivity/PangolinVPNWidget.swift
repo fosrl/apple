@@ -188,7 +188,7 @@ struct PangolinVPNWidgetView: View {
             Text(value)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .truncationMode(.tail)
         }
     }
 

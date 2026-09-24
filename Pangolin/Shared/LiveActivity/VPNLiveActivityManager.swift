@@ -8,12 +8,25 @@
     final class VPNLiveActivityManager {
         static let shared = VPNLiveActivityManager()
 
+        /// Absent means enabled, so existing installs keep the Live Activity.
+        static let enabledDefaultsKey = "net.pangolin.Pangolin.liveActivityEnabled"
+
+        static var isEnabled: Bool {
+            guard UserDefaults.standard.object(forKey: enabledDefaultsKey) != nil else {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: enabledDefaultsKey)
+        }
+
         private var activity: Activity<PangolinVPNAttributes>?
         private var resignObserver: NSObjectProtocol?
         private var activeObserver: NSObjectProtocol?
         /// Org to use once we're allowed to start (typically after leaving the foreground).
         private var pendingStartOrganizationName: String?
+        /// Kept while connected so turning the preference back on can start again.
+        private var connectedOrganizationName: String?
         private var isConnected = false
+        private var endedActivityIDs: Set<String> = []
 
         private let logger = OSLog(
             subsystem: Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin",
@@ -56,6 +69,7 @@
             case .connected:
                 isConnected = true
                 let org = organizationName?.isEmpty == false ? organizationName! : "Pangolin"
+                connectedOrganizationName = org
                 pendingStartOrganizationName = org
                 // If we're already inactive/background, start immediately.
                 if UIApplication.shared.applicationState != .active {
@@ -66,6 +80,7 @@
             case .disconnected:
                 isConnected = false
                 pendingStartOrganizationName = nil
+                connectedOrganizationName = nil
                 endActivity()
             case .starting, .registering:
                 break
@@ -77,6 +92,9 @@
             organizationName: String?
         ) {
             adoptExistingActivityIfNeeded()
+            if !Self.isEnabled {
+                endActivity()
+            }
 
             handleStatusChange(
                 status: status,
@@ -84,12 +102,30 @@
             )
         }
 
+        /// Applies the Preferences toggle. UserDefaults is already updated by the control.
+        func applyEnabledPreference() {
+            if Self.isEnabled {
+                guard isConnected, let org = connectedOrganizationName else { return }
+                pendingStartOrganizationName = org
+                if UIApplication.shared.applicationState != .active {
+                    startPendingIfNeeded()
+                }
+            } else {
+                endActivity()
+            }
+        }
+
         private func adoptExistingActivityIfNeeded() {
             guard activity == nil else { return }
-            activity = Activity<PangolinVPNAttributes>.activities.first
+            activity = Activity<PangolinVPNAttributes>.activities.first { existing in
+                !endedActivityIDs.contains(existing.id)
+                    && existing.activityState != .ended
+                    && existing.activityState != .dismissed
+            }
         }
 
         private func startPendingIfNeeded() {
+            guard Self.isEnabled else { return }
             guard isConnected,
                 let organizationName = pendingStartOrganizationName
             else { return }
@@ -97,6 +133,8 @@
         }
 
         private func startActivity(organizationName: String) {
+            guard Self.isEnabled else { return }
+
             guard ActivityAuthorizationInfo().areActivitiesEnabled else {
                 os_log("Live Activities are disabled", log: logger, type: .info)
                 return
@@ -150,6 +188,10 @@
             self.activity = nil
 
             guard !activities.isEmpty else { return }
+
+            for activity in activities {
+                endedActivityIDs.insert(activity.id)
+            }
 
             let finalState = PangolinVPNAttributes.ContentState(
                 statusText: TunnelStatus.disconnected.displayText

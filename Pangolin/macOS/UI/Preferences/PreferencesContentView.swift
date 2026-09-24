@@ -48,19 +48,6 @@ struct PreferencesContentView: View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
-                    Section(header: Text("Help")) {
-                        Link(destination: Self.docsConfigureClientURL) {
-                            HStack {
-                                Text("See docs for more info on these settings")
-                                Spacer()
-                                Image(systemName: "arrow.up.forward")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
-                            }
-                        }
-                        .foregroundColor(.accentColor)
-                    }
-
                     Section(header: Text("General")) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
@@ -84,6 +71,11 @@ struct PreferencesContentView: View {
                             .labelsHidden()
                         }
                     }
+
+                    OnDemandActivationSection(
+                        configManager: configManager,
+                        tunnelManager: tunnelManager
+                    )
 
                     Section(header: Text("DNS Settings")) {
                         HStack {
@@ -160,11 +152,6 @@ struct PreferencesContentView: View {
                         }
                     }
 
-                    OnDemandActivationSection(
-                        configManager: configManager,
-                        tunnelManager: tunnelManager
-                    )
-
                     Section(header: Text("Advanced")) {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
@@ -186,6 +173,19 @@ struct PreferencesContentView: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
+                    }
+
+                    Section(header: Text("Help")) {
+                        Link(destination: Self.docsConfigureClientURL) {
+                            HStack {
+                                Text("See docs for more info on these settings")
+                                Spacer()
+                                Image(systemName: "arrow.up.forward")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                        .foregroundColor(.accentColor)
                     }
                 }
                 .formStyle(.grouped)

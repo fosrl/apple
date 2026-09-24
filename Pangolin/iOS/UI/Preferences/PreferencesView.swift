@@ -3,6 +3,7 @@ import SwiftUI
 struct PreferencesView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
+    @AppStorage(VPNLiveActivityManager.enabledDefaultsKey) private var liveActivityEnabled = true
 
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
@@ -33,17 +34,26 @@ struct PreferencesView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Help")) {
-                    Link(destination: Self.docsConfigureClientURL) {
-                        HStack {
-                            Text("See docs for more info on these settings")
-                            Spacer()
-                            Image(systemName: "arrow.up.forward")
-                                .foregroundColor(.secondary)
+                Section(header: Text("General")) {
+                    Toggle(isOn: $liveActivityEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Dynamic Island & Live Activity")
+                                .font(.body)
+                            Text("Show connection status in the Dynamic Island and on the Lock Screen.")
                                 .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
+                    .tint(.accentColor)
+                    .onChange(of: liveActivityEnabled) { _, _ in
+                        VPNLiveActivityManager.shared.applyEnabledPreference()
+                    }
                 }
+
+                OnDemandActivationSection(
+                    configManager: configManager,
+                    tunnelManager: tunnelManager
+                )
 
                 Section(header: Text("DNS Settings")) {
                     Toggle(isOn: Binding(
@@ -116,11 +126,6 @@ struct PreferencesView: View {
                     }
                 }
 
-                OnDemandActivationSection(
-                    configManager: configManager,
-                    tunnelManager: tunnelManager
-                )
-
                 Section(header: Text("Advanced")) {
                     NavigationLink {
                         MTUModalView(
@@ -142,6 +147,18 @@ struct PreferencesView: View {
                             Spacer()
                             Text(tunnelMTUDisplay)
                                 .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                Section(header: Text("Help")) {
+                    Link(destination: Self.docsConfigureClientURL) {
+                        HStack {
+                            Text("See docs for more info on these settings")
+                            Spacer()
+                            Image(systemName: "arrow.up.forward")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
                         }
                     }
                 }

@@ -1,9 +1,4 @@
-import NetworkExtension
 import SwiftUI
-
-#if os(macOS)
-import CoreWLAN
-#endif
 
 /// On-Demand Activation block shared by macOS and iOS Preferences.
 struct OnDemandActivationSection: View {
@@ -13,7 +8,6 @@ struct OnDemandActivationSection: View {
     #if os(macOS)
     @State private var showSSIDEditor = false
     #endif
-    @State private var connectedSSID: String?
 
     init(configManager: ConfigManager, tunnelManager: TunnelManager) {
         self.configManager = configManager
@@ -23,17 +17,12 @@ struct OnDemandActivationSection: View {
     }
 
     var body: some View {
-        Section(header: Text("On-Demand Activation")) {
+        Section(header: Text("Connect Automatically On")) {
             #if os(macOS)
             macOSRows
             #else
             iOSRows
             #endif
-        }
-        .onAppear {
-            if viewModel.isWiFiInterfaceEnabled {
-                refreshConnectedSSID()
-            }
         }
         .onChange(of: configManager.config?.onDemandNonWiFiEnabled) { _, _ in
             reloadFromConfig()
@@ -45,7 +34,6 @@ struct OnDemandActivationSection: View {
         .sheet(isPresented: $showSSIDEditor) {
             OnDemandSSIDEditView(
                 viewModel: viewModel,
-                connectedSSID: connectedSSID,
                 onSave: { persistAndApply() },
                 onDismiss: { showSSIDEditor = false }
             )
@@ -86,8 +74,6 @@ struct OnDemandActivationSection: View {
                         viewModel.isWiFiInterfaceEnabled = newValue
                         if !newValue {
                             viewModel.ssidOption = .any
-                        } else {
-                            refreshConnectedSSID()
                         }
                         persistAndApply()
                     }
@@ -106,7 +92,6 @@ struct OnDemandActivationSection: View {
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
                 Button("Set...") {
-                    refreshConnectedSSID()
                     showSSIDEditor = true
                 }
                 .buttonStyle(.bordered)
@@ -142,8 +127,6 @@ struct OnDemandActivationSection: View {
                 viewModel.isWiFiInterfaceEnabled = newValue
                 if !newValue {
                     viewModel.ssidOption = .any
-                } else {
-                    refreshConnectedSSID()
                 }
                 persistAndApply()
             }
@@ -158,7 +141,6 @@ struct OnDemandActivationSection: View {
             NavigationLink {
                 OnDemandSSIDEditView(
                     viewModel: viewModel,
-                    connectedSSID: connectedSSID,
                     onSave: { persistAndApply() }
                 )
             } label: {
@@ -178,20 +160,6 @@ struct OnDemandActivationSection: View {
         .foregroundColor(.secondary)
     }
     #endif
-
-    private func refreshConnectedSSID() {
-        #if os(iOS)
-        if #available(iOS 14.0, *) {
-            NEHotspotNetwork.fetchCurrent { network in
-                DispatchQueue.main.async {
-                    connectedSSID = network?.ssid
-                }
-            }
-        }
-        #elseif os(macOS)
-        connectedSSID = CWWiFiClient.shared().interface()?.ssid()
-        #endif
-    }
 
     private func reloadFromConfig() {
         let fresh = ActivateOnDemandViewModel(from: configManager.config)

@@ -11,13 +11,21 @@ struct PangolinVPNLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    PangolinLiveActivityLogo(size: 44)
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        PangolinLiveActivityLogo(size: 44)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxHeight: .infinity)
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    Text(context.attributes.organizationName)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                    HStack(spacing: 6) {
+                        ConnectedIndicatorDot(size: 8)
+                        Text(context.state.statusText)
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
+                    .frame(maxHeight: .infinity, alignment: .leading)
                 }
             } compactLeading: {
                 // Same footprint as minimal so compact↔minimal morphs don't reflow the logo.
@@ -64,23 +72,16 @@ private struct WatchLiveActivityView: View {
     let context: ActivityViewContext<PangolinVPNAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(context.attributes.organizationName)
-                .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+        HStack(spacing: 8) {
+            PangolinLiveActivityLogo(size: 28)
 
-            HStack(spacing: 8) {
-                PangolinLiveActivityLogo(size: 28)
+            Spacer(minLength: 0)
 
-                Spacer(minLength: 0)
-
-                HStack(spacing: 6) {
-                    ConnectedIndicatorDot(size: 8)
-                    Text(context.state.statusText)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                }
+            HStack(spacing: 6) {
+                ConnectedIndicatorDot(size: 8)
+                Text(context.state.statusText)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
             }
         }
         .padding(12)
@@ -94,17 +95,11 @@ private struct LockScreenLiveActivityView: View {
         HStack(spacing: 12) {
             PangolinLiveActivityLogo(size: 40)
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    ConnectedIndicatorDot(size: 8)
-                    Text(context.state.statusText)
-                        .font(.headline)
-                    Spacer()
-                }
-
-                Text(context.attributes.organizationName)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
+            HStack(spacing: 6) {
+                ConnectedIndicatorDot(size: 8)
+                Text(context.state.statusText)
+                    .font(.headline)
+                Spacer()
             }
         }
         .padding(16)
