@@ -286,17 +286,15 @@ struct PangolinApp: App {
         .defaultSize(width: 800, height: 600)
         .windowResizability(.contentSize)
         .commands {
-            // Hide all menu bar items for preferences window
+            // Drop unused app and window commands. Leave the Edit menu intact:
+            // Select All, cut, copy, paste, and undo are menu commands, and
+            // removing them disables those shortcuts in every text field.
             CommandGroup(replacing: .appInfo) {}
             CommandGroup(replacing: .appSettings) {}
             CommandGroup(replacing: .appTermination) {}
             CommandGroup(replacing: .newItem) {}
-            CommandGroup(replacing: .pasteboard) {}
             CommandGroup(replacing: .sidebar) {}
-            CommandGroup(replacing: .textEditing) {}
-            CommandGroup(replacing: .textFormatting) {}
             CommandGroup(replacing: .toolbar) {}
-            CommandGroup(replacing: .undoRedo) {}
         }
     }
 }

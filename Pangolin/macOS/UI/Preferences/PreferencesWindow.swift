@@ -138,19 +138,31 @@ struct PreferencesWindow: View {
     private func hideMenuBarItems() {
         guard let mainMenu = NSApp.mainMenu else { return }
         
-        // Hide all menu items except the app name (first item)
+        // Hide all menu items except the app name (first item).
+        // Hidden items ignore key equivalents unless this flag is set, which
+        // would disable Select All, copy, and paste in text fields.
         for (index, menuItem) in mainMenu.items.enumerated() {
             if index == 0 {
                 // Keep the app name menu but hide its submenu items
                 if let submenu = menuItem.submenu {
                     for submenuItem in submenu.items {
+                        submenuItem.allowsKeyEquivalentWhenHidden = true
                         submenuItem.isHidden = true
                     }
                 }
             } else {
                 // Hide all other menu items (File, Edit, View, etc.)
+                allowKeyEquivalentsWhenHidden(menuItem)
                 menuItem.isHidden = true
             }
+        }
+    }
+
+    private func allowKeyEquivalentsWhenHidden(_ menuItem: NSMenuItem) {
+        menuItem.allowsKeyEquivalentWhenHidden = true
+        guard let submenu = menuItem.submenu else { return }
+        for submenuItem in submenu.items {
+            allowKeyEquivalentsWhenHidden(submenuItem)
         }
     }
     
