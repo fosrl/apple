@@ -25,6 +25,15 @@ class TunnelManager: NSObject, ObservableObject {
     /// Cleared when registration succeeds, or when the user connects or disconnects.
     @Published var connectionErrorMessage: String?
 
+    // Exit nodes (gateway-mode site resources). The list is for `gatewayResourcesOrgId` only;
+    // use `availableExitNodes` so a stale list from another org is never shown.
+    @Published private(set) var gatewayResources: [SiteResource] = []
+    @Published private(set) var gatewayResourcesOrgId: String?
+    /// The gateway site resource olm reports it is routing through while connected.
+    @Published private(set) var olmGatewayResourceId: Int?
+    /// niceId of the exit node saved in the config, applied on the next connect.
+    @Published private(set) var savedExitNodeNiceId: String?
+
     private var tunnelManager: NETunnelProviderManager?
     #if os(iOS)
         private let bundleIdentifier = "net.pangolin.Pangolin.PangoliniOS.PacketTunneliOS"
@@ -99,6 +108,7 @@ class TunnelManager: NSObject, ObservableObject {
         #if os(macOS)
             self.fingerprintManager.startCacheRefresh(interval: 3 * 3600)
         #endif
+        self.savedExitNodeNiceId = configManager.getExitNode()?.niceId
         super.init()
 
         // Observe VPN status changes
@@ -687,6 +697,12 @@ class TunnelManager: NSObject, ObservableObject {
 
         tunnelOptions["orgId"] = currentOrg.orgId as NSString
 
+        // Re-apply the saved exit node, if any, as the tunnel comes up
+        if let gateway = await resolveSavedExitNode(orgId: currentOrg.orgId) {
+            tunnelOptions["gatewaySiteResourceId"] = NSNumber(value: gateway.siteResourceId)
+            tunnelOptions["gatewaySiteIds"] = gateway.siteIds.map { NSNumber(value: $0) } as NSArray
+        }
+
         tunnelOptions["mtu"] = NSNumber(value: configManager.getTunnelMTU())
         tunnelOptions["holepunch"] = NSNumber(value: true)
         tunnelOptions["pingIntervalSeconds"] = NSNumber(value: 5)
@@ -960,6 +976,131 @@ class TunnelManager: NSObject, ObservableObject {
         return status
     }
 
+    // MARK: - Exit Nodes
+
+    /// The exit nodes available in the current org; empty when there are none.
+    var availableExitNodes: [SiteResource] {
+        guard let orgId = authManager.currentOrg?.orgId, gatewayResourcesOrgId == orgId else {
+            return []
+        }
+        return gatewayResources
+    }
+
+    /// The selected exit node's site resource ID, or nil for none. While connected this is what
+    /// olm reports (so it follows the server disabling a gateway); otherwise the saved choice.
+    var activeExitNodeId: Int? {
+        if isNEConnected {
+            return olmGatewayResourceId
+        }
+        guard let niceId = savedExitNodeNiceId else { return nil }
+        return availableExitNodes.first(where: { $0.niceId == niceId })?.siteResourceId
+    }
+
+    /// Reloads the org's exit nodes from the server.
+    func refreshExitNodes() async {
+        guard authManager.isAuthenticated, !authManager.sessionExpired,
+            let orgId = authManager.currentOrg?.orgId
+        else { return }
+
+        do {
+            let gateways = try await authManager.apiClient.listGatewayResources(orgId: orgId)
+            await MainActor.run {
+                self.gatewayResources = gateways
+                self.gatewayResourcesOrgId = orgId
+            }
+        } catch {
+            // Keep whatever we had; the server may just be unreachable.
+            os_log(
+                "Failed to list exit nodes: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
+        }
+    }
+
+    /// Routes all traffic through the given exit node. With the tunnel up it takes effect
+    /// immediately; otherwise the choice is saved and applied on the next connect.
+    func selectExitNode(_ node: SiteResource) async {
+        guard let orgId = authManager.currentOrg?.orgId else { return }
+
+        if isNEConnected {
+            do {
+                _ = try await socketManager.selectGateway(
+                    siteResourceId: node.siteResourceId, siteIds: node.siteIds)
+            } catch {
+                os_log(
+                    "Error selecting exit node: %{public}@", log: logger, type: .error,
+                    error.localizedDescription)
+                await MainActor.run {
+                    AlertManager.shared.showAlertDialog(
+                        title: "Exit Node Selection Failed",
+                        message:
+                            "Failed to route traffic through \(node.name): \(error.localizedDescription)"
+                    )
+                }
+                return
+            }
+            await MainActor.run { self.olmGatewayResourceId = node.siteResourceId }
+        }
+
+        await MainActor.run {
+            _ = self.configManager.setExitNode(orgId: orgId, niceId: node.niceId)
+            self.savedExitNodeNiceId = node.niceId
+        }
+    }
+
+    /// Stops routing traffic through an exit node and forgets the saved choice.
+    func disableExitNode() async {
+        if isNEConnected {
+            do {
+                _ = try await socketManager.disableGateway()
+            } catch {
+                os_log(
+                    "Error disabling exit node: %{public}@", log: logger, type: .error,
+                    error.localizedDescription)
+                await MainActor.run {
+                    AlertManager.shared.showAlertDialog(
+                        title: "Exit Node Failed",
+                        message: "Failed to disable the exit node: \(error.localizedDescription)"
+                    )
+                }
+                return
+            }
+            await MainActor.run { self.olmGatewayResourceId = nil }
+        }
+
+        await MainActor.run {
+            _ = self.configManager.setExitNode(orgId: nil, niceId: nil)
+            self.savedExitNodeNiceId = nil
+        }
+    }
+
+    /// Turns the saved exit node into the resource and site IDs to establish when connecting, or
+    /// nil to connect without one. Only the niceId is saved, so a deleted, disabled or site-less
+    /// resource is skipped.
+    private func resolveSavedExitNode(orgId: String) async -> SiteResource? {
+        guard let saved = configManager.getExitNode() else { return nil }
+        if let savedOrgId = saved.orgId, savedOrgId != orgId {
+            os_log(
+                "Saved exit node belongs to a different organization; not using it", log: logger,
+                type: .info)
+            return nil
+        }
+
+        do {
+            let gateways = try await authManager.apiClient.listGatewayResources(orgId: orgId)
+            if let gateway = gateways.first(where: { $0.niceId == saved.niceId }) {
+                return gateway
+            }
+            os_log(
+                "Saved exit node no longer exists or is disabled; not using it", log: logger,
+                type: .info)
+        } catch {
+            os_log(
+                "Could not look up saved exit node (%{public}@); connecting without it",
+                log: logger, type: .error, error.localizedDescription)
+        }
+        return nil
+    }
+
     func switchOrg(orgId: String) async {
         // Only switch if tunnel is connected
         guard isNEConnected else {
@@ -1054,6 +1195,16 @@ class TunnelManager: NSObject, ObservableObject {
                         }
                         break
                     } else {
+                        // Follow the exit node olm is actually routing through
+                        let gatewayId: Int? =
+                            socketStatus.gatewayActive == true
+                            ? socketStatus.gatewaySiteResourceId : nil
+                        await MainActor.run {
+                            if self.olmGatewayResourceId != gatewayId {
+                                self.olmGatewayResourceId = gatewayId
+                            }
+                        }
+
                         if socketStatus.error == nil, socketStatus.registered == true {
                             hasShownErrorAlert = false
                             await MainActor.run {

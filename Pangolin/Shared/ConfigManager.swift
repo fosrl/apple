@@ -231,6 +231,27 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
 
+    // MARK: - Exit Node
+
+    /// The org and niceId of the selected exit node, or nil if none is selected.
+    func getExitNode() -> (orgId: String?, niceId: String)? {
+        guard let niceId = config?.exitNodeNiceId, !niceId.isEmpty else { return nil }
+        return (config?.exitNodeOrgId, niceId)
+    }
+
+    /// Records the selected exit node; a nil niceId clears the selection.
+    func setExitNode(orgId: String?, niceId: String?) -> Bool {
+        var updatedConfig = config ?? Config()
+        if let niceId = niceId, !niceId.isEmpty {
+            updatedConfig.exitNodeNiceId = niceId
+            updatedConfig.exitNodeOrgId = orgId
+        } else {
+            updatedConfig.exitNodeNiceId = nil
+            updatedConfig.exitNodeOrgId = nil
+        }
+        return save(updatedConfig)
+    }
+
     // MARK: - Update Settings
 
     /// Optional override for Sparkle automatic update checks. `nil` leaves Sparkle prefs alone.

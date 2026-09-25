@@ -15,6 +15,7 @@ struct MainView: View {
     @ObservedObject var apiClient: APIClient
     @State private var showAccountPicker = false
     @State private var showOrganizationPicker = false
+    @State private var showExitNodePicker = false
     @State private var showLoginView = false
     @State private var startDeviceAuthImmediately = false
     @State private var selectedTab: TabSelection = .home
@@ -31,6 +32,7 @@ struct MainView: View {
                 tunnelManager: tunnelManager,
                 showAccountPicker: $showAccountPicker,
                 showOrganizationPicker: $showOrganizationPicker,
+                showExitNodePicker: $showExitNodePicker,
                 showLoginView: $showLoginView,
                 startDeviceAuthImmediately: $startDeviceAuthImmediately,
                 selectedTab: $selectedTab
@@ -73,6 +75,18 @@ struct MainView: View {
                 authManager: authManager,
                 tunnelManager: tunnelManager
             )
+        }
+        .sheet(isPresented: $showExitNodePicker) {
+            ExitNodePickerView(tunnelManager: tunnelManager)
+        }
+        .task(id: "\(authManager.isAuthenticated)-\(authManager.currentOrg?.orgId ?? "")") {
+            await tunnelManager.refreshExitNodes()
+        }
+        .onChange(of: tunnelManager.status) { _, newStatus in
+            // Connecting applies the saved exit node, so pick up the current list
+            if newStatus == .connected {
+                Task { await tunnelManager.refreshExitNodes() }
+            }
         }
         .sheet(isPresented: $showLoginView) {
             LoginView(
@@ -117,6 +131,7 @@ struct HomeTabView: View {
     @ObservedObject var tunnelManager: TunnelManager
     @Binding var showAccountPicker: Bool
     @Binding var showOrganizationPicker: Bool
+    @Binding var showExitNodePicker: Bool
     @Binding var showLoginView: Bool
     @Binding var startDeviceAuthImmediately: Bool
     @Binding var selectedTab: TabSelection
@@ -153,6 +168,13 @@ struct HomeTabView: View {
         )
     }
 
+    
+    /// Name of the selected exit node, or nil when none is selected.
+    private var activeExitNodeName: String? {
+        guard let activeId = tunnelManager.activeExitNodeId else { return nil }
+        return tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })?.name
+    }
+    
     private var isInIntermediateState: Bool {
         // Used for showing loading animation - include both starting and registering
         switch tunnelStatus {
@@ -397,6 +419,40 @@ struct HomeTabView: View {
                                             
                                             VStack(alignment: .leading, spacing: 4) {
                                                 Text(org.name)
+                                                    .font(.headline)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.secondary)
+                                                .font(.caption)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            
+                            // Exit node section (hidden when session expired or the org has none)
+                            if !authManager.sessionExpired, !tunnelManager.availableExitNodes.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    // Exit node section header
+                                    Text("Exit Node")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.secondary)
+                                    
+                                    // Exit node button
+                                    Button(action: {
+                                        showExitNodePicker = true
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "globe")
+                                                .foregroundColor(.accentColor)
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(activeExitNodeName ?? "None")
                                                     .font(.headline)
                                             }
                                             
@@ -726,6 +782,98 @@ struct AccountManagementView: View {
             }
             .overlay {
                 LoadingOverlay(isLoading: isSwitchingAccount || isDeletingAccount, successMessage: showSuccessMessage)
+            }
+        }
+    }
+}
+
+// MARK: - Exit Node Picker
+
+struct ExitNodePickerView: View {
+    @ObservedObject var tunnelManager: TunnelManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var isApplying = false
+    
+    private var shouldDisableButtons: Bool {
+        switch tunnelManager.status {
+        case .starting, .registering:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button(action: {
+                        Task {
+                            isApplying = true
+                            await tunnelManager.disableExitNode()
+                            isApplying = false
+                            dismiss()
+                        }
+                    }) {
+                        HStack {
+                            Text("None")
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            if tunnelManager.activeExitNodeId == nil {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                    }
+                    .disabled(shouldDisableButtons || tunnelManager.activeExitNodeId == nil)
+                    
+                    ForEach(tunnelManager.availableExitNodes) { node in
+                        Button(action: {
+                            Task {
+                                isApplying = true
+                                await tunnelManager.selectExitNode(node)
+                                isApplying = false
+                                dismiss()
+                            }
+                        }) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(node.name)
+                                        .foregroundColor(.primary)
+                                    if let siteNames = node.siteNames, !siteNames.isEmpty {
+                                        Text(siteNames.joined(separator: ", "))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                if tunnelManager.activeExitNodeId == node.siteResourceId {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                        .disabled(shouldDisableButtons || tunnelManager.activeExitNodeId == node.siteResourceId)
+                    }
+                } header: {
+                    Text("Route all traffic through")
+                }
+            }
+            .navigationTitle("Exit Node")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .overlay {
+                LoadingOverlay(isLoading: isApplying, successMessage: nil)
             }
         }
     }

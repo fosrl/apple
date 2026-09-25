@@ -119,6 +119,9 @@ struct MenuBarView: View {
                     Text("Organization")
                         .foregroundColor(.secondary)
                     OrganizationsMenu(authManager: authManager, tunnelManager: tunnelManager)
+                    if !authManager.sessionExpired {
+                        ExitNodeMenu(tunnelManager: tunnelManager)
+                    }
                 }
 
             }
@@ -337,6 +340,7 @@ struct MenuBarView: View {
         // Refresh organizations in background
         if authManager.isAuthenticated {
             await authManager.refreshOrganizations()
+            await tunnelManager.refreshExitNodes()
         }
     }
 
@@ -514,6 +518,79 @@ struct OrganizationsMenu: View {
             }
         } label: {
             Text(menuTitle)
+        }
+    }
+}
+
+/// Exit node selector: routes all tunnel traffic through a gateway resource. Hidden when the
+/// org has no exit nodes.
+struct ExitNodeMenu: View {
+    @ObservedObject var tunnelManager: TunnelManager
+
+    private var exitNodes: [SiteResource] {
+        tunnelManager.availableExitNodes
+    }
+
+    private var menuTitle: String {
+        if let activeId = tunnelManager.activeExitNodeId,
+            let node = exitNodes.first(where: { $0.siteResourceId == activeId })
+        {
+            return "Exit Node: \(node.name)"
+        }
+        return "Exit Node: None"
+    }
+
+    private var shouldDisableButtons: Bool {
+        switch tunnelManager.status {
+        case .starting, .registering:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var body: some View {
+        if !exitNodes.isEmpty {
+            Menu {
+                Text("Route all traffic through")
+                    .foregroundColor(.secondary)
+
+                Divider()
+
+                Button {
+                    Task {
+                        await tunnelManager.disableExitNode()
+                    }
+                } label: {
+                    HStack {
+                        Text("None")
+                        if tunnelManager.activeExitNodeId == nil {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .disabled(shouldDisableButtons)
+
+                ForEach(exitNodes) { node in
+                    Button {
+                        Task {
+                            await tunnelManager.selectExitNode(node)
+                        }
+                    } label: {
+                        HStack {
+                            Text(node.name)
+                            if tunnelManager.activeExitNodeId == node.siteResourceId {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    .disabled(shouldDisableButtons)
+                }
+            } label: {
+                Text(menuTitle)
+            }
         }
     }
 }

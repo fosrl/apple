@@ -374,6 +374,31 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    /// Every gateway-mode site resource (exit node) in the org that can be selected, fetching all
+    /// pages. Disabled resources and ones with no sites are dropped since they can't carry traffic.
+    func listGatewayResources(orgId: String) async throws -> [SiteResource] {
+        let pageSize = 100
+        var gateways: [SiteResource] = []
+        var page = 1
+        while true {
+            let (data, response) = try await makeRequest(
+                method: "GET", path: "/org/\(orgId)/site-resources",
+                queryParams: ["mode": "gateway", "page": String(page), "pageSize": String(pageSize)])
+            let result: ListSiteResourcesResponse = try parseResponse(data, response)
+
+            // Servers that predate gateway mode ignore the unknown filter value and return
+            // every resource, so filter again here.
+            gateways.append(
+                contentsOf: result.siteResources.filter {
+                    $0.mode == "gateway" && $0.enabled && !$0.siteIds.isEmpty
+                })
+
+            if result.siteResources.count < pageSize { break }
+            page += 1
+        }
+        return gateways
+    }
+
     func createOlm(userId: String, name: String) async throws -> CreateOlmResponse {
         let requestBody = CreateOlmRequest(name: name)
         let bodyData = try JSONEncoder().encode(requestBody)

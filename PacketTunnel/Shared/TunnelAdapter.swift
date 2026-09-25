@@ -282,6 +282,9 @@ public class TunnelAdapter {
         let postures = Self.dictionaryValue(options, "postures") ?? [:]
         let upstreamDNS = Self.stringArrayValue(options, "upstreamDNS") ?? []
         let matchDomains = Self.stringArrayValue(options, "matchDomains") ?? []
+        let gatewaySiteResourceId = (options["gatewaySiteResourceId"] as? NSNumber)?.intValue ?? 0
+        let gatewaySiteIds =
+            (options["gatewaySiteIds"] as? NSArray)?.compactMap { ($0 as? NSNumber)?.intValue } ?? []
 
         // No custom DNS configured; push a synchronous, best-effort read of the device's
         // real (pre-override) DNS servers directly into olm now, before startTunnel
@@ -310,6 +313,8 @@ public class TunnelAdapter {
             "tunnelDNS": tunnelDNS,
             "fingerprint": fingerprint,
             "postures": postures,
+            "gatewaySiteResourceId": gatewaySiteResourceId,
+            "gatewaySiteIds": gatewaySiteIds,
         ]
 
         self.overrideDNS = overrideDNSValue
