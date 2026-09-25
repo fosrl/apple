@@ -669,6 +669,7 @@ class AuthManager: ObservableObject {
         // Switch org in tunnel if connected
         if let tunnelManager = tunnelManager {
             await tunnelManager.switchOrg(orgId: org.orgId)
+            await tunnelManager.refreshExitNodes()
         }
 
         // If access is granted and the tunnel switches,

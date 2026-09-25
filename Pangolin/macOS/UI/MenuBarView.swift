@@ -243,6 +243,7 @@ struct MenuBarView: View {
             onboardingViewModel.isPresenting,
             showsTunnelSection,
             showsOrganizationSection,
+            showsExitNodeRow,
             accountManager.accounts.isEmpty,
             authManager.sessionExpired,
             authManager.isServerDown,
@@ -562,6 +563,36 @@ struct MenuBarView: View {
                 tunnelManager: tunnelManager,
                 activity: activity)
         }
+        if showsExitNodeRow {
+            exitNodeRow
+        }
+    }
+
+    // MARK: - Exit node
+
+    private static let exitNodeSubmenuID = "exitNode"
+
+    private var showsExitNodeRow: Bool {
+        !authManager.sessionExpired && !tunnelManager.availableExitNodes.isEmpty
+    }
+
+    private var exitNodeTitle: String {
+        if let activeId = tunnelManager.activeExitNodeId,
+            let node = tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })
+        {
+            return "Exit Node: \(node.name)"
+        }
+        return "Exit Node: None"
+    }
+
+    private var exitNodeRow: some View {
+        MenuSubmenuItem(
+            id: Self.exitNodeSubmenuID,
+            title: exitNodeTitle,
+            controller: submenus
+        ) {
+            ExitNodeSubmenu(tunnelManager: tunnelManager)
+        }
     }
 
     // MARK: - Footer
@@ -671,6 +702,7 @@ struct MenuBarView: View {
         // Refresh organizations in background
         if authManager.isAuthenticated {
             await authManager.refreshOrganizations()
+            await tunnelManager.refreshExitNodes()
         }
     }
 
@@ -875,6 +907,53 @@ struct OrganizationsSubmenu: View {
                 }
                 .disabled(activity.isTunnelStarting || activity.isSwitching)
             }
+        }
+    }
+}
+
+/// Exit node selector: routes all tunnel traffic through a gateway resource. Hidden when the
+/// org has no exit nodes.
+struct ExitNodeSubmenu: View {
+    @ObservedObject var tunnelManager: TunnelManager
+
+    private var exitNodes: [SiteResource] {
+        tunnelManager.availableExitNodes
+    }
+
+    private var isDisabled: Bool {
+        switch tunnelManager.status {
+        case .starting, .registering:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var body: some View {
+        MenuSectionHeader(title: "Route all traffic through", inset: true)
+
+        MenuItem(
+            title: "None",
+            showsCheckColumn: true,
+            isChecked: tunnelManager.activeExitNodeId == nil
+        ) {
+            Task {
+                await tunnelManager.disableExitNode()
+            }
+        }
+        .disabled(isDisabled)
+
+        ForEach(exitNodes) { node in
+            MenuItem(
+                title: node.name,
+                showsCheckColumn: true,
+                isChecked: tunnelManager.activeExitNodeId == node.siteResourceId
+            ) {
+                Task {
+                    await tunnelManager.selectExitNode(node)
+                }
+            }
+            .disabled(isDisabled)
         }
     }
 }

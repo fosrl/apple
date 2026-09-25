@@ -78,7 +78,21 @@ class SocketManager {
         return try await performRequest(method: "POST", path: "/switch-org", body: bodyData)
     }
 
-    /// Switches to a different organization
+    /// Routes all tunnel traffic through the given sites (the exit node). siteResourceId is the
+    /// gateway site resource they belong to; olm uses it to apply later server-pushed changes to
+    /// that resource only. Every site must already be a connected peer.
+    func selectGateway(siteResourceId: Int, siteIds: [Int]) async throws -> SocketGatewayResponse {
+        let requestBody = SocketSelectGatewayRequest(siteResourceId: siteResourceId, siteIds: siteIds)
+        let bodyData = try JSONEncoder().encode(requestBody)
+        return try await performRequest(method: "POST", path: "/gateway/select", body: bodyData)
+    }
+
+    /// Stops routing all tunnel traffic through an exit node
+    func disableGateway() async throws -> SocketGatewayResponse {
+        return try await performRequest(method: "POST", path: "/gateway/disable", body: nil)
+    }
+
+    /// Updates the device fingerprint and posture checks
     func updateMetadata(fingerprint: Fingerprint, postures: Postures) async throws
         -> UpdateMetadataResponse
     {
@@ -128,8 +142,8 @@ class SocketManager {
         // Parse HTTP response
         let (statusCode, responseBody) = try parseHTTPResponse(responseData)
 
-        // Check status code
-        guard statusCode == 200 else {
+        // Check status code (select-gateway answers 202 Accepted)
+        guard (200...299).contains(statusCode) else {
             let errorMessage = String(data: responseBody, encoding: .utf8)
             throw SocketError.httpError(statusCode, errorMessage)
         }

@@ -19,6 +19,11 @@ struct Config: Codable {
     var autoDownloadUpdatesEnabled: Bool?
     /// When set, overrides Sparkle's scheduled check interval (seconds; minimum 3600).
     var updateCheckIntervalSeconds: Int?
+    /// The exit node (a gateway-mode site resource) selected from the app, re-applied on the
+    /// next connect. Only the niceId is stored so its current resource ID and sites are always
+    /// looked up from the server rather than going stale.
+    var exitNodeNiceId: String?
+    var exitNodeOrgId: String?
 
     /// On-demand: connect on cellular (iOS) or ethernet (macOS).
     var onDemandNonWiFiEnabled: Bool?
@@ -43,6 +48,8 @@ struct Config: Codable {
         case onDemandWiFiEnabled
         case onDemandSSIDOption
         case onDemandSSIDs
+        case exitNodeNiceId
+        case exitNodeOrgId
     }
 }
 
@@ -327,6 +334,11 @@ struct SocketStatusResponse: Codable, Equatable {
     let networkSettings: NetworkSettings?
     let error: SocketStatusError?
     let exitNode: ExitNodeStatus?
+    /// Whether all traffic is routed through a gateway (exit node), the gateway site resource
+    /// it was selected from, and the sites currently in use for it.
+    let gatewayActive: Bool?
+    let gatewaySiteResourceId: Int?
+    let gatewaySiteIds: [Int]?
 }
 
 struct SocketPeer: Codable, Equatable {
@@ -475,6 +487,35 @@ struct SocketSwitchOrgResponse: Codable {
 
 struct UpdateMetadataResponse: Codable {
     let status: String
+}
+
+struct SocketSelectGatewayRequest: Codable {
+    let siteResourceId: Int
+    let siteIds: [Int]
+}
+
+struct SocketGatewayResponse: Codable {
+    let status: String
+}
+
+// MARK: - Gateway (Exit Node) Resources
+
+/// A site resource as returned by GET /org/:orgId/site-resources. Only the fields the exit node
+/// picker needs are modeled. Gateway-mode resources are what the app calls exit nodes.
+struct SiteResource: Codable, Identifiable, Equatable {
+    var id: Int { siteResourceId }
+
+    let siteResourceId: Int
+    let niceId: String
+    let name: String
+    let mode: String
+    let enabled: Bool
+    let siteIds: [Int]
+    let siteNames: [String]?
+}
+
+struct ListSiteResourcesResponse: Codable {
+    let siteResources: [SiteResource]
 }
 
 // MARK: - Server Info
