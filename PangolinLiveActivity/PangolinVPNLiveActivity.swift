@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -18,14 +19,13 @@ struct PangolinVPNLiveActivity: Widget {
                     }
                     .frame(maxHeight: .infinity)
                 }
-                DynamicIslandExpandedRegion(.center) {
-                    HStack(spacing: 6) {
-                        ConnectedIndicatorDot(size: 8)
-                        Text(context.state.statusText)
-                            .font(.headline)
-                            .lineLimit(1)
+                DynamicIslandExpandedRegion(.trailing) {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        IslandPowerButton(isOn: context.state.statusText == "Connected")
+                        Spacer(minLength: 0)
                     }
-                    .frame(maxHeight: .infinity, alignment: .leading)
+                    .frame(maxHeight: .infinity)
                 }
             } compactLeading: {
                 // Same footprint as minimal so compact↔minimal morphs don't reflow the logo.
@@ -115,8 +115,37 @@ private struct LockScreenLiveActivityView: View {
             }
 
             Spacer(minLength: 0)
+
+            IslandPowerButton(isOn: context.state.statusText == "Connected")
         }
         .padding(16)
+    }
+}
+
+private struct IslandPowerButton: View {
+    let isOn: Bool
+
+    var body: some View {
+        Button(intent: TogglePangolinVPNControlIntent(value: !isOn)) {
+            Image(systemName: "power")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(isOn ? Color.green : Color.white.opacity(0.72))
+                .frame(width: 44, height: 44)
+                .background {
+                    Circle()
+                        .fill(isOn ? Color.green.opacity(0.18) : Color.white.opacity(0.08))
+                }
+                .overlay {
+                    Circle()
+                        .strokeBorder(
+                            isOn ? Color.green : Color.white.opacity(0.35),
+                            lineWidth: 1.5
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isOn ? "Connected" : "Disconnected")
+        .accessibilityHint(isOn ? "Disconnect Pangolin" : "Connect Pangolin")
     }
 }
 

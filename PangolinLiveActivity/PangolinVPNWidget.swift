@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WidgetKit
 
 struct PangolinVPNWidget: Widget {
@@ -7,12 +8,16 @@ struct PangolinVPNWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: PangolinVPNWidgetProvider()) { entry in
             PangolinVPNWidgetView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(Self.systemWidgetBackground, for: .widget)
         }
         .configurationDisplayName("Pangolin")
         .description("Connect or disconnect Pangolin.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
+
+    private static let systemWidgetBackground = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .black : .white
+    })
 }
 
 struct PangolinVPNWidgetEntry: TimelineEntry {
@@ -78,7 +83,8 @@ struct PangolinVPNWidgetView: View {
                 Text(entry.snapshot.statusText)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let org = entry.snapshot.organizationName, !org.isEmpty {
                     Text(org)
@@ -102,17 +108,14 @@ struct PangolinVPNWidgetView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     logo(size: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            statusDot
-                            Text(entry.snapshot.statusText)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.65)
-                                .layoutPriority(1)
-                        }
+                    HStack(spacing: 6) {
+                        statusDot
+                        Text(entry.snapshot.statusText)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
