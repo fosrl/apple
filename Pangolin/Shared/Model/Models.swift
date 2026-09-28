@@ -30,6 +30,10 @@ struct Config: Codable {
     var exitNodeNiceId: String?
     var exitNodeOrgId: String?
 
+    /// Overrides the cookie name the session token is sent and read under. Nil/empty means use
+    /// the API client's built-in default ("p_session_token"). Matches Windows' sessionCookieName.
+    var sessionCookieName: String?
+
     /// On-demand: connect on cellular (iOS) or ethernet (macOS).
     var onDemandNonWiFiEnabled: Bool?
     /// On-demand: connect on Wi-Fi.
@@ -56,6 +60,7 @@ struct Config: Codable {
         case onDemandSSIDs
         case exitNodeNiceId
         case exitNodeOrgId
+        case sessionCookieName
     }
 }
 

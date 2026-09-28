@@ -231,6 +231,14 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
 
+    // MARK: - Session Cookie Name
+
+    /// Override for the cookie name the session token is sent and read under, or empty string
+    /// if not set (the API client's built-in default is used).
+    func getSessionCookieName() -> String {
+        return config?.sessionCookieName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
     // MARK: - Exit Node Precedence
 
     /// When enabled, routes for individual resources are not added to the routing table and

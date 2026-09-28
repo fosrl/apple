@@ -45,7 +45,7 @@ enum APIError: Error, LocalizedError {
 class APIClient: ObservableObject {
     private var baseURL: String
     private var sessionToken: String?
-    private let sessionCookieName = "p_session_token"
+    private var sessionCookieName = "p_session_token"
     private let csrfToken = "x-csrf-protection"
 
     /// Called when a request made with a session token returns 401 or 403. Set by AuthManager to mark session expired.
@@ -94,6 +94,14 @@ class APIClient: ObservableObject {
     
     func updateSessionToken(_ token: String?) {
         self.sessionToken = token
+    }
+
+    /// Overrides the cookie name the session token is sent and read under. An empty/whitespace-only
+    /// name is a no-op, keeping the current (default) name.
+    func updateSessionCookieName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        self.sessionCookieName = trimmed
     }
     
     private static func normalizeBaseURL(_ url: String) -> String {

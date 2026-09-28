@@ -47,6 +47,7 @@ class AuthManager: ObservableObject {
         self.configManager = configManager
         self.accountManager = accountManager
         self.secretManager = secretManager
+        apiClient.updateSessionCookieName(configManager.getSessionCookieName())
         apiClient.onUnauthorized = { [weak self] in
             Task { @MainActor in
                 self?.markSessionExpiredFromConnection()
@@ -123,6 +124,7 @@ class AuthManager: ObservableObject {
         let loginApiClient: APIClient
         if let hostname = hostnameOverride {
             loginApiClient = APIClient(baseURL: hostname, sessionToken: nil)
+            loginApiClient.updateSessionCookieName(configManager.getSessionCookieName())
         } else {
             loginApiClient = apiClient
         }
@@ -849,6 +851,7 @@ class AuthManager: ObservableObject {
     /// shared one's token and 401 handling are unaffected; failures are ignored.
     private func signOutOnServerInBackground(hostname: String, token: String) {
         let client = APIClient(baseURL: hostname, sessionToken: token)
+        client.updateSessionCookieName(configManager.getSessionCookieName())
         Task {
             try? await client.logout()
         }
