@@ -203,20 +203,21 @@ final class MenuSubmenuController: ObservableObject {
         }
     }
 
-    /// Places the submenu to the right of the menu with its first row level with
-    /// the anchor row, flipping left when there isn't room, as NSMenu does.
+    /// Places the submenu against the right edge of the anchor row, with its first
+    /// row level with it, flipping left when there isn't room, as NSMenu does.
     fileprivate func reposition(size: CGSize) {
         guard let panel, let anchor = anchorView, let parent = anchor.window,
             size.width > 0, size.height > 0
         else { return }
 
         let rowRect = parent.convertToScreen(anchor.convert(anchor.bounds, to: nil))
-        let parentFrame = parent.frame
-        let screen = (parent.screen ?? NSScreen.main)?.visibleFrame ?? parentFrame
+        let screen = (parent.screen ?? NSScreen.main)?.visibleFrame ?? parent.frame
 
-        var x = parentFrame.maxX + 1
+        // Butt up against the row's hover highlight, overlapping the parent's
+        // edge padding, as native submenus do.
+        var x = rowRect.maxX
         if x + size.width > screen.maxX {
-            x = parentFrame.minX - size.width - 1
+            x = rowRect.minX - size.width
         }
         let top = rowRect.maxY + MenuMetrics.panelPadding
         let y = max(screen.minY, min(top, screen.maxY) - size.height)
@@ -243,6 +244,7 @@ private struct SubmenuRoot: View {
         .padding(MenuMetrics.panelPadding)
         .frame(minWidth: MenuMetrics.submenuMinWidth, maxWidth: MenuMetrics.submenuMaxWidth)
         .fixedSize()
+        .submenuBackground()
         // Rows inside the submenu open and close the next level down, never the
         // submenu they live in.
         .environment(\.submenuController, child)
@@ -252,6 +254,21 @@ private struct SubmenuRoot: View {
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             controller.reposition(size: size)
+        }
+    }
+}
+
+private extension View {
+    /// The menu bar panel's own background: Liquid Glass on macOS 26+. Earlier
+    /// versions get a visual effect view from `SubmenuPanel` instead.
+    @ViewBuilder
+    func submenuBackground() -> some View {
+        if #available(macOS 26.0, *) {
+            glassEffect(
+                .regular,
+                in: RoundedRectangle(cornerRadius: MenuMetrics.glassCornerRadius, style: .continuous))
+        } else {
+            self
         }
     }
 }
@@ -272,6 +289,13 @@ private final class SubmenuPanel: NSPanel {
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         collectionBehavior = [.transient, .ignoresCycle, .fullScreenAuxiliary]
+
+        // On macOS 26+ the SwiftUI content draws the same Liquid Glass as the
+        // menu bar panel (see `submenuBackground()`), so the window stays clear.
+        if #available(macOS 26.0, *) {
+            contentView = hostingView
+            return
+        }
 
         let background = NSVisualEffectView()
         background.material = .menu

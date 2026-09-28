@@ -96,8 +96,8 @@ struct MenuBarLabel: View {
 
     /// Login, preferences, and onboarding windows that should keep the app in the Dock.
     private static func hasVisibleAppWindow() -> Bool {
-        let knownIds: Set<String> = ["main", "preferences", "onboarding"]
-        var knownTitles: Set<String> = ["Pangolin", "Pangolin Setup"]
+        let knownIds: Set<String> = ["preferences", "onboarding"]
+        var knownTitles: Set<String> = ["Pangolin Setup"]
         knownTitles.formUnion(PreferencesSection.allCases.map(\.rawValue))
 
         return NSApp.windows.contains { window in
@@ -282,33 +282,6 @@ struct PangolinApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        // Main Window (Login)
-        WindowGroup("Pangolin", id: "main") {
-            LoginView(
-                authManager: authManager,
-                accountManager: accountManager,
-                configManager: configManager,
-                apiClient: apiClient
-            )
-            .handlesExternalEvents(preferring: ["main"], allowing: ["main"])
-            .onAppear {
-                // Ensure window has correct identifier
-                DispatchQueue.main.async {
-                    if let window = NSApplication.shared.windows.first(where: {
-                        $0.title == "Pangolin"
-                    }) {
-                        window.identifier = NSUserInterfaceItemIdentifier("main")
-                    }
-                }
-            }
-        }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 440, height: 300)
-        .windowResizability(.contentSize)
-        .commands {
-            CommandGroup(replacing: .newItem) {}
-        }
-
         // Onboarding Window
         WindowGroup("Pangolin Setup", id: "onboarding") {
             MacOnboardingFlowView(viewModel: onboardingViewModel)
@@ -322,7 +295,9 @@ struct PangolinApp: App {
         WindowGroup("Preferences", id: "preferences") {
             PreferencesWindow(
                 configManager: configManager,
-                tunnelManager: tunnelManager
+                tunnelManager: tunnelManager,
+                accountManager: accountManager,
+                authManager: authManager
             )
             .handlesExternalEvents(preferring: ["preferences"], allowing: ["preferences"])
         }

@@ -9,7 +9,10 @@ enum MenuMetrics {
     static let panelWidth: CGFloat = 310
     static let submenuMinWidth: CGFloat = 180
     static let submenuMaxWidth: CGFloat = 340
+    /// Corner radius of the pre-Liquid Glass submenu background.
     static let panelCornerRadius: CGFloat = 10
+    /// Corner radius of the menu bar panel's Liquid Glass (macOS 26+).
+    static let glassCornerRadius: CGFloat = 16
     static let panelPadding: CGFloat = 6
     static let rowHeight: CGFloat = 26
     static let rowHorizontalPadding: CGFloat = 10
@@ -366,6 +369,8 @@ struct MenuWindowVisibilityReader: NSViewRepresentable {
 struct MenuToggleRow: View {
     let title: String
     @Binding var isOn: Bool
+    /// Overrides the system accent color for the switch.
+    var tint: Color?
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.submenuController) private var submenuController
     @Environment(\.menuSuppressesHover) private var suppressesHover
@@ -383,7 +388,7 @@ struct MenuToggleRow: View {
             Toggle(title, isOn: $isOn)
                 .toggleStyle(.switch)
                 .labelsHidden()
-                .tint(accent)
+                .tint(tint ?? accent)
         }
         .padding(.horizontal, MenuMetrics.rowHorizontalPadding)
         .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
