@@ -10,6 +10,9 @@ class OLMStatusManager: ObservableObject {
     private let socketManager: SocketManager
     private var olmStatusPollingTask: Task<Void, Never>?
     private var isPollingOlmStatus = false
+    /// Views currently showing live status. Polling runs while any are open, so
+    /// one closing doesn't stop updates for another.
+    private var pollingClients = 0
     private let socketPollInterval: TimeInterval = 1.0 
     
     private let logger: OSLog = {
@@ -21,11 +24,10 @@ class OLMStatusManager: ObservableObject {
         self.socketManager = socketManager
     }
     
-    /// Starts polling socketStatus for OLMStatusContentView live updates
+    /// Starts polling socketStatus for live updates. Balance each call with
+    /// `stopPolling()`.
     func startPolling() {
-        // Stop any existing polling
-        stopPolling()
-        
+        pollingClients += 1
         guard !isPollingOlmStatus else { return }
         
         isPollingOlmStatus = true
@@ -56,8 +58,10 @@ class OLMStatusManager: ObservableObject {
         }
     }
     
-    /// Stops polling socketStatus
+    /// Stops polling socketStatus once every caller of `startPolling()` has stopped.
     func stopPolling() {
+        pollingClients = max(0, pollingClients - 1)
+        guard pollingClients == 0 else { return }
         isPollingOlmStatus = false
         olmStatusPollingTask?.cancel()
         olmStatusPollingTask = nil

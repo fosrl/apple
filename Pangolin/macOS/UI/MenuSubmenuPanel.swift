@@ -28,6 +28,15 @@ final class MenuSubmenuController: ObservableObject {
         }
     }
 
+    /// Opens submenus from rows inside this controller's submenu.
+    var child: MenuSubmenuController {
+        if let childController { return childController }
+        let controller = MenuSubmenuController()
+        childController = controller
+        return controller
+    }
+
+    private var childController: MenuSubmenuController?
     private var panel: SubmenuPanel?
     private var pendingWork: DispatchWorkItem?
     private weak var anchorView: NSView?
@@ -83,12 +92,15 @@ final class MenuSubmenuController: ObservableObject {
     func close() {
         stopAiming()
         stopTrackingPointer()
+        childController?.close()
         guard let panel else {
             openID = nil
             return
         }
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
+        // Tear the content down so its views see onDisappear (e.g. to stop polling).
+        panel.hostingView.rootView = AnyView(EmptyView())
         openID = nil
     }
 
@@ -215,7 +227,14 @@ final class MenuSubmenuController: ObservableObject {
 
 private struct SubmenuRoot: View {
     let controller: MenuSubmenuController
+    @ObservedObject var child: MenuSubmenuController
     let content: AnyView
+
+    init(controller: MenuSubmenuController, content: AnyView) {
+        self.controller = controller
+        self.child = controller.child
+        self.content = content
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -224,8 +243,10 @@ private struct SubmenuRoot: View {
         .padding(MenuMetrics.panelPadding)
         .frame(minWidth: MenuMetrics.submenuMinWidth, maxWidth: MenuMetrics.submenuMaxWidth)
         .fixedSize()
-        // Rows inside the submenu must not close the submenu they live in.
-        .environment(\.submenuController, nil)
+        // Rows inside the submenu open and close the next level down, never the
+        // submenu they live in.
+        .environment(\.submenuController, child)
+        .environment(\.menuSuppressesHover, child.isAimingAtSubmenu)
         .onHover { hovering in
             if hovering { controller.pointerEnteredSubmenu() }
         }

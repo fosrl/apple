@@ -106,7 +106,7 @@ struct SiteStatusSheet: View {
                 statusRow(connected: site.connected)
                 detailRow(label: "Connection", value: site.connection ?? "—")
                 detailRow(label: "Endpoint", value: display(site.endpoint))
-                detailRow(label: "Last Seen", value: displayLastSeen(site.lastSeen))
+                detailRow(label: "Last Seen", value: site.lastSeenDescription)
             }
             #if os(iOS)
             .padding()
@@ -157,9 +157,29 @@ struct SiteStatusSheet: View {
         return value
     }
 
-    private func displayLastSeen(_ value: String?) -> String {
-        guard let value, !value.isEmpty else { return "—" }
-        guard let date = Self.parseDate(value) else { return value }
+    private var labelFont: Font {
+        #if os(macOS)
+        .system(size: 13)
+        #else
+        .body
+        #endif
+    }
+
+    private var valueFont: Font {
+        #if os(macOS)
+        .system(size: 13)
+        #else
+        .body
+        #endif
+    }
+}
+
+extension SiteStatusItem {
+    /// When the site was last seen, as a relative time ("12s ago"). Falls back to
+    /// the raw value if it isn't a date, or "—" if there is none.
+    var lastSeenDescription: String {
+        guard let lastSeen, !lastSeen.isEmpty else { return "—" }
+        guard let date = Self.parseDate(lastSeen) else { return lastSeen }
         return Self.relativeTime(since: date)
     }
 
@@ -189,21 +209,5 @@ struct SiteStatusSheet: View {
             return date
         }
         return nil
-    }
-
-    private var labelFont: Font {
-        #if os(macOS)
-        .system(size: 13)
-        #else
-        .body
-        #endif
-    }
-
-    private var valueFont: Font {
-        #if os(macOS)
-        .system(size: 13)
-        #else
-        .body
-        #endif
     }
 }

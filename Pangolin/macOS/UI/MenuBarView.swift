@@ -189,6 +189,10 @@ struct MenuBarView: View {
         .task(id: liveTunnelState) {
             await settleTunnelState(liveTunnelState)
         }
+        .onChange(of: tunnelState.isConnected) { _, connected in
+            // The sites list is only offered while connected.
+            if !connected, submenus.openID == Self.sitesSubmenuID { submenus.close() }
+        }
         .onChange(of: isBusy, initial: true) { _, busy in
             updateLoading(busy: busy)
         }
@@ -381,15 +385,38 @@ struct MenuBarView: View {
         return isUp || tunnelManager.isNEConnected ? "Disconnect" : "Connect"
     }
 
+    /// The status line. Once connected, hovering it lists the sites and their status.
+    @ViewBuilder
     private var tunnelStatusRow: some View {
+        if tunnelState.isConnected {
+            MenuSubmenuItem(id: Self.sitesSubmenuID, controller: submenus) {
+                SitesSubmenu(
+                    olmStatusManager: tunnelManager.olmStatusManager,
+                    tunnelManager: tunnelManager,
+                    controller: submenus.child,
+                    openStatusPanel: { openPreferencesWindow(section: .olmStatus) })
+            } label: {
+                tunnelStatusLabel
+            }
+        } else {
+            tunnelStatusLabel
+                .font(MenuMetrics.font)
+                .padding(.horizontal, MenuMetrics.rowHorizontalPadding)
+                .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, alignment: .leading)
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    if hovering { submenus.pointerEnteredOtherRow() }
+                }
+        }
+    }
+
+    private static let sitesSubmenuID = "sites"
+
+    private var tunnelStatusLabel: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(tunnelState.color)
-                .frame(width: 8, height: 8)
-                .frame(width: 12, height: 12)
+            MenuStatusDot(color: tunnelState.color)
 
             Text(tunnelState.text)
-                .font(MenuMetrics.font)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .contentTransition(.opacity)
@@ -400,16 +427,8 @@ struct MenuBarView: View {
                     .scaleEffect(0.6)
                     .frame(width: 12, height: 12)
             }
-
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, MenuMetrics.rowHorizontalPadding)
-        .frame(minHeight: MenuMetrics.rowHeight)
-        .contentShape(Rectangle())
         .animation(.easeInOut(duration: 0.15), value: tunnelState)
-        .onHover { hovering in
-            if hovering { submenus.pointerEnteredOtherRow() }
-        }
     }
 
     private var tunnelToggleRow: some View {
@@ -680,7 +699,10 @@ struct MenuBarView: View {
             })
     }
 
-    private func openPreferencesWindow() {
+    private func openPreferencesWindow(section: PreferencesSection? = nil) {
+        if let section {
+            PreferencesNavigation.shared.requestedSection = section
+        }
         // A new window only gets its identifier once PreferencesWindow configures
         // it, and its title follows the selected section, so match on either.
         let titles = Set(["Preferences"] + PreferencesSection.allCases.map(\.rawValue))
@@ -857,6 +879,98 @@ struct OrganizationsSubmenu: View {
     }
 }
 
+/// Lists each site with its status. Hovering a site shows its details.
+struct SitesSubmenu: View {
+    @ObservedObject var olmStatusManager: OLMStatusManager
+    @ObservedObject var tunnelManager: TunnelManager
+    /// Opens the per-site detail submenus.
+    let controller: MenuSubmenuController
+    let openStatusPanel: () -> Void
+
+    private var sites: [SiteStatusItem] {
+        olmStatusManager.socketStatus.map(SiteStatusItem.list(from:)) ?? []
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            rows
+        }
+        // Poll only while the list is on screen.
+        .onAppear { olmStatusManager.startPolling() }
+        .onDisappear { olmStatusManager.stopPolling() }
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        MenuItem(title: "Open Status…") {
+            openStatusPanel()
+        }
+
+        MenuSeparator()
+
+        if !sites.isEmpty {
+            MenuSectionHeader(title: sites.count == 1 ? "1 Site" : "\(sites.count) Sites")
+            ForEach(sites) { site in
+                MenuSubmenuItem(
+                    id: site.id,
+                    title: site.name,
+                    dotColor: site.connected ? .green : Color.secondary.opacity(0.5),
+                    controller: controller
+                ) {
+                    SiteDetailSubmenu(siteID: site.id, olmStatusManager: olmStatusManager)
+                }
+            }
+        } else if olmStatusManager.socketStatus == nil && !tunnelManager.isNEConnected {
+            MenuLabel(text: "Connect to see sites.")
+        } else if olmStatusManager.socketStatus == nil {
+            MenuLabel(text: "Loading…")
+        } else {
+            MenuLabel(text: "No sites")
+        }
+    }
+}
+
+/// Details for one site, kept live by the sites submenu's polling.
+struct SiteDetailSubmenu: View {
+    let siteID: String
+    @ObservedObject var olmStatusManager: OLMStatusManager
+
+    private var site: SiteStatusItem? {
+        guard let status = olmStatusManager.socketStatus else { return nil }
+        return SiteStatusItem.list(from: status).first { $0.id == siteID }
+    }
+
+    var body: some View {
+        if let site {
+            MenuSectionHeader(title: site.name)
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                Text("Status")
+                Spacer(minLength: 0)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(site.connected ? Color.green : Color.secondary.opacity(0.5))
+                        .frame(width: 8, height: 8)
+                    Text(site.connected ? "Connected" : "Disconnected")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(MenuMetrics.font)
+            .padding(.horizontal, MenuMetrics.rowHorizontalPadding)
+            .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, alignment: .leading)
+            MenuDetailRow(label: "Connection", value: site.connection ?? "—")
+            MenuDetailRow(label: "Endpoint", value: Self.display(site.endpoint))
+            MenuDetailRow(label: "Last Seen", value: site.lastSeenDescription)
+        } else {
+            MenuLabel(text: "This site is no longer connected.")
+        }
+    }
+
+    private static func display(_ value: String?) -> String {
+        guard let value, !value.isEmpty else { return "—" }
+        return value
+    }
+}
+
 struct MoreSubmenu: View {
     @ObservedObject var checkForUpdatesViewModel: CheckForUpdatesViewModel
     let openURL: (String) -> Void
@@ -877,7 +991,7 @@ struct MoreSubmenu: View {
 
         MenuSeparator()
 
-        MenuLabel(text: "© \(String(Calendar.current.component(.year, from: Date()))) Fossorial, Inc.")
+        MenuSectionHeader(title: "© \(String(Calendar.current.component(.year, from: Date()))) Fossorial, Inc.")
         MenuItem(title: "Terms of Service") {
             openURL("https://pangolin.net/tos")
         }
@@ -887,7 +1001,7 @@ struct MoreSubmenu: View {
 
         MenuSeparator()
 
-        MenuLabel(text: "Version \(appVersion)")
+        MenuSectionHeader(title: "Version \(appVersion)")
         MenuItem(title: "Check for Updates…") {
             checkForUpdates()
         }

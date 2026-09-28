@@ -28,6 +28,11 @@ struct PreferencesWindow: View {
         .onChange(of: selectedSection) {
             updateWindowTitle()
         }
+        .onReceive(PreferencesNavigation.shared.$requestedSection) { section in
+            guard let section else { return }
+            selectedSection = section
+            PreferencesNavigation.shared.requestedSection = nil
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             if let window = notification.object as? NSWindow, window.identifier?.rawValue == "preferences" {
                 configureWindow(window)

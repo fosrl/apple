@@ -120,14 +120,25 @@ struct MenuItem: View {
 
 /// A row that opens `content` in a panel beside the menu, like an NSMenu
 /// submenu. Hovering opens it after a short delay; clicking opens it at once.
-struct MenuSubmenuItem<Content: View>: View {
+struct MenuSubmenuItem<Label: View, Content: View>: View {
     let id: String
-    let title: String
-    var isLoading = false
     @ObservedObject var controller: MenuSubmenuController
-    @ViewBuilder let content: () -> Content
+    let content: () -> Content
+    let label: () -> Label
 
     @State private var anchor = MenuAnchor()
+
+    init(
+        id: String,
+        controller: MenuSubmenuController,
+        @ViewBuilder content: @escaping () -> Content,
+        @ViewBuilder label: @escaping () -> Label
+    ) {
+        self.id = id
+        self.controller = controller
+        self.content = content
+        self.label = label
+    }
 
     private var isOpen: Bool { controller.openID == id }
 
@@ -136,12 +147,8 @@ struct MenuSubmenuItem<Content: View>: View {
             open(delay: 0)
         } label: {
             HStack(spacing: 5) {
-                Text(title)
-                    .truncationMode(.middle)
+                label()
                 Spacer(minLength: 12)
-                if isLoading {
-                    ProgressView().controlSize(.mini)
-                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -160,6 +167,76 @@ struct MenuSubmenuItem<Content: View>: View {
         controller.requestOpen(id: id, anchor: view, delay: delay) {
             AnyView(content())
         }
+    }
+}
+
+extension MenuSubmenuItem where Label == MenuSubmenuTitle {
+    init(
+        id: String,
+        title: String,
+        isLoading: Bool = false,
+        dotColor: Color? = nil,
+        controller: MenuSubmenuController,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.init(id: id, controller: controller, content: content) {
+            MenuSubmenuTitle(title: title, isLoading: isLoading, dotColor: dotColor)
+        }
+    }
+}
+
+/// The standard submenu row label: optional status dot, title, optional spinner.
+struct MenuSubmenuTitle: View {
+    let title: String
+    var isLoading = false
+    var dotColor: Color?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let dotColor {
+                MenuStatusDot(color: dotColor)
+            }
+            Text(title)
+                .truncationMode(.middle)
+            if isLoading {
+                Spacer(minLength: 0)
+                ProgressView().controlSize(.mini)
+            }
+        }
+    }
+}
+
+/// The small colored circle used for tunnel and site status.
+struct MenuStatusDot: View {
+    let color: Color
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 8, height: 8)
+            .frame(width: 12, height: 12)
+    }
+}
+
+/// A label and value on one row, for read-only details.
+struct MenuDetailRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text(label)
+            Spacer(minLength: 0)
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
+                .truncationMode(.middle)
+        }
+        .font(MenuMetrics.font)
+        .padding(.horizontal, MenuMetrics.rowHorizontalPadding)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, alignment: .leading)
     }
 }
 
