@@ -169,10 +169,12 @@ struct HomeTabView: View {
     }
 
     
-    /// Name of the selected exit node, or nil when none is selected.
-    private var activeExitNodeName: String? {
-        guard let activeId = tunnelManager.activeExitNodeId else { return nil }
-        return tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })?.name
+    /// Display text for the exit node row: the selected node's name, "…" while an
+    /// active selection's name hasn't loaded yet (e.g. right after launch, before
+    /// availableExitNodes is populated), or "None" when nothing is selected.
+    private var activeExitNodeDisplayText: String {
+        guard let activeId = tunnelManager.activeExitNodeId else { return "None" }
+        return tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })?.name ?? "…"
     }
     
     private var isInIntermediateState: Bool {
@@ -435,8 +437,11 @@ struct HomeTabView: View {
                                 }
                             }
                             
-                            // Exit node section (hidden when session expired or the org has none)
-                            if !authManager.sessionExpired, !tunnelManager.availableExitNodes.isEmpty {
+                            // Exit node section (hidden when session expired or the org has none;
+                            // shown even if the name list hasn't loaded yet as long as there's an
+                            // active selection to display, so it doesn't flash away and back)
+                            if !authManager.sessionExpired,
+                                !tunnelManager.availableExitNodes.isEmpty || tunnelManager.activeExitNodeId != nil {
                                 VStack(alignment: .leading, spacing: 12) {
                                     // Exit node section header
                                     Text("Exit Node")
@@ -452,7 +457,7 @@ struct HomeTabView: View {
                                                 .foregroundColor(.accentColor)
                                             
                                             VStack(alignment: .leading, spacing: 4) {
-                                                Text(activeExitNodeName ?? "None")
+                                                Text(activeExitNodeDisplayText)
                                                     .font(.headline)
                                             }
                                             

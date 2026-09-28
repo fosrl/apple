@@ -579,17 +579,23 @@ struct MenuBarView: View {
 
     private static let exitNodeSubmenuID = "exitNode"
 
+    // Also true when there's an active selection but the display-name list hasn't loaded
+    // yet (e.g. right after opening the menu), so the row doesn't disappear only to
+    // reappear once refreshExitNodes() finishes.
     private var showsExitNodeRow: Bool {
-        !authManager.sessionExpired && !tunnelManager.availableExitNodes.isEmpty
+        !authManager.sessionExpired
+            && (!tunnelManager.availableExitNodes.isEmpty || tunnelManager.activeExitNodeId != nil)
     }
 
     private var exitNodeTitle: String {
-        if let activeId = tunnelManager.activeExitNodeId,
-            let node = tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })
-        {
-            return "Exit Node: \(node.name)"
+        guard let activeId = tunnelManager.activeExitNodeId else {
+            return "Exit Node: None"
         }
-        return "Exit Node: None"
+        // The name list may not have loaded yet even though the selection itself is
+        // already known - show a placeholder rather than "None" so an active exit
+        // node never reads as off while its name is still loading.
+        let name = tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })?.name
+        return "Exit Node: \(name ?? "…")"
     }
 
     private var exitNodeRow: some View {
