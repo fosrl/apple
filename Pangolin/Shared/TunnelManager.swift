@@ -31,8 +31,8 @@ class TunnelManager: NSObject, ObservableObject {
     @Published private(set) var gatewayResourcesOrgId: String?
     /// The gateway site resource olm reports it is routing through while connected.
     @Published private(set) var olmGatewayResourceId: Int?
-    /// niceId of the exit node saved in the config, applied on the next connect.
-    @Published private(set) var savedExitNodeNiceId: String?
+    /// Resource ID of the exit node saved on the active account, applied on the next connect.
+    @Published private(set) var savedExitNodeResourceId: Int?
 
     private var tunnelManager: NETunnelProviderManager?
     #if os(iOS)
@@ -108,7 +108,7 @@ class TunnelManager: NSObject, ObservableObject {
         #if os(macOS)
             self.fingerprintManager.startCacheRefresh(interval: 3 * 3600)
         #endif
-        self.savedExitNodeNiceId = configManager.getExitNode()?.niceId
+        self.savedExitNodeResourceId = accountManager.activeAccount.flatMap { accountManager.getExitNode(userId: $0.userId) }
         super.init()
 
         // Observe VPN status changes
@@ -1028,8 +1028,8 @@ class TunnelManager: NSObject, ObservableObject {
         if isNEConnected {
             return olmGatewayResourceId
         }
-        guard let niceId = savedExitNodeNiceId else { return nil }
-        return availableExitNodes.first(where: { $0.niceId == niceId })?.siteResourceId
+        guard let resourceId = savedExitNodeResourceId else { return nil }
+        return availableExitNodes.first(where: { $0.siteResourceId == resourceId })?.siteResourceId
     }
 
     /// Reloads the org's exit nodes from the server.
@@ -1055,7 +1055,7 @@ class TunnelManager: NSObject, ObservableObject {
     /// Routes all traffic through the given exit node. With the tunnel up it takes effect
     /// immediately; otherwise the choice is saved and applied on the next connect.
     func selectExitNode(_ node: SiteResource) async {
-        guard let orgId = authManager.currentOrg?.orgId else { return }
+        guard authManager.currentOrg?.orgId != nil, let userId = accountManager.activeAccount?.userId else { return }
 
         if isNEConnected {
             do {
@@ -1078,8 +1078,8 @@ class TunnelManager: NSObject, ObservableObject {
         }
 
         await MainActor.run {
-            _ = self.configManager.setExitNode(orgId: orgId, niceId: node.niceId)
-            self.savedExitNodeNiceId = node.niceId
+            self.accountManager.setExitNode(userId: userId, resourceId: node.siteResourceId)
+            self.savedExitNodeResourceId = node.siteResourceId
         }
     }
 
@@ -1104,26 +1104,24 @@ class TunnelManager: NSObject, ObservableObject {
         }
 
         await MainActor.run {
-            _ = self.configManager.setExitNode(orgId: nil, niceId: nil)
-            self.savedExitNodeNiceId = nil
+            if let userId = self.accountManager.activeAccount?.userId {
+                self.accountManager.setExitNode(userId: userId, resourceId: nil)
+            }
+            self.savedExitNodeResourceId = nil
         }
     }
 
     /// Turns the saved exit node into the resource and site IDs to establish when connecting, or
-    /// nil to connect without one. Only the niceId is saved, so a deleted, disabled or site-less
-    /// resource is skipped.
+    /// nil to connect without one. Only the resource ID is saved (scoped to the account's org),
+    /// so a deleted, disabled or site-less resource is skipped.
     private func resolveSavedExitNode(orgId: String) async -> SiteResource? {
-        guard let saved = configManager.getExitNode() else { return nil }
-        if let savedOrgId = saved.orgId, savedOrgId != orgId {
-            os_log(
-                "Saved exit node belongs to a different organization; not using it", log: logger,
-                type: .info)
-            return nil
-        }
+        guard let userId = accountManager.activeAccount?.userId,
+            let resourceId = accountManager.getExitNode(userId: userId)
+        else { return nil }
 
         do {
             let gateways = try await authManager.apiClient.listGatewayResources(orgId: orgId)
-            if let gateway = gateways.first(where: { $0.niceId == saved.niceId }) {
+            if let gateway = gateways.first(where: { $0.siteResourceId == resourceId }) {
                 return gateway
             }
             os_log(

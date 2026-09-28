@@ -24,11 +24,6 @@ struct Config: Codable {
     var autoDownloadUpdatesEnabled: Bool?
     /// When set, overrides Sparkle's scheduled check interval (seconds; minimum 3600).
     var updateCheckIntervalSeconds: Int?
-    /// The exit node (a gateway-mode site resource) selected from the app, re-applied on the
-    /// next connect. Only the niceId is stored so its current resource ID and sites are always
-    /// looked up from the server rather than going stale.
-    var exitNodeNiceId: String?
-    var exitNodeOrgId: String?
 
     /// Overrides the cookie name the session token is sent and read under. Nil/empty means use
     /// the API client's built-in default ("p_session_token"). Matches Windows' sessionCookieName.
@@ -58,8 +53,6 @@ struct Config: Codable {
         case onDemandWiFiEnabled
         case onDemandSSIDOption
         case onDemandSSIDs
-        case exitNodeNiceId
-        case exitNodeOrgId
         case sessionCookieName
     }
 }
@@ -75,6 +68,12 @@ struct Account: Identifiable, Codable, Hashable {
     var orgId: String
     var username: String?
     var name: String?
+    /// The exit node (a gateway-mode site resource) selected for this account, re-applied on
+    /// the next connect. It can differ per account, so it's stored here rather than on the root
+    /// config, and it belongs to the account's currently selected org (orgId above). Only the
+    /// resource ID is stored (not the niceId, which can be renamed); its sites are looked up
+    /// from the server on every connect so they can't go stale.
+    var exitNodeResourceId: Int?
 }
 
 extension Account {
