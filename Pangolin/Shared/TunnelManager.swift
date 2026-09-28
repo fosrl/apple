@@ -31,6 +31,12 @@ class TunnelManager: NSObject, ObservableObject {
     @Published private(set) var gatewayResourcesOrgId: String?
     /// The gateway site resource olm reports it is routing through while connected.
     @Published private(set) var olmGatewayResourceId: Int?
+    /// True once the current connection's first socket status poll has been processed, so
+    /// `olmGatewayResourceId` is known to be a real answer from olm rather than just not yet
+    /// set. Reset at the start of each connection attempt. Published on its own since
+    /// `olmGatewayResourceId` may stay nil (no exit node) across the flip, which wouldn't
+    /// otherwise notify observers.
+    @Published private var hasOlmGatewayStatus = false
     /// Resource ID of the exit node saved on the active account, applied on the next connect.
     @Published private(set) var savedExitNodeResourceId: Int?
 
@@ -714,11 +720,6 @@ class TunnelManager: NSObject, ObservableObject {
         if let gateway = await resolveSavedExitNode(orgId: currentOrg.orgId) {
             tunnelOptions["gatewaySiteResourceId"] = NSNumber(value: gateway.siteResourceId)
             tunnelOptions["gatewaySiteIds"] = gateway.siteIds.map { NSNumber(value: $0) } as NSArray
-            // Seed the live value now, since we already know what olm will be told to
-            // establish. Otherwise activeExitNodeId reads it as nil (isNEConnected flips
-            // true, via the system VPN state or the polling loop, before the first socket
-            // poll confirms the gateway) and the exit node picker flashes "None" on connect.
-            await MainActor.run { self.olmGatewayResourceId = gateway.siteResourceId }
         }
 
         tunnelOptions["mtu"] = NSNumber(value: configManager.getTunnelMTU())
@@ -1027,10 +1028,13 @@ class TunnelManager: NSObject, ObservableObject {
         return gatewayResources
     }
 
-    /// The selected exit node's site resource ID, or nil for none. While connected this is what
-    /// olm reports (so it follows the server disabling a gateway); otherwise the saved choice.
+    /// The selected exit node's site resource ID, or nil for none. Once olm has confirmed what
+    /// it's actually routing through (`hasOlmGatewayStatus`), this is what it reports, so it
+    /// follows e.g. the server disabling a gateway; before that - including the window right
+    /// after connecting, before the first status poll lands - it's the saved choice, so the
+    /// picker doesn't flash "None" while `isNEConnected` is true but olm hasn't answered yet.
     var activeExitNodeId: Int? {
-        if isNEConnected {
+        if isNEConnected, hasOlmGatewayStatus {
             return olmGatewayResourceId
         }
         guard let resourceId = savedExitNodeResourceId else { return nil }
@@ -1169,6 +1173,9 @@ class TunnelManager: NSObject, ObservableObject {
         isPollingSocket = true
         // Clear error alert flag when starting a new connection attempt
         hasShownErrorAlert = false
+        // This connection hasn't heard from olm yet; activeExitNodeId falls back to the saved
+        // choice until the first poll below sets this.
+        hasOlmGatewayStatus = false
 
         socketPollingTask = Task { [weak self] in
             guard let self = self else { return }
@@ -1234,11 +1241,18 @@ class TunnelManager: NSObject, ObservableObject {
                         }
                         break
                     } else {
-                        // Follow the exit node olm is actually routing through
+                        // Follow the exit node olm is actually routing through. olm applies any
+                        // pending gateway synchronously before marking itself registered, so
+                        // gatewayActive only becomes a trustworthy answer once registered is
+                        // true - before that, activeExitNodeId keeps showing the saved choice.
+                        let registered = socketStatus.registered == true
                         let gatewayId: Int? =
                             socketStatus.gatewayActive == true
                             ? socketStatus.gatewaySiteResourceId : nil
                         await MainActor.run {
+                            if registered {
+                                self.hasOlmGatewayStatus = true
+                            }
                             if self.olmGatewayResourceId != gatewayId {
                                 self.olmGatewayResourceId = gatewayId
                             }
