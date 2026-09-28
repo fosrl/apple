@@ -437,7 +437,8 @@ struct MenuBarView: View {
             isOn: Binding(
                 get: { activity.pendingTunnelOn ?? isTunnelOn },
                 set: { setTunnel(on: $0) }
-            )
+            ),
+            tint: tunnelState.toggleTint
         )
         .disabled(isToggleDisabled)
     }
@@ -768,12 +769,20 @@ private enum TunnelDisplayState: Equatable {
         }
     }
 
+    /// Same colors as the iOS status card.
     var color: Color {
         switch self {
         case .connected: return .green
-        case .registering, .disconnected(onDemand: true): return .yellow
+        case .registering: return .orange
+        case .disconnected(onDemand: true): return Color(nsColor: .systemYellow)
         case .disconnecting, .disconnected(onDemand: false), .locked: return Color.secondary.opacity(0.5)
         }
+    }
+
+    /// Yellow while on-demand is engaged but its rules keep the tunnel down,
+    /// as on iOS. Otherwise the switch uses the system accent.
+    var toggleTint: Color? {
+        self == .disconnected(onDemand: true) ? Color(nsColor: .systemYellow) : nil
     }
 
     var isTransitioning: Bool {
@@ -888,7 +897,8 @@ struct SitesSubmenu: View {
     let openStatusPanel: () -> Void
 
     private var sites: [SiteStatusItem] {
-        olmStatusManager.socketStatus.map(SiteStatusItem.list(from:)) ?? []
+        guard let status = olmStatusManager.socketStatus else { return [] }
+        return SiteStatusItem.list(from: status)
     }
 
     var body: some View {
