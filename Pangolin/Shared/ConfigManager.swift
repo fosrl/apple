@@ -231,6 +231,21 @@ class ConfigManager: ObservableObject {
         return save(updatedConfig)
     }
 
+    // MARK: - Exit Node Precedence
+
+    /// When enabled, routes for individual resources are not added to the routing table and
+    /// their aliases are not resolved, so all traffic is sent through the exit node instead of
+    /// directly to resources.
+    func getExitNodeTakesPrecedence() -> Bool {
+        return config?.exitNodeTakesPrecedence ?? false
+    }
+
+    func setExitNodeTakesPrecedence(_ enabled: Bool) -> Bool {
+        var updatedConfig = config ?? Config()
+        updatedConfig.exitNodeTakesPrecedence = enabled
+        return save(updatedConfig)
+    }
+
     // MARK: - Exit Node
 
     /// The org and niceId of the selected exit node, or nil if none is selected.

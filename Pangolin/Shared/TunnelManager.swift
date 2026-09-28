@@ -723,6 +723,7 @@ class TunnelManager: NSObject, ObservableObject {
 
         tunnelOptions["overrideDNS"] = NSNumber(value: configManager.getDNSOverrideEnabled())
         tunnelOptions["tunnelDNS"] = NSNumber(value: configManager.getDNSTunnelEnabled())
+        tunnelOptions["exitNodeTakesPrecedence"] = NSNumber(value: configManager.getExitNodeTakesPrecedence())
 
         var upstreamDNSServers: [String] = []
         let primaryDNS = configManager.getPrimaryDNSServer()

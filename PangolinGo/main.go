@@ -27,22 +27,23 @@ type InitOlmConfig struct {
 
 // StartTunnelConfig represents the JSON configuration for startTunnel
 type StartTunnelConfig struct {
-	Endpoint            string         `json:"endpoint"`
-	ID                  string         `json:"id"`
-	Secret              string         `json:"secret"`
-	MTU                 int            `json:"mtu"`
-	DNS                 string         `json:"dns"`
-	Holepunch           bool           `json:"holepunch"`
-	PingIntervalSeconds int            `json:"pingIntervalSeconds"`
-	PingTimeoutSeconds  int            `json:"pingTimeoutSeconds"`
-	UserToken           string         `json:"userToken"`
-	OrgID               string         `json:"orgId"`
-	UpstreamDNS         []string       `json:"upstreamDNS"`
-	MatchDomains        []string       `json:"matchDomains"`
-	OverrideDNS         bool           `json:"overrideDNS"`
-	TunnelDNS           bool           `json:"tunnelDNS"`
-	Fingerprint         map[string]any `json:"fingerprint"`
-	Postures            map[string]any `json:"postures"`
+	Endpoint                string         `json:"endpoint"`
+	ID                      string         `json:"id"`
+	Secret                  string         `json:"secret"`
+	MTU                     int            `json:"mtu"`
+	DNS                     string         `json:"dns"`
+	Holepunch               bool           `json:"holepunch"`
+	PingIntervalSeconds     int            `json:"pingIntervalSeconds"`
+	PingTimeoutSeconds      int            `json:"pingTimeoutSeconds"`
+	UserToken               string         `json:"userToken"`
+	OrgID                   string         `json:"orgId"`
+	UpstreamDNS             []string       `json:"upstreamDNS"`
+	MatchDomains            []string       `json:"matchDomains"`
+	OverrideDNS             bool           `json:"overrideDNS"`
+	TunnelDNS               bool           `json:"tunnelDNS"`
+	ExitNodeTakesPrecedence bool           `json:"exitNodeTakesPrecedence"`
+	Fingerprint             map[string]any `json:"fingerprint"`
+	Postures                map[string]any `json:"postures"`
 
 	// GatewaySiteResourceID/GatewaySiteIDs, when set, establish the exit node (gateway) as the
 	// tunnel comes up. The resource ID is what olm uses to apply later server-pushed changes
@@ -153,17 +154,18 @@ func startTunnel(fd C.int, configJSON *C.char) *C.char {
 
 	// Create OLM Config with tunnel parameters
 	tunnelConfig := olmpkg.TunnelConfig{
-		Endpoint:             config.Endpoint,
-		ID:                   config.ID,
-		Secret:               config.Secret,
-		MTU:                  config.MTU,
-		Holepunch:            config.Holepunch,
-		PingIntervalDuration: time.Duration(config.PingIntervalSeconds) * time.Second,
-		PingTimeoutDuration:  time.Duration(config.PingTimeoutSeconds) * time.Second,
-		FileDescriptorTun:    uint32(fd),
-		UserToken:            config.UserToken,
-		OverrideDNS:          config.OverrideDNS,
-		TunnelDNS:            config.TunnelDNS,
+		Endpoint:                          config.Endpoint,
+		ID:                                config.ID,
+		Secret:                            config.Secret,
+		MTU:                               config.MTU,
+		Holepunch:                         config.Holepunch,
+		PingIntervalDuration:              time.Duration(config.PingIntervalSeconds) * time.Second,
+		PingTimeoutDuration:               time.Duration(config.PingTimeoutSeconds) * time.Second,
+		FileDescriptorTun:                 uint32(fd),
+		UserToken:                         config.UserToken,
+		OverrideDNS:                       config.OverrideDNS,
+		TunnelDNS:                         config.TunnelDNS,
+		DisableRoutesAndAliasesOnExitNode: config.ExitNodeTakesPrecedence,
 		// This binary is always the macOS/iOS app embed (never the CLI), which
 		// applies DNS override natively via NEDNSSettings (see TunnelAdapter.swift).
 		NativeDNSManaged:   true,

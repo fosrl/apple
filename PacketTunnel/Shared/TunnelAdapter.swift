@@ -282,6 +282,7 @@ public class TunnelAdapter {
         let postures = Self.dictionaryValue(options, "postures") ?? [:]
         let upstreamDNS = Self.stringArrayValue(options, "upstreamDNS") ?? []
         let matchDomains = Self.stringArrayValue(options, "matchDomains") ?? []
+        let exitNodeTakesPrecedence = Self.boolValue(options, "exitNodeTakesPrecedence") ?? false
         let gatewaySiteResourceId = (options["gatewaySiteResourceId"] as? NSNumber)?.intValue ?? 0
         let gatewaySiteIds =
             (options["gatewaySiteIds"] as? NSArray)?.compactMap { ($0 as? NSNumber)?.intValue } ?? []
@@ -311,6 +312,7 @@ public class TunnelAdapter {
             "matchDomains": matchDomains,
             "overrideDNS": overrideDNSValue,
             "tunnelDNS": tunnelDNS,
+            "exitNodeTakesPrecedence": exitNodeTakesPrecedence,
             "fingerprint": fingerprint,
             "postures": postures,
             "gatewaySiteResourceId": gatewaySiteResourceId,

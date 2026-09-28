@@ -13,6 +13,10 @@ struct PreferencesView: View {
         configManager.getDNSTunnelEnabled()
     }
 
+    private var exitNodeTakesPrecedence: Bool {
+        configManager.getExitNodeTakesPrecedence()
+    }
+
     private var primaryDNSServer: String {
         configManager.getPrimaryDNSServer()
     }
@@ -127,6 +131,22 @@ struct PreferencesView: View {
                 }
 
                 Section(header: Text("Advanced")) {
+                    Toggle(isOn: Binding(
+                        get: { exitNodeTakesPrecedence },
+                        set: { newValue in
+                            _ = configManager.setExitNodeTakesPrecedence(newValue)
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Exit Node Takes Precedence Over Resources")
+                                .font(.body)
+                            Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources. Exit node (gateway) routes are unaffected.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .tint(.accentColor)
+
                     NavigationLink {
                         MTUModalView(
                             title: "MTU",
