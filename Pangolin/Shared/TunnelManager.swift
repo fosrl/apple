@@ -37,6 +37,12 @@ class TunnelManager: NSObject, ObservableObject {
     /// `olmGatewayResourceId` may stay nil (no exit node) across the flip, which wouldn't
     /// otherwise notify observers.
     @Published private var hasOlmGatewayStatus = false
+    /// Bumped every time something authoritative updates `olmGatewayResourceId` (a live
+    /// select/disable call, or a fresh connection's polling reset). A socket poll captures
+    /// this before its request and discards its answer if the count has moved on by the
+    /// time it returns, so a poll that was already in flight when the user made a live
+    /// change can't land afterward and stomp the newer value back to the old one.
+    private var gatewayUpdateGeneration = 0
     /// Resource ID of the exit node saved on the active account, applied on the next connect.
     @Published private(set) var savedExitNodeResourceId: Int?
 
@@ -1083,7 +1089,11 @@ class TunnelManager: NSObject, ObservableObject {
                 }
                 return
             }
-            await MainActor.run { self.olmGatewayResourceId = node.siteResourceId }
+            await MainActor.run {
+                self.gatewayUpdateGeneration += 1
+                self.hasOlmGatewayStatus = true
+                self.olmGatewayResourceId = node.siteResourceId
+            }
         }
 
         await MainActor.run {
@@ -1109,7 +1119,11 @@ class TunnelManager: NSObject, ObservableObject {
                 }
                 return
             }
-            await MainActor.run { self.olmGatewayResourceId = nil }
+            await MainActor.run {
+                self.gatewayUpdateGeneration += 1
+                self.hasOlmGatewayStatus = true
+                self.olmGatewayResourceId = nil
+            }
         }
 
         await MainActor.run {
@@ -1176,12 +1190,17 @@ class TunnelManager: NSObject, ObservableObject {
         // This connection hasn't heard from olm yet; activeExitNodeId falls back to the saved
         // choice until the first poll below sets this.
         hasOlmGatewayStatus = false
+        // Invalidate any poll from a previous run that might still be in flight.
+        gatewayUpdateGeneration += 1
 
         socketPollingTask = Task { [weak self] in
             guard let self = self else { return }
 
             while !Task.isCancelled && self.isPollingSocket {
                 do {
+                    // Captured before the request so a live select/disable call that lands
+                    // while this poll is in flight can be detected once it returns.
+                    let pollGeneration = await MainActor.run { self.gatewayUpdateGeneration }
                     // Query socket for status
                     let socketStatus = try await self.socketManager.getStatus()
 
@@ -1250,6 +1269,10 @@ class TunnelManager: NSObject, ObservableObject {
                             socketStatus.gatewayActive == true
                             ? socketStatus.gatewaySiteResourceId : nil
                         await MainActor.run {
+                            // A live select/disable call (or a fresh connect's reset) landed
+                            // while this request was in flight; its answer may predate that
+                            // change, so leave the newer value alone.
+                            guard self.gatewayUpdateGeneration == pollGeneration else { return }
                             if registered {
                                 self.hasOlmGatewayStatus = true
                             }
