@@ -1047,6 +1047,7 @@ struct SiteDetailSubmenu: View {
             .padding(.horizontal, MenuMetrics.rowHorizontalPadding)
             .frame(maxWidth: .infinity, minHeight: MenuMetrics.rowHeight, alignment: .leading)
             MenuDetailRow(label: "Connection", value: site.connection ?? "—")
+            MenuDetailRow(label: "Exit Node", value: site.connection != nil ? (site.isGateway ? "Yes" : "No") : "—")
             MenuDetailRow(label: "Endpoint", value: Self.display(site.endpoint))
             MenuDetailRow(label: "Last Seen", value: site.lastSeenDescription)
         } else {

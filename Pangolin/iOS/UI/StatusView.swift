@@ -159,6 +159,13 @@ struct StatusView: View {
                         Text(orgId)
                             .foregroundColor(.secondary)
                     }
+
+                    HStack {
+                        Text("Exit Node")
+                        Spacer()
+                        Text(status.gatewayLabel)
+                            .foregroundColor(.secondary)
+                    }
                 }
             } header: {
                 Text("Connection Status")

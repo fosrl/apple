@@ -171,6 +171,15 @@ struct OLMStatusContentView: View {
                             .font(.system(size: 13))
                             .foregroundColor(.secondary)
                     }
+
+                    HStack {
+                        Text("Exit Node")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Text(status.gatewayLabel)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
                 }
             } header: {
                 Text("Connection Status")

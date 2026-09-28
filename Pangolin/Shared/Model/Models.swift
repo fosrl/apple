@@ -380,6 +380,9 @@ struct SiteStatusItem: Identifiable, Equatable {
     let lastSeen: String?
     /// "Local", "Relay", or "Direct". Nil when the status payload has no connection flags.
     let connection: String?
+    /// True when this site is one of those currently used as the exit node (gateway)
+    /// that all traffic is routed through.
+    let isGateway: Bool
 
     static func list(from status: SocketStatusResponse) -> [SiteStatusItem] {
         var items: [SiteStatusItem] = []
@@ -391,10 +394,12 @@ struct SiteStatusItem: Identifiable, Equatable {
                     connected: exitNode.connected,
                     endpoint: exitNode.endpoint,
                     lastSeen: exitNode.lastSeen,
-                    connection: nil
+                    connection: nil,
+                    isGateway: false
                 )
             )
         }
+        let gatewaySiteIds: Set<Int> = status.gatewayActive == true ? Set(status.gatewaySiteIds ?? []) : []
         if let peers = status.peers {
             for key in peers.keys.sorted() {
                 guard let peer = peers[key] else { continue }
@@ -405,7 +410,8 @@ struct SiteStatusItem: Identifiable, Equatable {
                         connected: peer.connected ?? false,
                         endpoint: peer.endpoint,
                         lastSeen: peer.lastSeen,
-                        connection: connectionLabel(isLocal: peer.isLocal, isRelay: peer.isRelay)
+                        connection: connectionLabel(isLocal: peer.isLocal, isRelay: peer.isRelay),
+                        isGateway: peer.siteId.map { gatewaySiteIds.contains($0) } ?? false
                     )
                 )
             }
@@ -421,6 +427,18 @@ struct SiteStatusItem: Identifiable, Equatable {
             return "Relay"
         }
         return "Direct"
+    }
+}
+
+extension SocketStatusResponse {
+    /// Summarizes the exit node the same way the Windows/CLI status does: "Off", or
+    /// "Active (resource N)" with the gateway site resource's ID.
+    var gatewayLabel: String {
+        guard gatewayActive == true else { return "Off" }
+        if let id = gatewaySiteResourceId, id != 0 {
+            return "Active (resource \(id))"
+        }
+        return "Active"
     }
 }
 

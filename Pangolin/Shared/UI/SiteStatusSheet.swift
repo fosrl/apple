@@ -105,6 +105,7 @@ struct SiteStatusSheet: View {
                 detailRow(label: "Site", value: site.name)
                 statusRow(connected: site.connected)
                 detailRow(label: "Connection", value: site.connection ?? "—")
+                detailRow(label: "Exit Node", value: site.connection != nil ? (site.isGateway ? "Yes" : "No") : "—")
                 detailRow(label: "Endpoint", value: display(site.endpoint))
                 detailRow(label: "Last Seen", value: site.lastSeenDescription)
             }
