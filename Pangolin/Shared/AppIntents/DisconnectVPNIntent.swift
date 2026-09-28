@@ -1,7 +1,7 @@
 import AppIntents
 
 nonisolated struct DisconnectVPNIntent: AppIntent {
-    static var title: LocalizedStringResource = "Disconnect Pangolin VPN"
+    static var title: LocalizedStringResource = "Disconnect Pangolin"
     static var description = IntentDescription("Disables the Pangolin VPN connection.")
     static var openAppWhenRun: Bool = false
     static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
@@ -13,6 +13,6 @@ nonisolated struct DisconnectVPNIntent: AppIntent {
         await tunnelManager.disconnect()
         let finalStatus = await tunnelManager.waitUntilSettled()
 
-        return .result(dialog: "Pangolin VPN: \(finalStatus.displayText).")
+        return .result(dialog: "Pangolin: \(finalStatus.displayText).")
     }
 }

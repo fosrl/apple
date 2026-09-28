@@ -1,7 +1,7 @@
 import AppIntents
 
 nonisolated struct ConnectVPNIntent: AppIntent {
-    static var title: LocalizedStringResource = "Connect Pangolin VPN"
+    static var title: LocalizedStringResource = "Connect Pangolin"
     static var description = IntentDescription("Enables the Pangolin VPN connection.")
     static var openAppWhenRun: Bool = false
     static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
@@ -26,9 +26,9 @@ nonisolated struct ConnectVPNIntent: AppIntent {
             throw PangolinIntentError.connectionFailed(error)
         }
         guard finalStatus == .connected else {
-            throw PangolinIntentError.connectionFailed("Pangolin VPN didn't finish connecting.")
+            throw PangolinIntentError.connectionFailed("Pangolin didn't finish connecting.")
         }
 
-        return .result(dialog: "Pangolin VPN: Connected.")
+        return .result(dialog: "Pangolin: Connected.")
     }
 }

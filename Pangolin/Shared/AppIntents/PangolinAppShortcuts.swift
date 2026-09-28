@@ -16,7 +16,7 @@ struct PangolinAppShortcuts: AppShortcutsProvider {
                 "Start \(.applicationName)",
                 "Start \(.applicationName) VPN",
             ],
-            shortTitle: "Connect VPN",
+            shortTitle: "Connect Pangolin",
             systemImageName: "lock.shield"
         )
         AppShortcut(
@@ -32,7 +32,7 @@ struct PangolinAppShortcuts: AppShortcutsProvider {
                 "Stop \(.applicationName)",
                 "Stop \(.applicationName) VPN",
             ],
-            shortTitle: "Disconnect VPN",
+            shortTitle: "Disconnect Pangolin",
             systemImageName: "lock.slash"
         )
         AppShortcut(
@@ -48,7 +48,7 @@ struct PangolinAppShortcuts: AppShortcutsProvider {
                 "Is \(.applicationName) VPN connected",
                 "\(.applicationName) VPN status",
             ],
-            shortTitle: "VPN Status",
+            shortTitle: "Pangolin Status",
             systemImageName: "info.circle"
         )
     }

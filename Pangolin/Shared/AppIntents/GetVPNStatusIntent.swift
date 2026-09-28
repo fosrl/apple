@@ -1,7 +1,7 @@
 import AppIntents
 
 nonisolated struct GetVPNStatusIntent: AppIntent {
-    static var title: LocalizedStringResource = "Get Pangolin VPN Status"
+    static var title: LocalizedStringResource = "Pangolin Status"
     static var description = IntentDescription(
         "Returns whether the Pangolin VPN is connected, along with the active organization and server."
     )
@@ -24,6 +24,6 @@ nonisolated struct GetVPNStatusIntent: AppIntent {
             serverHostname: accountManager.activeAccount?.hostname
         )
 
-        return .result(value: entity, dialog: "Pangolin VPN: \(entity.statusText).")
+        return .result(value: entity, dialog: "Pangolin: \(entity.statusText).")
     }
 }

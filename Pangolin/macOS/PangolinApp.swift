@@ -35,6 +35,82 @@ struct MenuBarIconView: View {
     }
 }
 
+/// Status item label. It lives for the whole session, unlike the `.window`
+/// style panel content, which isn't built until the first click, so launch
+/// work hangs off this view.
+struct MenuBarLabel: View {
+    let authManager: AuthManager
+    @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var onboardingViewModel: MacOnboardingViewModel
+    @Environment(\.openWindow) private var openWindow
+    @State private var contextMenu: StatusItemContextMenu?
+
+    var body: some View {
+        MenuBarIconView(tunnelManager: tunnelManager)
+            .onAppear {
+                if contextMenu == nil {
+                    let menu = StatusItemContextMenu(tunnelManager: tunnelManager)
+                    menu.install()
+                    contextMenu = menu
+                }
+
+
+                // Menu-bar-only unless onboarding or a restored window is open.
+                // Window restoration runs first and bails out while the policy is still
+                // .regular, so this check has to notice those windows or the Dock icon
+                // disappears out from under them.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    guard !onboardingViewModel.isPresenting else { return }
+                    guard !Self.hasVisibleAppWindow() else { return }
+                    guard NSApp.activationPolicy() != .accessory else { return }
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+            .task {
+                await authManager.initialize()
+                await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+            }
+            .task {
+                await onboardingViewModel.refreshPages()
+                if onboardingViewModel.isPresenting, !onboardingViewModel.hasOpenedOnboardingWindowThisSession {
+                    onboardingViewModel.hasOpenedOnboardingWindowThisSession = true
+                    openWindow(id: "onboarding")
+                    NSApp.setActivationPolicy(.regular)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        NSApp.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                    }
+                }
+            }
+            .onChange(of: onboardingViewModel.isPresenting) { _, newValue in
+                if !newValue {
+                    onboardingViewModel.hasOpenedOnboardingWindowThisSession = false
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                Task {
+                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+                }
+            }
+    }
+
+    /// Login, preferences, and onboarding windows that should keep the app in the Dock.
+    private static func hasVisibleAppWindow() -> Bool {
+        let knownIds: Set<String> = ["main", "preferences", "onboarding"]
+        var knownTitles: Set<String> = ["Pangolin", "Pangolin Setup"]
+        knownTitles.formUnion(PreferencesSection.allCases.map(\.rawValue))
+
+        return NSApp.windows.contains { window in
+            let isShown = window.isVisible || window.isMiniaturized
+            guard isShown else { return false }
+            if let id = window.identifier?.rawValue, knownIds.contains(id) {
+                return true
+            }
+            return knownTitles.contains(window.title)
+        }
+    }
+}
+
 struct AnimatedLoadingIcon: View {
     @State private var currentFrame = 1
 
@@ -142,22 +218,6 @@ struct PangolinApp: App {
         _onboardingViewModel = StateObject(wrappedValue: onboardingVM)
     }
 
-    /// Login, preferences, and onboarding windows that should keep the app in the Dock.
-    private static func hasVisibleAppWindow() -> Bool {
-        let knownIds: Set<String> = ["main", "preferences", "onboarding"]
-        var knownTitles: Set<String> = ["Pangolin", "Pangolin Setup"]
-        knownTitles.formUnion(PreferencesSection.allCases.map(\.rawValue))
-
-        return NSApp.windows.contains { window in
-            let isShown = window.isVisible || window.isMiniaturized
-            guard isShown else { return false }
-            if let id = window.identifier?.rawValue, knownIds.contains(id) {
-                return true
-            }
-            return knownTitles.contains(window.title)
-        }
-    }
-
     /// Applies present pangolin.json update keys to Sparkle. Absent keys leave Sparkle prefs alone.
     private static func applyUpdateSettings(from configManager: ConfigManager, to updater: SPUUpdater) {
         var didChangeSchedulerSettings = false
@@ -213,31 +273,14 @@ struct PangolinApp: App {
                 updater: updaterController.updater,
                 onboardingViewModel: onboardingViewModel
             )
-            .onAppear {
-                // Menu-bar-only unless onboarding or a restored window is open.
-                // Window restoration runs first and bails out while the policy is still
-                // .regular, so this check has to notice those windows or the Dock icon
-                // disappears out from under them.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    guard !onboardingViewModel.isPresenting else { return }
-                    guard !Self.hasVisibleAppWindow() else { return }
-                    guard NSApp.activationPolicy() != .accessory else { return }
-                    NSApp.setActivationPolicy(.accessory)
-                }
-
-                Task {
-                    await authManager.initialize()
-                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                Task {
-                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
-                }
-            }
         } label: {
-            MenuBarIconView(tunnelManager: tunnelManager)
+            MenuBarLabel(
+                authManager: authManager,
+                tunnelManager: tunnelManager,
+                onboardingViewModel: onboardingViewModel
+            )
         }
+        .menuBarExtraStyle(.window)
 
         // Main Window (Login)
         WindowGroup("Pangolin", id: "main") {

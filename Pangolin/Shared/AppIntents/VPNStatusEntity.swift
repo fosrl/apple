@@ -1,7 +1,7 @@
 import AppIntents
 
 nonisolated struct VPNStatusEntity: TransientAppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Pangolin VPN Status"
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Pangolin Status"
 
     var isConnected: Bool
     var statusText: String

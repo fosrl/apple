@@ -479,17 +479,30 @@ class TunnelManager: NSObject, ObservableObject {
                 return protocolConfig.providerBundleIdentifier == bundleIdentifier
             })
         {
-            // Reload to get the actual manager instance
-            do {
-                try await existingManager.loadFromPreferences()
-                await MainActor.run {
-                    tunnelManager = existingManager
+            // Keep the manager we already have while its profile still exists. A
+            // freshly loaded instance can report its connection as down until
+            // NetworkExtension catches up, which stops socket polling and shows a
+            // connected tunnel as registering again.
+            var candidates = [existingManager]
+            if let current = tunnelManager, current !== existingManager {
+                candidates.insert(current, at: 0)
+            }
+
+            // Reload to get the actual manager instance. If the kept manager's
+            // profile was replaced, loading it fails and the new one is used.
+            for manager in candidates {
+                do {
+                    try await manager.loadFromPreferences()
+                    await MainActor.run {
+                        tunnelManager = manager
+                    }
+                    await updateConnectionStatus()
+                    return
+                } catch {
+                    os_log(
+                        "Error loading manager: %{public}@", log: logger, type: .error,
+                        error.localizedDescription)
                 }
-                await updateConnectionStatus()
-            } catch {
-                os_log(
-                    "Error loading manager: %{public}@", log: logger, type: .error,
-                    error.localizedDescription)
             }
         } else {
             // Register the extension
@@ -945,6 +958,28 @@ class TunnelManager: NSObject, ObservableObject {
 
         manager.connection.stopVPNTunnel()
         await updateConnectionStatus()
+    }
+
+    /// Disconnects, turns off on-demand so the OS can't bring the tunnel back, and
+    /// waits until the extension has actually stopped the tunnel or `timeout`
+    /// elapses. `disconnect()` alone returns as soon as the stop is requested.
+    func stopCompletely(timeout: TimeInterval = 5) async {
+        await disconnect()
+
+        guard let manager = tunnelManager else { return }
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            switch manager.connection.status {
+            case .disconnected, .invalid:
+                // Publish the stopped state now rather than waiting for the
+                // status notification, so callers see it as soon as this returns.
+                await updateConnectionStatus()
+                return
+            default:
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+        }
+        os_log("Tunnel did not stop within %{public}.0fs", log: logger, type: .error, timeout)
     }
 
     /// Polls `status` until it reaches a terminal state (`.connected` or `.disconnected`) or
