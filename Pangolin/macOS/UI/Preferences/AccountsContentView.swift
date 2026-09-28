@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Lists the accounts on this Mac and adds, switches, and removes them.
@@ -26,41 +27,25 @@ struct AccountsContentView: View {
     }
 
     var body: some View {
-        ScrollView {
-            Form {
-                Section {
-                    if accounts.isEmpty {
-                        emptyRow
-                    } else {
-                        ForEach(accounts) { account in
-                            accountRow(account)
-                        }
-                    }
-                } header: {
-                    Text("Accounts")
-                } footer: {
-                    if !accounts.isEmpty {
-                        HStack {
-                            Spacer()
-                            Button("Add Account…") {
-                                showLogin(hostname: nil)
-                            }
-                        }
-                    }
-                }
+        Group {
+            if accounts.isEmpty {
+                welcomeScreen
+            } else {
+                accountList
             }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showLogin(hostname: nil)
-                } label: {
-                    Label("Add Account", systemImage: "plus")
+            // The welcome screen has its own button.
+            if !accounts.isEmpty {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showLogin(hostname: nil)
+                    } label: {
+                        Label("Add Account", systemImage: "plus")
+                    }
+                    .help("Add Account")
                 }
-                .help("Add Account")
             }
         }
         .sheet(item: $loginRequest) { request in
@@ -92,21 +77,65 @@ struct AccountsContentView: View {
 
     // MARK: - Rows
 
-    private var emptyRow: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("No Accounts")
-                    .font(.system(size: 13))
-                Text("Log in to Pangolin Cloud or your own server to connect.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+    private var accountList: some View {
+        ScrollView {
+            Form {
+                Section {
+                    ForEach(accounts) { account in
+                        accountRow(account)
+                    }
+                } header: {
+                    Text("Accounts")
+                } footer: {
+                    HStack {
+                        Spacer()
+                        Button("Add Account…") {
+                            showLogin(hostname: nil)
+                        }
+                    }
+                }
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    /// Shown until the first login, in place of the list.
+    private var welcomeScreen: some View {
+        VStack(spacing: 0) {
             Spacer()
-            Button("Log In…") {
+
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+                .accessibilityHidden(true)
+
+            Text("Log In to Pangolin")
+                .font(.system(size: 22, weight: .semibold))
+                .padding(.top, 16)
+
+            Text("Connect to your organization's private resources by logging in to Pangolin Cloud or your own Pangolin server.")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 340)
+                .padding(.top, 6)
+
+            Button {
                 showLogin(hostname: nil)
+            } label: {
+                Text("Log In…")
+                    .frame(minWidth: 120)
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
+            .padding(.top, 24)
+
+            Spacer()
+            Spacer()
         }
+        .padding(32)
     }
 
     private func accountRow(_ account: Account) -> some View {
