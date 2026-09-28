@@ -431,11 +431,11 @@ struct SiteStatusItem: Identifiable, Equatable {
 
 extension SocketStatusResponse {
     /// Summarizes the exit node the same way the Windows/CLI status does: "Off", or
-    /// "Active (resource N)" with the gateway site resource's ID.
+    /// "Active" with the gateway site resource's ID.
     var gatewayLabel: String {
         guard gatewayActive == true else { return "Off" }
         if let id = gatewaySiteResourceId, id != 0 {
-            return "Active (resource \(id))"
+            return "Active"
         }
         return "Active"
     }
