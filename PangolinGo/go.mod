@@ -1,6 +1,6 @@
 module github.com/fosrl/apple
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/fosrl/newt v1.16.0
@@ -11,16 +11,20 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/nftables v0.3.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/mdlayher/netlink v1.7.3-0.20250113171957-fbb4dce95f42 // indirect
+	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/miekg/dns v1.1.70 // indirect
 	github.com/vishvananda/netlink v1.3.1 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
 	golang.org/x/mod v0.34.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
@@ -32,5 +36,6 @@ require (
 )
 
 // Uncomment when developing dependencies.
-// replace github.com/fosrl/olm => ../../olm
-// replace github.com/fosrl/newt => ../../newt
+replace github.com/fosrl/olm => ../../olm
+
+replace github.com/fosrl/newt => ../../newt

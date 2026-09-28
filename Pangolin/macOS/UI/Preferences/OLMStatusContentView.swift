@@ -197,16 +197,21 @@ struct OLMStatusContentView: View {
                     Text("Sites")
                 }
             } else {
-                Section {
-                    Text("No sites connected")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                } header: {
-                    Text("Sites")
-                }
+                noSitesSection
             }
         } else {
             disconnectedSection
+            noSitesSection
+        }
+    }
+
+    private var noSitesSection: some View {
+        Section {
+            Text("No sites connected")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+        } header: {
+            Text("Sites")
         }
     }
 
