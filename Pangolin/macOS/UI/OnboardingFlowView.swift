@@ -159,7 +159,7 @@ struct MacOnboardingFlowView: View {
 
     private var stepCount: Int { viewModel.currentIndex == 4 ? 5 : 4 }
 
-    /// Matches LoginView background: dark #161618, light #FDFDFD
+    /// Onboarding background: dark #161618, light #FDFDFD
     private var windowBackgroundColor: Color {
         colorScheme == .dark
             ? Color(.sRGB, red: 0x16/255.0, green: 0x16/255.0, blue: 0x18/255.0, opacity: 1)
@@ -538,7 +538,7 @@ private struct MacOnboardingCompletionPageContent: View {
     }
 }
 
-// MARK: - Window configuration (matches LoginView title bar style)
+// MARK: - Window configuration
 
 private struct OnboardingWindowAccessor: NSViewRepresentable {
     var callback: (NSWindow) -> Void

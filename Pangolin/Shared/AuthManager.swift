@@ -772,27 +772,26 @@ class AuthManager: ObservableObject {
         }
     }
 
+    /// Whether the account still has a saved session. Without one it has to log
+    /// in again before it can connect.
+    func hasSession(userId: String) -> Bool {
+        secretManager.getSessionToken(userId: userId) != nil
+    }
+
+    /// Removes an account from this device. Everything local happens right away,
+    /// so this works with the server unreachable; revoking the session on the
+    /// server is attempted in the background and never waited on.
     func deleteAccount(userId: String) async {
-        guard accountManager.accounts[userId] != nil else {
+        guard let account = accountManager.accounts[userId] else {
             return
         }
 
         let isActiveAccount = accountManager.activeAccount?.userId == userId
-        let remainingAccounts = accountManager.accounts.filter { $0.key != userId }
-        let hasOtherAccounts = !remainingAccounts.isEmpty
+        let token = secretManager.getSessionToken(userId: userId)
 
         // If deleting the active account, disconnect tunnel first
-        if isActiveAccount {
-            if let tunnelManager = tunnelManager {
-                await tunnelManager.disconnect()
-            }
-
-            // Try to call logout endpoint (ignore errors)
-            do {
-                try await apiClient.logout()
-            } catch {
-                // Ignore errors - still clear local data
-            }
+        if isActiveAccount, let tunnelManager = tunnelManager {
+            await tunnelManager.disconnect()
         }
 
         // Clear local data
@@ -801,67 +800,56 @@ class AuthManager: ObservableObject {
 
         accountManager.removeAccount(userId: userId)
 
-        // If we deleted the active account, switch to another or logout
-        if isActiveAccount {
-            if hasOtherAccounts, let nextAccount = remainingAccounts.values.first {
-                // Switch to the first available account
-                await switchAccount(userId: nextAccount.userId)
-            } else {
-                // No other accounts, fully log out
-                apiClient.updateSessionToken(nil)
+        if let token {
+            signOutOnServerInBackground(hostname: account.hostname, token: token)
+        }
 
-                isAuthenticated = false
-                currentOrg = nil
-                organizations = []
-                errorMessage = nil
-                deviceAuthCode = nil
-                deviceAuthLoginURL = nil
-            }
+        if isActiveAccount {
+            await activateNextAccountOrSignOut()
         }
     }
 
+    /// Removes the active account. See `deleteAccount(userId:)`.
     func logout() async {
         guard let activeAccount = accountManager.activeAccount else {
             return
         }
+        await deleteAccount(userId: activeAccount.userId)
+    }
 
-        let userId = activeAccount.userId
+    /// After the active account is removed: switch to the first remaining account
+    /// by name, or clear the signed-in state if none are left.
+    private func activateNextAccountOrSignOut() async {
+        let nextAccount = accountManager.accounts.values.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }.first
 
-        // Check if there are other accounts before removing this one
-        let remainingAccounts = accountManager.accounts.filter { $0.key != userId }
-        let hasOtherAccounts = !remainingAccounts.isEmpty
-
-        // Disconnect tunnel before logging out
-        if let tunnelManager = tunnelManager {
-            await tunnelManager.disconnect()
-        }
-
-        // Try to call logout endpoint (ignore errors)
-        do {
-            try await apiClient.logout()
-        } catch {
-            // Ignore errors - still clear local data
-        }
-
-        // Clear local data
-        _ = secretManager.deleteSessionToken(userId: userId)
-
-        accountManager.removeAccount(userId: userId)
-
-        // If there are other accounts, switch to one of them
-        if hasOtherAccounts, let nextAccount = remainingAccounts.values.first {
-            // Switch to the first available account
+        if let nextAccount {
             await switchAccount(userId: nextAccount.userId)
-        } else {
-            // No other accounts, fully log out
-            apiClient.updateSessionToken(nil)
+            return
+        }
 
-            isAuthenticated = false
-            currentOrg = nil
-            organizations = []
-            errorMessage = nil
-            deviceAuthCode = nil
-            deviceAuthLoginURL = nil
+        // No other accounts, fully log out
+        apiClient.updateSessionToken(nil)
+
+        isAuthenticated = false
+        currentUser = nil
+        currentOrg = nil
+        organizations = []
+        serverInfo = nil
+        errorMessage = nil
+        isServerDown = false
+        sessionExpired = false
+        deviceAuthCode = nil
+        deviceAuthLoginURL = nil
+    }
+
+    /// Best-effort logout call for a removed account. Uses its own client so the
+    /// shared one's token and 401 handling are unaffected; failures are ignored.
+    private func signOutOnServerInBackground(hostname: String, token: String) {
+        let client = APIClient(baseURL: hostname, sessionToken: token)
+        Task {
+            try? await client.logout()
         }
     }
 }

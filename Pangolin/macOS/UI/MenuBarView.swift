@@ -312,7 +312,7 @@ struct MenuBarView: View {
     private var isToggleDisabled: Bool {
         if activity.pendingTunnelOn != nil || activity.isSwitching { return true }
         // A locked account can still turn the tunnel off, but not on.
-        if authManager.sessionExpired && !isTunnelOn { return true }
+        if activeAccountNeedsLogin && !isTunnelOn { return true }
         // WireGuard keeps the control enabled when on-demand rules exist.
         if tunnelManager.hasOnDemandRules { return false }
         return tunnelManager.status == .starting && !tunnelManager.isNEConnected
@@ -443,15 +443,20 @@ struct MenuBarView: View {
         .disabled(isToggleDisabled)
     }
 
+    /// The active account has to log in again: its session expired or none is saved.
+    private var activeAccountNeedsLogin: Bool {
+        guard let account = accountManager.activeAccount else { return false }
+        return authManager.sessionExpired || !authManager.hasSession(userId: account.userId)
+    }
+
     @ViewBuilder
     private var tunnelNotices: some View {
-        if authManager.sessionExpired {
+        if activeAccountNeedsLogin {
             MenuLabel(
                 text: "Your session expired. Log in again to connect.",
                 systemImage: "lock.fill")
             MenuItem(title: "Log In…") {
-                authManager.startDeviceAuthImmediately = true
-                openLoginWindow()
+                openLoginWindow(renewing: accountManager.activeAccount?.hostname)
             }
             .disabled(authManager.isDeviceAuthInProgress)
         } else if let message = tunnelManager.connectionErrorMessage {
@@ -491,8 +496,8 @@ struct MenuBarView: View {
                 text: "The server appears to be down.",
                 systemImage: "exclamationmark.triangle.fill", tint: .orange)
             MenuSeparator()
-        } else if let errorMessage = authManager.errorMessage, !authManager.sessionExpired {
-            // Session-expired errors are covered by the tunnel notices.
+        } else if let errorMessage = authManager.errorMessage, !activeAccountNeedsLogin {
+            // Errors about logging in again are covered by the tunnel notices.
             MenuLabel(text: errorMessage, systemImage: "exclamationmark.triangle.fill", tint: .orange)
             MenuSeparator()
         }
@@ -529,7 +534,8 @@ struct MenuBarView: View {
                     accountManager: accountManager,
                     tunnelManager: tunnelManager,
                     activity: activity,
-                    addAccount: openLoginWindow,
+                    addAccount: { openLoginWindow() },
+                    manageAccounts: { openPreferencesWindow(section: .accounts) },
                     logOut: {
                         dismissMenu()
                         activity.logOut()
@@ -682,22 +688,11 @@ struct MenuBarView: View {
         NSWorkspace.shared.open(url)
     }
 
-    private func openLoginWindow() {
-        presentWindow(
-            id: "main",
-            matches: { $0.identifier?.rawValue == "main" || $0.title == "Pangolin" },
-            configure: { window in
-                window.identifier = NSUserInterfaceItemIdentifier("main")
-
-                // Only a close button: no minimize, zoom, or resizing
-                var styleMask = window.styleMask
-                styleMask.remove([.miniaturizable, .resizable])
-                styleMask.insert([.titled, .closable])
-                window.styleMask = styleMask
-                window.standardWindowButton(.miniaturizeButton)?.isHidden = true
-                window.standardWindowButton(.zoomButton)?.isHidden = true
-                window.standardWindowButton(.closeButton)?.isHidden = false
-            })
+    /// Opens Preferences on Accounts with the login sheet. `renewing` logs in to
+    /// that server right away, for a locked account.
+    private func openLoginWindow(renewing hostname: String? = nil) {
+        PreferencesNavigation.shared.requestedLogin = AccountLoginRequest(hostname: hostname)
+        openPreferencesWindow(section: .accounts)
     }
 
     private func openPreferencesWindow(section: PreferencesSection? = nil) {
@@ -811,6 +806,7 @@ struct AccountsSubmenu: View {
     @ObservedObject var tunnelManager: TunnelManager
     @ObservedObject var activity: MenuBarActivity
     let addAccount: () -> Void
+    let manageAccounts: () -> Void
     let logOut: () -> Void
 
     /// Sorted so the list doesn't reshuffle between openings.
@@ -846,6 +842,10 @@ struct AccountsSubmenu: View {
             addAccount()
         }
         .disabled(activity.isSwitching)
+
+        MenuItem(title: "Manage Accounts…", showsCheckColumn: true) {
+            manageAccounts()
+        }
 
         if accountManager.activeAccount != nil {
             MenuItem(title: "Log Out", showsCheckColumn: true, isLoading: activity.isLoggingOut) {

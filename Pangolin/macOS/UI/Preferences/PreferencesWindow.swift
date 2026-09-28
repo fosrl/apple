@@ -4,6 +4,8 @@ import AppKit
 struct PreferencesWindow: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var authManager: AuthManager
     @State private var selectedSection: PreferencesSection = .preferences
     
     var body: some View {
@@ -15,7 +17,9 @@ struct PreferencesWindow: View {
             PreferencesDetailView(
                 selectedSection: selectedSection,
                 configManager: configManager,
-                tunnelManager: tunnelManager
+                tunnelManager: tunnelManager,
+                accountManager: accountManager,
+                authManager: authManager
             )
         }
         .frame(minWidth: 600, minHeight: 400)
@@ -95,7 +99,7 @@ struct PreferencesWindow: View {
         // Hide app from dock when window closes (if no other windows)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             let hasOtherWindows = NSApplication.shared.windows.contains { window in
-                window.isVisible && (window.identifier?.rawValue == "main" || window.identifier?.rawValue == "preferences")
+                window.isVisible && window.identifier?.rawValue == "preferences"
             }
             if !hasOtherWindows {
                 guard NSApp.activationPolicy() != .accessory else { return }
@@ -206,6 +210,8 @@ struct PreferencesDetailView: View {
     let selectedSection: PreferencesSection
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
+    let accountManager: AccountManager
+    let authManager: AuthManager
     
     var body: some View {
         // Content
@@ -214,6 +220,12 @@ struct PreferencesDetailView: View {
             case .preferences:
                 PreferencesContentView(
                     configManager: configManager,
+                    tunnelManager: tunnelManager
+                )
+            case .accounts:
+                AccountsContentView(
+                    accountManager: accountManager,
+                    authManager: authManager,
                     tunnelManager: tunnelManager
                 )
             case .olmStatus:
