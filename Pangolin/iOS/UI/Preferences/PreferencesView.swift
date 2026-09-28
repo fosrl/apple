@@ -140,7 +140,7 @@ struct PreferencesView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Exit Node Takes Precedence Over Resources")
                                 .font(.body)
-                            Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources. Exit node (gateway) routes are unaffected.")
+                            Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
