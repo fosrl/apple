@@ -714,6 +714,11 @@ class TunnelManager: NSObject, ObservableObject {
         if let gateway = await resolveSavedExitNode(orgId: currentOrg.orgId) {
             tunnelOptions["gatewaySiteResourceId"] = NSNumber(value: gateway.siteResourceId)
             tunnelOptions["gatewaySiteIds"] = gateway.siteIds.map { NSNumber(value: $0) } as NSArray
+            // Seed the live value now, since we already know what olm will be told to
+            // establish. Otherwise activeExitNodeId reads it as nil (isNEConnected flips
+            // true, via the system VPN state or the polling loop, before the first socket
+            // poll confirms the gateway) and the exit node picker flashes "None" on connect.
+            await MainActor.run { self.olmGatewayResourceId = gateway.siteResourceId }
         }
 
         tunnelOptions["mtu"] = NSNumber(value: configManager.getTunnelMTU())
