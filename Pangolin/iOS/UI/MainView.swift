@@ -42,7 +42,10 @@ struct MainView: View {
             }
             .tag(TabSelection.home)
             
-            StatusView(olmStatusManager: tunnelManager.olmStatusManager)
+            StatusView(
+                olmStatusManager: tunnelManager.olmStatusManager,
+                exitNodes: tunnelManager.availableExitNodes
+            )
                 .tabItem {
                     Label("Status", systemImage: "app.connected.to.app.below.fill")
                 }
@@ -865,7 +868,7 @@ struct ExitNodePickerView: View {
                         .disabled(shouldDisableButtons || tunnelManager.activeExitNodeId == node.siteResourceId)
                     }
                 } header: {
-                    Text("Route all traffic through")
+                    Text("Route All Traffic Through")
                 }
             }
             .navigationTitle("Exit Node")

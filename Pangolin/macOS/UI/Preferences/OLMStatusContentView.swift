@@ -8,6 +8,8 @@ enum DisplayMode: String, CaseIterable {
 
 struct OLMStatusContentView: View {
     @ObservedObject var olmStatusManager: OLMStatusManager
+    /// The org's exit nodes, used to name the active one.
+    let exitNodes: [SiteResource]
     @AppStorage("net.pangolin.Pangolin.statusDisplayMode") private var displayMode: DisplayMode = .formatted
     @State private var showCopyConfirmation = false
     @State private var selectedSiteID: String?
@@ -172,13 +174,15 @@ struct OLMStatusContentView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    HStack {
-                        Text("Exit Node")
-                            .font(.system(size: 13))
-                        Spacer()
-                        Text(status.gatewayLabel)
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
+                    if status.gatewayActive == true {
+                        HStack {
+                            Text("Exit Node")
+                                .font(.system(size: 13))
+                            Spacer()
+                            Text(status.gatewayLabel(exitNodes: exitNodes))
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             } header: {

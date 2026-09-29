@@ -95,15 +95,7 @@ struct MenuItem: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 if showsCheckColumn {
-                    ZStack {
-                        if isLoading {
-                            ProgressView().controlSize(.mini)
-                        } else if isChecked {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                    }
-                    .frame(width: MenuMetrics.checkColumnWidth)
+                    MenuCheckColumn(isChecked: isChecked, isLoading: isLoading)
                 }
 
                 Text(title)
@@ -121,11 +113,31 @@ struct MenuItem: View {
     }
 }
 
+/// The leading gutter of a checkable row: a checkmark, a spinner, or nothing.
+struct MenuCheckColumn: View {
+    var isChecked = false
+    var isLoading = false
+
+    var body: some View {
+        ZStack {
+            if isLoading {
+                ProgressView().controlSize(.mini)
+            } else if isChecked {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+        }
+        .frame(width: MenuMetrics.checkColumnWidth)
+    }
+}
+
 /// A row that opens `content` in a panel beside the menu, like an NSMenu
-/// submenu. Hovering opens it after a short delay; clicking opens it at once.
+/// submenu. Hovering opens it after a short delay; clicking opens it at once,
+/// or runs `action` instead when the row is also a selectable item.
 struct MenuSubmenuItem<Label: View, Content: View>: View {
     let id: String
     @ObservedObject var controller: MenuSubmenuController
+    let action: (() -> Void)?
     let content: () -> Content
     let label: () -> Label
 
@@ -134,11 +146,13 @@ struct MenuSubmenuItem<Label: View, Content: View>: View {
     init(
         id: String,
         controller: MenuSubmenuController,
+        action: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder label: @escaping () -> Label
     ) {
         self.id = id
         self.controller = controller
+        self.action = action
         self.content = content
         self.label = label
     }
@@ -147,7 +161,11 @@ struct MenuSubmenuItem<Label: View, Content: View>: View {
 
     var body: some View {
         Button {
-            open(delay: 0)
+            if let action {
+                action()
+            } else {
+                open(delay: 0)
+            }
         } label: {
             HStack(spacing: 5) {
                 label()

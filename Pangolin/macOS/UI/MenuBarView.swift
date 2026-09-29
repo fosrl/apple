@@ -571,6 +571,7 @@ struct MenuBarView: View {
                 activity: activity)
         }
         if showsExitNodeRow {
+            MenuSectionHeader(title: "Exit Node")
             exitNodeRow
         }
     }
@@ -589,13 +590,13 @@ struct MenuBarView: View {
 
     private var exitNodeTitle: String {
         guard let activeId = tunnelManager.activeExitNodeId else {
-            return "Exit Node: None"
+            return "None"
         }
         // The name list may not have loaded yet even though the selection itself is
         // already known - show a placeholder rather than "None" so an active exit
         // node never reads as off while its name is still loading.
         let name = tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })?.name
-        return "Exit Node: \(name ?? "…")"
+        return name ?? "…"
     }
 
     private var exitNodeRow: some View {
@@ -604,7 +605,7 @@ struct MenuBarView: View {
             title: exitNodeTitle,
             controller: submenus
         ) {
-            ExitNodeSubmenu(tunnelManager: tunnelManager)
+            ExitNodeSubmenu(tunnelManager: tunnelManager, controller: submenus.child)
         }
     }
 
@@ -930,6 +931,8 @@ struct OrganizationsSubmenu: View {
 /// org has no exit nodes.
 struct ExitNodeSubmenu: View {
     @ObservedObject var tunnelManager: TunnelManager
+    /// Opens each exit node's list of sites.
+    let controller: MenuSubmenuController
 
     private var exitNodes: [SiteResource] {
         tunnelManager.availableExitNodes
@@ -945,7 +948,7 @@ struct ExitNodeSubmenu: View {
     }
 
     var body: some View {
-        MenuSectionHeader(title: "Route all traffic through", inset: true)
+        MenuSectionHeader(title: "Route All Traffic Through", inset: true)
 
         MenuItem(
             title: "None",
@@ -959,16 +962,40 @@ struct ExitNodeSubmenu: View {
         .disabled(isDisabled)
 
         ForEach(exitNodes) { node in
-            MenuItem(
-                title: node.name,
-                showsCheckColumn: true,
-                isChecked: tunnelManager.activeExitNodeId == node.siteResourceId
-            ) {
+            let isChecked = tunnelManager.activeExitNodeId == node.siteResourceId
+            let select: () -> Void = {
                 Task {
                     await tunnelManager.selectExitNode(node)
                 }
             }
-            .disabled(isDisabled)
+            if let siteNames = node.siteNames, !siteNames.isEmpty {
+                // Clicking selects the exit node; hovering lists its sites.
+                MenuSubmenuItem(id: "exitNode:\(node.siteResourceId)", controller: controller, action: select) {
+                    ExitNodeSitesSubmenu(siteNames: siteNames)
+                } label: {
+                    HStack(spacing: 5) {
+                        MenuCheckColumn(isChecked: isChecked)
+                        Text(node.name)
+                            .truncationMode(.middle)
+                    }
+                }
+                .disabled(isDisabled)
+            } else {
+                MenuItem(title: node.name, showsCheckColumn: true, isChecked: isChecked, action: select)
+                    .disabled(isDisabled)
+            }
+        }
+    }
+}
+
+/// The sites an exit node routes traffic through.
+struct ExitNodeSitesSubmenu: View {
+    let siteNames: [String]
+
+    var body: some View {
+        MenuSectionHeader(title: siteNames.count == 1 ? "1 Site" : "\(siteNames.count) Sites")
+        ForEach(Array(siteNames.enumerated()), id: \.offset) { _, name in
+            MenuLabel(text: name)
         }
     }
 }

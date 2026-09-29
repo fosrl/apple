@@ -229,7 +229,10 @@ struct PreferencesDetailView: View {
                     tunnelManager: tunnelManager
                 )
             case .olmStatus:
-                OLMStatusContentView(olmStatusManager: tunnelManager.olmStatusManager)
+                OLMStatusContentView(
+                    olmStatusManager: tunnelManager.olmStatusManager,
+                    exitNodes: tunnelManager.availableExitNodes
+                )
             case .about:
                 AboutContentView()
             }
