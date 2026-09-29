@@ -243,6 +243,7 @@ class TunnelManager: NSObject, ObservableObject {
             isOnDemandEnabled = false
             hasOnDemandRules = false
             stopSocketPolling()
+            resetLiveGatewayState()
             return
         }
 
@@ -262,12 +263,16 @@ class TunnelManager: NSObject, ObservableObject {
                 status = .disconnected
                 isNEConnected = false
                 stopSocketPolling()
+                resetLiveGatewayState()
             }
         case .connecting:
             // Extension is starting, transition to registering
             status = .registering
             isNEConnected = true  // Extension is running, show disconnect button
             stopSocketPolling()
+            // Must happen in the same main-actor turn as isNEConnected flipping true, or
+            // activeExitNodeId would briefly read the previous session's gateway.
+            resetLiveGatewayState()
         case .connected:
             // Extension is connected, start polling socket
             isNEConnected = true
@@ -287,11 +292,13 @@ class TunnelManager: NSObject, ObservableObject {
             status = .disconnected
             isNEConnected = false
             stopSocketPolling()
+            resetLiveGatewayState()
         default:
             // For any other status, show disconnected
             status = .disconnected
             isNEConnected = false
             stopSocketPolling()
+            resetLiveGatewayState()
         }
 
         os_log(
@@ -1361,6 +1368,18 @@ class TunnelManager: NSObject, ObservableObject {
         default:
             return false
         }
+    }
+
+    /// Forgets what olm last reported about the gateway, so a new connection starts from the
+    /// saved choice instead of the previous session's live value. Without this,
+    /// `hasOlmGatewayStatus` stays true across a disconnect and, as soon as `isNEConnected`
+    /// flips true on the next connect (before the first poll), `activeExitNodeId` returns the
+    /// stale `olmGatewayResourceId` - flashing the previously used exit node (or "None").
+    @MainActor
+    private func resetLiveGatewayState() {
+        gatewayUpdateGeneration += 1
+        hasOlmGatewayStatus = false
+        olmGatewayResourceId = nil
     }
 
     private func stopSocketPolling() {
