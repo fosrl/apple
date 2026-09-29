@@ -2,9 +2,10 @@ import SwiftUI
 
 struct DNSServerModalView: View {
     let title: String
-    @Binding var dnsServer: String
-    @Binding var isPresented: Bool
+    let initialValue: String
     let onSave: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
     @State private var editedValue: String
     @State private var showValidationError = false
     @FocusState private var isTextFieldFocused: Bool
@@ -12,75 +13,69 @@ struct DNSServerModalView: View {
     private var trimmedValue: String {
         editedValue.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
-    init(title: String, dnsServer: Binding<String>, isPresented: Binding<Bool>, onSave: @escaping (String) -> Void) {
+
+    init(title: String, initialValue: String, onSave: @escaping (String) -> Void) {
         self.title = title
-        self._dnsServer = dnsServer
-        self._isPresented = isPresented
+        self.initialValue = initialValue
         self.onSave = onSave
-        self._editedValue = State(initialValue: dnsServer.wrappedValue)
+        self._editedValue = State(initialValue: initialValue)
     }
-    
+
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("DNS Server", text: $editedValue)
-                        .autocorrectionDisabled()
-                        .autocapitalization(.none)
-                        .keyboardType(.numbersAndPunctuation)
-                        .focused($isTextFieldFocused)
-                } footer: {
-                    if showValidationError && !trimmedValue.isEmpty && !IPAddressValidator.isValid(trimmedValue) {
-                        Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
-                            .font(.caption)
-                            .foregroundColor(.red)
+        Form {
+            Section {
+                TextField("DNS Server", text: $editedValue)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.numbersAndPunctuation)
+                    .focused($isTextFieldFocused)
+            } footer: {
+                if showValidationError && !trimmedValue.isEmpty && !IPAddressValidator.isValid(trimmedValue) {
+                    Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                } else {
+                    Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
+                        .font(.caption)
+                }
+            }
+            .onChange(of: editedValue) { _, _ in showValidationError = false }
+
+            Section {
+                Button {
+                    editedValue = "1.1.1.1"
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("Use Default")
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    if IPAddressValidator.isValid(trimmedValue) {
+                        onSave(trimmedValue.isEmpty ? "" : trimmedValue)
+                        dismiss()
                     } else {
-                        Text("Enter an IP address for the DNS server (e.g., 1.1.1.1)")
-                            .font(.caption)
+                        showValidationError = true
                     }
                 }
-                .onChange(of: editedValue) { _ in showValidationError = false }
-                
-                Section {
-                    Button(action: {
-                        editedValue = "1.1.1.1"
-                    }) {
-                        HStack {
-                            Spacer()
-                            Text("Use Default")
-                            Spacer()
-                        }
-                    }
-                }
+                .fontWeight(.semibold)
             }
-            .navigationTitle("DNS Server")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        if IPAddressValidator.isValid(trimmedValue) {
-                            let value = trimmedValue.isEmpty ? "" : trimmedValue
-                            onSave(value)
-                            isPresented = false
-                        } else {
-                            showValidationError = true
-                        }
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
-            .onAppear {
-                // Focus text field when modal appears
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isTextFieldFocused = true
-                }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isTextFieldFocused = true
             }
         }
     }

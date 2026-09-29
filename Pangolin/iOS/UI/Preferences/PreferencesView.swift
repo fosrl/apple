@@ -2,29 +2,29 @@ import SwiftUI
 
 struct PreferencesView: View {
     @ObservedObject var configManager: ConfigManager
-    @State private var showPrimaryDNSModal = false
-    @State private var showSecondaryDNSModal = false
-    @State private var showMTUModal = false
-    @State private var editingPrimaryDNS = ""
-    @State private var editingSecondaryDNS = ""
-    @State private var editingMTU = ""
-    
+    @ObservedObject var tunnelManager: TunnelManager
+    @AppStorage(VPNLiveActivityManager.enabledDefaultsKey) private var liveActivityEnabled = true
+
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
     }
-    
+
     private var dnsTunnelEnabled: Bool {
         configManager.getDNSTunnelEnabled()
     }
-    
+
+    private var exitNodeTakesPrecedence: Bool {
+        configManager.getExitNodeTakesPrecedence()
+    }
+
     private var primaryDNSServer: String {
         configManager.getPrimaryDNSServer()
     }
-    
+
     private var secondaryDNSServer: String {
         configManager.getSecondaryDNSServer()
     }
-    
+
     private var displaySecondaryDNS: String {
         secondaryDNSServer.isEmpty ? "Not set" : secondaryDNSServer
     }
@@ -32,98 +32,130 @@ struct PreferencesView: View {
     private var tunnelMTUDisplay: String {
         String(configManager.getTunnelMTU())
     }
-    
+
     private static let docsConfigureClientURL = URL(string: "https://docs.pangolin.net/manage/clients/configure-client")!
 
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Help")) {
-                    Link(destination: Self.docsConfigureClientURL) {
-                        HStack {
-                            Text("See docs for more info on these settings")
-                            Spacer()
-                            Image(systemName: "arrow.up.forward")
-                                .foregroundColor(.secondary)
+                Section(header: Text("General")) {
+                    Toggle(isOn: $liveActivityEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Dynamic Island & Live Activity")
+                                .font(.body)
+                            Text("Show connection status in the Dynamic Island and on the Lock Screen.")
                                 .font(.caption)
+                                .foregroundColor(.secondary)
                         }
+                    }
+                    .tint(.accentColor)
+                    .onChange(of: liveActivityEnabled) { _, _ in
+                        VPNLiveActivityManager.shared.applyEnabledPreference()
                     }
                 }
 
+                OnDemandActivationSection(
+                    configManager: configManager,
+                    tunnelManager: tunnelManager
+                )
+
                 Section(header: Text("DNS Settings")) {
-                Toggle(isOn: Binding(
-                    get: { dnsOverrideEnabled },
-                    set: { newValue in
-                        _ = configManager.setDNSOverrideEnabled(newValue)
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Enable Aliases (DNS Override)")
-                            .font(.body)
-                        Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a Pangolin resource will be forwarded to your configured Upstream DNS Server.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .tint(.accentColor)
-                
-                Toggle(isOn: Binding(
-                    get: { dnsTunnelEnabled },
-                    set: { newValue in
-                        _ = configManager.setDNSTunnelEnabled(newValue)
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("DNS Over Tunnel")
-                            .font(.body)
-                        Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a Pangolin resource and enter its address as an Upstream DNS Server.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .tint(.accentColor)
-                .disabled(!dnsOverrideEnabled)
-                
-                if dnsOverrideEnabled {
-                    Button(action: {
-                        editingPrimaryDNS = primaryDNSServer
-                        showPrimaryDNSModal = true
-                    }) {
-                        HStack {
-                            Text("Primary Upstream DNS Server")
-                            Spacer()
-                            Text(primaryDNSServer)
-                                .foregroundColor(.secondary)
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
+                    Toggle(isOn: Binding(
+                        get: { dnsOverrideEnabled },
+                        set: { newValue in
+                            _ = configManager.setDNSOverrideEnabled(newValue)
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable Aliases (DNS Override)")
+                                .font(.body)
+                            Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a Pangolin resource will be forwarded to your configured Upstream DNS Server.")
                                 .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
-                    .buttonStyle(.plain)
-                    
-                    Button(action: {
-                        editingSecondaryDNS = secondaryDNSServer
-                        showSecondaryDNSModal = true
-                    }) {
-                        HStack {
-                            Text("Secondary Upstream DNS Server")
-                            Spacer()
-                            Text(displaySecondaryDNS)
-                                .foregroundColor(.secondary)
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
+                    .tint(.accentColor)
+
+                    Toggle(isOn: Binding(
+                        get: { dnsTunnelEnabled },
+                        set: { newValue in
+                            _ = configManager.setDNSTunnelEnabled(newValue)
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("DNS Over Tunnel")
+                                .font(.body)
+                            Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a Pangolin resource and enter its address as an Upstream DNS Server.")
                                 .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
-                    .buttonStyle(.plain)
-                }
+                    .tint(.accentColor)
+                    .disabled(!dnsOverrideEnabled)
+
+                    if dnsOverrideEnabled {
+                        NavigationLink {
+                            DNSServerModalView(
+                                title: "Primary Upstream DNS Server",
+                                initialValue: primaryDNSServer,
+                                onSave: { newValue in
+                                    _ = configManager.setPrimaryDNSServer(newValue)
+                                }
+                            )
+                        } label: {
+                            HStack {
+                                Text("Primary Upstream DNS Server")
+                                Spacer()
+                                Text(primaryDNSServer)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        NavigationLink {
+                            DNSServerModalView(
+                                title: "Secondary Upstream DNS Server",
+                                initialValue: secondaryDNSServer,
+                                onSave: { newValue in
+                                    _ = configManager.setSecondaryDNSServer(newValue)
+                                }
+                            )
+                        } label: {
+                            HStack {
+                                Text("Secondary Upstream DNS Server")
+                                Spacer()
+                                Text(displaySecondaryDNS)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 }
 
                 Section(header: Text("Advanced")) {
-                    Button(action: {
-                        editingMTU = tunnelMTUDisplay
-                        showMTUModal = true
-                    }) {
+                    Toggle(isOn: Binding(
+                        get: { exitNodeTakesPrecedence },
+                        set: { newValue in
+                            _ = configManager.setExitNodeTakesPrecedence(newValue)
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Exit Node Takes Precedence Over Resources")
+                                .font(.body)
+                            Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .tint(.accentColor)
+
+                    NavigationLink {
+                        MTUModalView(
+                            title: "MTU",
+                            initialValue: tunnelMTUDisplay,
+                            onSave: { newValue in
+                                _ = configManager.setTunnelMTUFromString(newValue)
+                            }
+                        )
+                    } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("MTU")
@@ -135,46 +167,24 @@ struct PreferencesView: View {
                             Spacer()
                             Text(tunnelMTUDisplay)
                                 .foregroundColor(.secondary)
-                            Image(systemName: "chevron.right")
+                        }
+                    }
+                }
+
+                Section(header: Text("Help")) {
+                    Link(destination: Self.docsConfigureClientURL) {
+                        HStack {
+                            Text("See docs for more info on these settings")
+                            Spacer()
+                            Image(systemName: "arrow.up.forward")
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .navigationTitle("Preferences")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showPrimaryDNSModal) {
-                DNSServerModalView(
-                    title: "Primary Upstream DNS Server",
-                    dnsServer: $editingPrimaryDNS,
-                    isPresented: $showPrimaryDNSModal,
-                    onSave: { newValue in
-                        _ = configManager.setPrimaryDNSServer(newValue)
-                    }
-                )
-            }
-            .sheet(isPresented: $showSecondaryDNSModal) {
-                DNSServerModalView(
-                    title: "Secondary Upstream DNS Server",
-                    dnsServer: $editingSecondaryDNS,
-                    isPresented: $showSecondaryDNSModal,
-                    onSave: { newValue in
-                        _ = configManager.setSecondaryDNSServer(newValue)
-                    }
-                )
-            }
-            .sheet(isPresented: $showMTUModal) {
-                MTUModalView(
-                    title: "MTU",
-                    mtuValue: $editingMTU,
-                    isPresented: $showMTUModal,
-                    onSave: { newValue in
-                        _ = configManager.setTunnelMTUFromString(newValue)
-                    }
-                )
-            }
         }
     }
 }

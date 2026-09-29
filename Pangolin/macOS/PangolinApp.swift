@@ -1,6 +1,8 @@
+import AppIntents
 import AppKit
 import Sparkle
 import SwiftUI
+import UserNotifications
 import os.log
 
 #if os(macOS)
@@ -33,6 +35,82 @@ struct MenuBarIconView: View {
     }
 }
 
+/// Status item label. It lives for the whole session, unlike the `.window`
+/// style panel content, which isn't built until the first click, so launch
+/// work hangs off this view.
+struct MenuBarLabel: View {
+    let authManager: AuthManager
+    @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var onboardingViewModel: MacOnboardingViewModel
+    @Environment(\.openWindow) private var openWindow
+    @State private var contextMenu: StatusItemContextMenu?
+
+    var body: some View {
+        MenuBarIconView(tunnelManager: tunnelManager)
+            .onAppear {
+                if contextMenu == nil {
+                    let menu = StatusItemContextMenu(tunnelManager: tunnelManager)
+                    menu.install()
+                    contextMenu = menu
+                }
+
+
+                // Menu-bar-only unless onboarding or a restored window is open.
+                // Window restoration runs first and bails out while the policy is still
+                // .regular, so this check has to notice those windows or the Dock icon
+                // disappears out from under them.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    guard !onboardingViewModel.isPresenting else { return }
+                    guard !Self.hasVisibleAppWindow() else { return }
+                    guard NSApp.activationPolicy() != .accessory else { return }
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+            .task {
+                await authManager.initialize()
+                await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+            }
+            .task {
+                await onboardingViewModel.refreshPages()
+                if onboardingViewModel.isPresenting, !onboardingViewModel.hasOpenedOnboardingWindowThisSession {
+                    onboardingViewModel.hasOpenedOnboardingWindowThisSession = true
+                    openWindow(id: "onboarding")
+                    NSApp.setActivationPolicy(.regular)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        NSApp.windows.first { $0.title == "Pangolin Setup" }?.makeKeyAndOrderFront(nil)
+                    }
+                }
+            }
+            .onChange(of: onboardingViewModel.isPresenting) { _, newValue in
+                if !newValue {
+                    onboardingViewModel.hasOpenedOnboardingWindowThisSession = false
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                Task {
+                    await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+                }
+            }
+    }
+
+    /// Login, preferences, and onboarding windows that should keep the app in the Dock.
+    private static func hasVisibleAppWindow() -> Bool {
+        let knownIds: Set<String> = ["preferences", "onboarding"]
+        var knownTitles: Set<String> = ["Pangolin Setup"]
+        knownTitles.formUnion(PreferencesSection.allCases.map(\.rawValue))
+
+        return NSApp.windows.contains { window in
+            let isShown = window.isVisible || window.isMiniaturized
+            guard isShown else { return false }
+            if let id = window.identifier?.rawValue, knownIds.contains(id) {
+                return true
+            }
+            return knownTitles.contains(window.title)
+        }
+    }
+}
+
 struct AnimatedLoadingIcon: View {
     @State private var currentFrame = 1
 
@@ -50,8 +128,23 @@ struct AnimatedLoadingIcon: View {
     }
 }
 
+final class PangolinAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        UNUserNotificationCenter.current().delegate = self
+        PangolinAppShortcuts.updateAppShortcutParameters()
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+}
+
 @main
 struct PangolinApp: App {
+    @NSApplicationDelegateAdaptor(PangolinAppDelegate.self) private var appDelegate
     @StateObject private var configManager = ConfigManager()
     @StateObject private var secretManager = SecretManager()
     @StateObject private var accountManager = AccountManager()
@@ -104,6 +197,9 @@ struct PangolinApp: App {
 
         // Set tunnel manager reference in auth manager for org switching
         authMgr.tunnelManager = tunnelMgr
+
+        AppDependencies.shared.configure(
+            tunnelManager: tunnelMgr, authManager: authMgr, accountManager: accountMgr)
 
         let onboardingState = OnboardingStateManager()
         let onboardingVM = MacOnboardingViewModel(
@@ -177,47 +273,14 @@ struct PangolinApp: App {
                 updater: updaterController.updater,
                 onboardingViewModel: onboardingViewModel
             )
-            .onAppear {
-                // Set activation policy to accessory (menu bar only) when not showing onboarding
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    guard !onboardingViewModel.isPresenting, NSApp.activationPolicy() != .accessory else { return }
-                    NSApp.setActivationPolicy(.accessory)
-                }
-
-                Task {
-                    await authManager.initialize()
-                }
-            }
         } label: {
-            MenuBarIconView(tunnelManager: tunnelManager)
-        }
-
-        // Main Window (Login)
-        WindowGroup("Pangolin", id: "main") {
-            LoginView(
+            MenuBarLabel(
                 authManager: authManager,
-                accountManager: accountManager,
-                configManager: configManager,
-                apiClient: apiClient
+                tunnelManager: tunnelManager,
+                onboardingViewModel: onboardingViewModel
             )
-            .handlesExternalEvents(preferring: ["main"], allowing: ["main"])
-            .onAppear {
-                // Ensure window has correct identifier
-                DispatchQueue.main.async {
-                    if let window = NSApplication.shared.windows.first(where: {
-                        $0.title == "Pangolin"
-                    }) {
-                        window.identifier = NSUserInterfaceItemIdentifier("main")
-                    }
-                }
-            }
         }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 440, height: 300)
-        .windowResizability(.contentSize)
-        .commands {
-            CommandGroup(replacing: .newItem) {}
-        }
+        .menuBarExtraStyle(.window)
 
         // Onboarding Window
         WindowGroup("Pangolin Setup", id: "onboarding") {
@@ -232,24 +295,24 @@ struct PangolinApp: App {
         WindowGroup("Preferences", id: "preferences") {
             PreferencesWindow(
                 configManager: configManager,
-                tunnelManager: tunnelManager
+                tunnelManager: tunnelManager,
+                accountManager: accountManager,
+                authManager: authManager
             )
             .handlesExternalEvents(preferring: ["preferences"], allowing: ["preferences"])
         }
         .defaultSize(width: 800, height: 600)
         .windowResizability(.contentSize)
         .commands {
-            // Hide all menu bar items for preferences window
+            // Drop unused app and window commands. Leave the Edit menu intact:
+            // Select All, cut, copy, paste, and undo are menu commands, and
+            // removing them disables those shortcuts in every text field.
             CommandGroup(replacing: .appInfo) {}
             CommandGroup(replacing: .appSettings) {}
             CommandGroup(replacing: .appTermination) {}
             CommandGroup(replacing: .newItem) {}
-            CommandGroup(replacing: .pasteboard) {}
             CommandGroup(replacing: .sidebar) {}
-            CommandGroup(replacing: .textEditing) {}
-            CommandGroup(replacing: .textFormatting) {}
             CommandGroup(replacing: .toolbar) {}
-            CommandGroup(replacing: .undoRedo) {}
         }
     }
 }

@@ -5,6 +5,7 @@ import Combine
 import UIKit
 #elseif os(macOS)
 import AppKit
+import UserNotifications
 #endif
 
 @MainActor
@@ -68,5 +69,46 @@ class AlertManager: ObservableObject {
         
         showAlertDialog(title: title, message: message)
     }
+
+    #if os(macOS)
+    /// Posts a banner for a failed connection. Falls back to a modal alert when
+    /// notifications are denied or the request cannot be delivered.
+    func showConnectionErrorNotification(title: String, message: String) async {
+        let center = UNUserNotificationCenter.current()
+        let authorized: Bool
+        switch await center.notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            authorized = true
+        case .notDetermined:
+            authorized = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        case .denied:
+            authorized = false
+        @unknown default:
+            authorized = false
+        }
+
+        guard authorized else {
+            showAlertDialog(title: title, message: message)
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = message
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "connection-error",
+            content: content,
+            trigger: nil
+        )
+
+        do {
+            try await center.add(request)
+        } catch {
+            showAlertDialog(title: title, message: message)
+        }
+    }
+    #endif
 }
 

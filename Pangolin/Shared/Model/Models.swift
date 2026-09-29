@@ -13,12 +13,30 @@ struct Config: Codable {
     /// any pattern are sent directly to the host's system DNS servers instead. Nil/empty means
     /// match every domain (the feature is disabled).
     var matchDomains: [String]?
+    /// When enabled, routes for individual resources are not added to the routing table and
+    /// their aliases are not resolved, so all traffic is sent through the exit node instead of
+    /// directly to resources. Exit node (gateway) routes are unaffected. Matches olm's
+    /// TunnelConfig.DisableRoutesAndAliasesOnExitNode.
+    var exitNodeTakesPrecedence: Bool?
     /// When set, overrides Sparkle's automatic update check preference.
     var autoUpdateChecksEnabled: Bool?
     /// When set, overrides Sparkle's automatic download/install preference.
     var autoDownloadUpdatesEnabled: Bool?
     /// When set, overrides Sparkle's scheduled check interval (seconds; minimum 3600).
     var updateCheckIntervalSeconds: Int?
+
+    /// Overrides the cookie name the session token is sent and read under. Nil/empty means use
+    /// the API client's built-in default ("p_session_token"). Matches Windows' sessionCookieName.
+    var sessionCookieName: String?
+
+    /// On-demand: connect on cellular (iOS) or ethernet (macOS).
+    var onDemandNonWiFiEnabled: Bool?
+    /// On-demand: connect on Wi-Fi.
+    var onDemandWiFiEnabled: Bool?
+    /// On-demand SSID filter mode when Wi-Fi is enabled.
+    var onDemandSSIDOption: OnDemandSSIDOptionKind?
+    /// SSIDs for only/except modes.
+    var onDemandSSIDs: [String]?
 
     enum CodingKeys: String, CodingKey {
         case dnsOverrideEnabled
@@ -27,9 +45,15 @@ struct Config: Codable {
         case secondaryDNSServer
         case tunnelMTU
         case matchDomains = "dnsMatchDomains"
+        case exitNodeTakesPrecedence
         case autoUpdateChecksEnabled
         case autoDownloadUpdatesEnabled
         case updateCheckIntervalSeconds
+        case onDemandNonWiFiEnabled
+        case onDemandWiFiEnabled
+        case onDemandSSIDOption
+        case onDemandSSIDs
+        case sessionCookieName
     }
 }
 
@@ -44,6 +68,12 @@ struct Account: Identifiable, Codable, Hashable {
     var orgId: String
     var username: String?
     var name: String?
+    /// The exit node (a gateway-mode site resource) selected for this account, re-applied on
+    /// the next connect. It can differ per account, so it's stored here rather than on the root
+    /// config, and it belongs to the account's currently selected org (orgId above). Only the
+    /// resource ID is stored (not the niceId, which can be renamed); its sites are looked up
+    /// from the server on every connect so they can't go stale.
+    var exitNodeResourceId: Int?
 }
 
 extension Account {
@@ -314,6 +344,11 @@ struct SocketStatusResponse: Codable, Equatable {
     let networkSettings: NetworkSettings?
     let error: SocketStatusError?
     let exitNode: ExitNodeStatus?
+    /// Whether all traffic is routed through a gateway (exit node), the gateway site resource
+    /// it was selected from, and the sites currently in use for it.
+    let gatewayActive: Bool?
+    let gatewaySiteResourceId: Int?
+    let gatewaySiteIds: [Int]?
 }
 
 struct SocketPeer: Codable, Equatable {
@@ -334,6 +369,78 @@ struct ExitNodeStatus: Codable, Equatable {
     let rtt: Int64?  // nanoseconds
     let lastSeen: String?
     let endpoint: String?
+}
+
+struct SiteStatusItem: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let connected: Bool
+    let endpoint: String?
+    let lastSeen: String?
+    /// "Local", "Relay", or "Direct". Nil when the status payload has no connection flags.
+    let connection: String?
+    /// True when this site is one of those currently used as the exit node (gateway)
+    /// that all traffic is routed through.
+    let isGateway: Bool
+
+    static func list(from status: SocketStatusResponse) -> [SiteStatusItem] {
+        var items: [SiteStatusItem] = []
+        if let exitNode = status.exitNode {
+            items.append(
+                SiteStatusItem(
+                    id: "exit-node",
+                    name: "Pangolin Server",
+                    connected: exitNode.connected,
+                    endpoint: exitNode.endpoint,
+                    lastSeen: exitNode.lastSeen,
+                    connection: nil,
+                    isGateway: false
+                )
+            )
+        }
+        let gatewaySiteIds: Set<Int> = status.gatewayActive == true ? Set(status.gatewaySiteIds ?? []) : []
+        if let peers = status.peers {
+            for key in peers.keys.sorted() {
+                guard let peer = peers[key] else { continue }
+                items.append(
+                    SiteStatusItem(
+                        id: key,
+                        name: peer.name ?? "Unknown",
+                        connected: peer.connected ?? false,
+                        endpoint: peer.endpoint,
+                        lastSeen: peer.lastSeen,
+                        connection: connectionLabel(isLocal: peer.isLocal, isRelay: peer.isRelay),
+                        isGateway: peer.siteId.map { gatewaySiteIds.contains($0) } ?? false
+                    )
+                )
+            }
+        }
+        return items
+    }
+
+    static func connectionLabel(isLocal: Bool?, isRelay: Bool?) -> String {
+        if isLocal == true {
+            return "Local"
+        }
+        if isRelay == true {
+            return "Relay"
+        }
+        return "Direct"
+    }
+}
+
+extension SocketStatusResponse {
+    /// Summarizes the exit node the same way the Windows status does: "Off", or "Active"
+    /// followed by the exit node's name in parentheses when it is among `exitNodes`.
+    func gatewayLabel(exitNodes: [SiteResource]) -> String {
+        guard gatewayActive == true else { return "Off" }
+        if let id = gatewaySiteResourceId,
+            let name = exitNodes.first(where: { $0.siteResourceId == id })?.name
+        {
+            return "Active (\(name))"
+        }
+        return "Active"
+    }
 }
 
 struct NetworkSettings: Codable, Equatable {
@@ -410,6 +517,35 @@ struct SocketSwitchOrgResponse: Codable {
 
 struct UpdateMetadataResponse: Codable {
     let status: String
+}
+
+struct SocketSelectGatewayRequest: Codable {
+    let siteResourceId: Int
+    let siteIds: [Int]
+}
+
+struct SocketGatewayResponse: Codable {
+    let status: String
+}
+
+// MARK: - Gateway (Exit Node) Resources
+
+/// A site resource as returned by GET /org/:orgId/site-resources. Only the fields the exit node
+/// picker needs are modeled. Gateway-mode resources are what the app calls exit nodes.
+struct SiteResource: Codable, Identifiable, Equatable {
+    var id: Int { siteResourceId }
+
+    let siteResourceId: Int
+    let niceId: String
+    let name: String
+    let mode: String
+    let enabled: Bool
+    let siteIds: [Int]
+    let siteNames: [String]?
+}
+
+struct ListSiteResourcesResponse: Codable {
+    let siteResources: [SiteResource]
 }
 
 // MARK: - Server Info

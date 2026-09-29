@@ -8,7 +8,11 @@ enum DisplayMode: String, CaseIterable {
 
 struct OLMStatusContentView: View {
     @ObservedObject var olmStatusManager: OLMStatusManager
-    @State private var displayMode: DisplayMode = .formatted
+    /// The org's exit nodes, used to name the active one.
+    let exitNodes: [SiteResource]
+    @AppStorage("net.pangolin.Pangolin.statusDisplayMode") private var displayMode: DisplayMode = .formatted
+    @State private var showCopyConfirmation = false
+    @State private var selectedSiteID: String?
     
     // Computed property to format socket status as JSON
     private var statusJSON: String? {
@@ -24,28 +28,63 @@ struct OLMStatusContentView: View {
         }
         return jsonString
     }
+
+    private var displayedJSON: String {
+        statusJSON ?? Self.placeholderJSON
+    }
+
+    private static let placeholderJSON = """
+    {
+      "connected": false
+    }
+    """
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Mode selector
-            Picker("", selection: $displayMode) {
-                ForEach(DisplayMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+        ScrollView {
+            Form {
+                Section {
+                    Picker(selection: $displayMode) {
+                        ForEach(DisplayMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    } label: {
+                        Text("Display Mode")
+                    }
+                    .pickerStyle(.menu)
+                } header: {
+                    Text("View")
+                }
+
+                if displayMode == .json {
+                    jsonContent
+                } else {
+                    formattedContent
                 }
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-            
-            // Content based on mode
-            if displayMode == .json {
-                jsonView
-            } else {
-                formattedView
-            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .toolbar {
+            if displayMode == .json {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(displayedJSON, forType: .string)
+                        showCopyConfirmation = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            showCopyConfirmation = false
+                        }
+                    }) {
+                        if showCopyConfirmation {
+                            Label("Copied", systemImage: "checkmark")
+                        } else {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                    }
+                }
+            }
+        }
         .onAppear {
             // Start separate polling for live updates when view appears
             olmStatusManager.startPolling()
@@ -54,153 +93,149 @@ struct OLMStatusContentView: View {
             // Stop polling when view disappears to avoid unnecessary work
             olmStatusManager.stopPolling()
         }
+        .sheet(isPresented: siteSheetPresented) {
+            if let selectedSiteID {
+                SiteStatusSheet(siteID: selectedSiteID, olmStatusManager: olmStatusManager)
+            }
+        }
+    }
+
+    private var siteSheetPresented: Binding<Bool> {
+        Binding(
+            get: { selectedSiteID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    selectedSiteID = nil
+                }
+            }
+        )
     }
     
     // MARK: - JSON View
     
-    private var jsonView: some View {
-        ScrollView {
-            if let json = statusJSON {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(json)
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                }
-            } else {
-                Form {
-                    Section {
-                        HStack {
-                            Text("Status")
-                                .font(.system(size: 13))
-                            Spacer()
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color.gray)
-                                    .frame(width: 8, height: 8)
-                                Text("Disconnected")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } header: {
-                        Text("Connection Status")
-                    }
-                }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-            }
+    private var jsonContent: some View {
+        Section {
+            Text(displayedJSON)
+                .font(.system(.body, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } header: {
+            Text("JSON")
         }
     }
     
     // MARK: - Formatted View
     
-    private var formattedView: some View {
-        ScrollView {
-            if let status = olmStatusManager.socketStatus {
-                Form {
-                    // Overall Status Section
-                    Section {
+    @ViewBuilder
+    private var formattedContent: some View {
+        if let status = olmStatusManager.socketStatus {
+            Section {
+                HStack {
+                    Text("Agent")
+                        .font(.system(size: 13))
+                    Spacer()
+                    Text(status.agent ?? "Unknown")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+
+                if let version = status.version {
+                    HStack {
+                        Text("Version")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Text(version)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                HStack {
+                    Text("Status")
+                        .font(.system(size: 13))
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(status.connected ? Color.green : Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text(formatStatus(connected: status.connected, registered: status.registered))
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                if let orgId = status.orgId {
+                    HStack {
+                        Text("Organization")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Text(orgId)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+
+                    if status.gatewayActive == true {
                         HStack {
-                            Text("Agent")
+                            Text("Exit Node")
                                 .font(.system(size: 13))
                             Spacer()
-                            Text(status.agent ?? "Unknown")
+                            Text(status.gatewayLabel(exitNodes: exitNodes))
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }
-                        
-                        if let version = status.version {
-                            HStack {
-                                Text("Version")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Text(version)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        HStack {
-                            Text("Status")
-                                .font(.system(size: 13))
-                            Spacer()
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(status.connected ? Color.green : Color.gray)
-                                    .frame(width: 8, height: 8)
-                                Text(formatStatus(connected: status.connected, registered: status.registered))
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        if let orgId = status.orgId {
-                            HStack {
-                                Text("Organization")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Text(orgId)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } header: {
-                        Text("Connection Status")
-                    }
-                    
-                    // Peers Section (the exit node, if connected, is shown first as "Pangolin Server")
-                    if status.exitNode != nil || !(status.peers?.isEmpty ?? true) {
-                        Section {
-                            if let exitNode = status.exitNode {
-                                PeerRowView(name: "Pangolin Server", endpoint: exitNode.endpoint, connected: exitNode.connected)
-                            }
-                            if let peers = status.peers {
-                                ForEach(Array(peers.keys.sorted()), id: \.self) { peerKey in
-                                    if let peer = peers[peerKey] {
-                                        PeerRowView(name: peer.name ?? "Unknown", endpoint: peer.endpoint, connected: peer.connected ?? false)
-                                    }
-                                }
-                            }
-                        } header: {
-                            Text("Sites")
-                        }
-                    } else {
-                        Section {
-                            Text("No sites connected")
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
-                        } header: {
-                            Text("Sites")
-                        }
                     }
                 }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
-            } else {
-                Form {
-                    Section {
-                        HStack {
-                            Text("Status")
-                                .font(.system(size: 13))
-                            Spacer()
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color.gray)
-                                    .frame(width: 8, height: 8)
-                                Text("Disconnected")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } header: {
-                        Text("Connection Status")
-                    }
-                }
-                .formStyle(.grouped)
-                .scrollContentBackground(.hidden)
+            } header: {
+                Text("Connection Status")
             }
+
+            let sites = SiteStatusItem.list(from: status)
+            if !sites.isEmpty {
+                Section {
+                    ForEach(sites) { site in
+                        SiteStatusRow(site: site) {
+                            selectedSiteID = site.id
+                        }
+                    }
+                } header: {
+                    Text("Sites")
+                }
+            } else {
+                noSitesSection
+            }
+        } else {
+            disconnectedSection
+            noSitesSection
+        }
+    }
+
+    private var noSitesSection: some View {
+        Section {
+            Text("No sites connected")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+        } header: {
+            Text("Sites")
+        }
+    }
+
+    private var disconnectedSection: some View {
+        Section {
+            HStack {
+                Text("Status")
+                    .font(.system(size: 13))
+                Spacer()
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.gray)
+                        .frame(width: 8, height: 8)
+                    Text("Disconnected")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+            }
+        } header: {
+            Text("Connection Status")
         }
     }
     
@@ -216,48 +251,6 @@ struct OLMStatusContentView: View {
         } else {
             return "Disconnected"
         }
-    }
-}
-
-// MARK: - Peer Row View
-
-struct PeerRowView: View {
-    let name: String
-    let endpoint: String?
-    let connected: Bool
-
-    var body: some View {
-        HStack {
-            // Peer name
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .font(.system(size: 13))
-                if let endpoint = endpoint {
-                    Text(endpoint)
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Status indicators
-            HStack(spacing: 12) {
-                // Connected status
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(connected ? Color.green : Color.gray)
-                        .frame(width: 8, height: 8)
-                    Text(formatStatus(connected))
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-    }
-
-    private func formatStatus(_ connected: Bool) -> String {
-        return connected ? "Connected" : "Disconnected"
     }
 }
 

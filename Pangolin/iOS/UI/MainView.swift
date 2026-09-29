@@ -15,10 +15,14 @@ struct MainView: View {
     @ObservedObject var apiClient: APIClient
     @State private var showAccountPicker = false
     @State private var showOrganizationPicker = false
+    @State private var showExitNodePicker = false
     @State private var showLoginView = false
     @State private var startDeviceAuthImmediately = false
     @State private var selectedTab: TabSelection = .home
-    
+    @Environment(\.scenePhase) private var scenePhase
+    /// Last OLM error already presented, so foregrounding does not alert again.
+    @State private var presentedConnectionError: String?
+
     var body: some View {
         TabView(selection: $selectedTab) {
             HomeTabView(
@@ -28,6 +32,7 @@ struct MainView: View {
                 tunnelManager: tunnelManager,
                 showAccountPicker: $showAccountPicker,
                 showOrganizationPicker: $showOrganizationPicker,
+                showExitNodePicker: $showExitNodePicker,
                 showLoginView: $showLoginView,
                 startDeviceAuthImmediately: $startDeviceAuthImmediately,
                 selectedTab: $selectedTab
@@ -37,13 +42,16 @@ struct MainView: View {
             }
             .tag(TabSelection.home)
             
-            StatusView(olmStatusManager: tunnelManager.olmStatusManager)
+            StatusView(
+                olmStatusManager: tunnelManager.olmStatusManager,
+                exitNodes: tunnelManager.availableExitNodes
+            )
                 .tabItem {
                     Label("Status", systemImage: "app.connected.to.app.below.fill")
                 }
             .tag(TabSelection.status)
             
-            PreferencesView(configManager: configManager)
+            PreferencesView(configManager: configManager, tunnelManager: tunnelManager)
                 .tabItem {
                     Label("Preferences", systemImage: "gearshape.fill")
                 }
@@ -71,6 +79,18 @@ struct MainView: View {
                 tunnelManager: tunnelManager
             )
         }
+        .sheet(isPresented: $showExitNodePicker) {
+            ExitNodePickerView(tunnelManager: tunnelManager)
+        }
+        .task(id: "\(authManager.isAuthenticated)-\(authManager.currentOrg?.orgId ?? "")") {
+            await tunnelManager.refreshExitNodes()
+        }
+        .onChange(of: tunnelManager.status) { _, newStatus in
+            // Connecting applies the saved exit node, so pick up the current list
+            if newStatus == .connected {
+                Task { await tunnelManager.refreshExitNodes() }
+            }
+        }
         .sheet(isPresented: $showLoginView) {
             LoginView(
                 authManager: authManager,
@@ -80,6 +100,28 @@ struct MainView: View {
                 startDeviceAuthImmediately: $startDeviceAuthImmediately
             )
         }
+        .onAppear {
+            presentConnectionErrorIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                presentConnectionErrorIfNeeded()
+            }
+        }
+        .onChange(of: tunnelManager.connectionErrorMessage) { _, message in
+            if message == nil {
+                presentedConnectionError = nil
+            }
+            presentConnectionErrorIfNeeded()
+        }
+    }
+
+    private func presentConnectionErrorIfNeeded() {
+        guard scenePhase == .active else { return }
+        guard let message = tunnelManager.connectionErrorMessage, !message.isEmpty else { return }
+        guard presentedConnectionError != message else { return }
+        presentedConnectionError = message
+        AlertManager.shared.showAlertDialog(title: "Connection Error", message: message)
     }
 }
 
@@ -92,6 +134,7 @@ struct HomeTabView: View {
     @ObservedObject var tunnelManager: TunnelManager
     @Binding var showAccountPicker: Bool
     @Binding var showOrganizationPicker: Bool
+    @Binding var showExitNodePicker: Bool
     @Binding var showLoginView: Bool
     @Binding var startDeviceAuthImmediately: Bool
     @Binding var selectedTab: TabSelection
@@ -99,14 +142,24 @@ struct HomeTabView: View {
     private var tunnelStatus: TunnelStatus {
         tunnelManager.status
     }
-    
+
+    /// WireGuard: switch is on when activating/active OR on-demand is engaged.
+    private var isToggleOn: Bool {
+        switch tunnelStatus {
+        case .starting, .registering, .connected:
+            return true
+        case .disconnected:
+            return tunnelManager.isOnDemandEnabled
+        }
+    }
+
     private var toggleBinding: Binding<Bool> {
         Binding(
-            get: { tunnelManager.isNEConnected },
+            get: { isToggleOn },
             set: { newValue in
                 guard !authManager.sessionExpired else { return }
-                // Only prevent interaction when starting (not when registering)
-                guard tunnelStatus != .starting else { return }
+                // WireGuard: with on-demand rules the switch stays interactive in all states.
+                if tunnelStatus == .starting && !tunnelManager.hasOnDemandRules { return }
                 Task {
                     if newValue {
                         await tunnelManager.connect()
@@ -116,6 +169,15 @@ struct HomeTabView: View {
                 }
             }
         )
+    }
+
+    
+    /// Display text for the exit node row: the selected node's name, "…" while an
+    /// active selection's name hasn't loaded yet (e.g. right after launch, before
+    /// availableExitNodes is populated), or "None" when nothing is selected.
+    private var activeExitNodeDisplayText: String {
+        guard let activeId = tunnelManager.activeExitNodeId else { return "None" }
+        return tunnelManager.availableExitNodes.first(where: { $0.siteResourceId == activeId })?.name ?? "…"
     }
     
     private var isInIntermediateState: Bool {
@@ -127,18 +189,35 @@ struct HomeTabView: View {
             return false
         }
     }
-    
+
+    /// Yellow when on-demand engaged but not connected; green otherwise when on.
+    private var toggleTint: Color {
+        if tunnelManager.isOnDemandEnabled && !isInIntermediateState && tunnelStatus != .connected {
+            return Color(uiColor: .systemYellow)
+        }
+        return Color(uiColor: .systemGreen)
+    }
+
     private var statusColor: Color {
         switch tunnelStatus {
         case .connected:
             return .green
-        case .disconnected:
-            return .gray
         case .starting, .registering:
             return .orange
+        case .disconnected:
+            return tunnelManager.isOnDemandEnabled ? Color(uiColor: .systemYellow) : .gray
         }
     }
-    
+
+    private var statusLabel: String {
+        tunnelStatus.displayText
+    }
+
+    /// Shown on the same line as status when on-demand rules are configured.
+    private var onDemandCaption: String? {
+        guard tunnelManager.hasOnDemandRules else { return nil }
+        return tunnelManager.isOnDemandEnabled ? "On-Demand Enabled" : "On-Demand Disabled"
+    }
     
     var body: some View {
         NavigationStack {
@@ -204,45 +283,53 @@ struct HomeTabView: View {
                             .cornerRadius(24)
                         } else {
                             Button(action: {
-                                guard tunnelStatus != .starting else { return }
+                                // WireGuard: with on-demand rules the control stays interactive while activating.
+                                if tunnelStatus == .starting && !tunnelManager.hasOnDemandRules { return }
                                 Task {
-                                    if tunnelManager.isNEConnected {
+                                    if isToggleOn {
                                         await tunnelManager.disconnect()
                                     } else {
                                         await tunnelManager.connect()
                                     }
                                 }
                             }) {
-                                VStack(spacing: 16) {
+                                VStack(spacing: 8) {
                                     HStack(spacing: 12) {
                                         Circle()
                                             .fill(statusColor)
                                             .frame(width: 12, height: 12)
-                                        
-                                        HStack(spacing: 8) {
-                                            Text(tunnelStatus.displayText)
-                                                .font(.headline)
-                                                .foregroundColor(.primary)
-                                            
-                                            if isInIntermediateState {
-                                                ProgressView()
-                                                    .scaleEffect(0.8)
-                                                    .id("loading-progress")
-                                            }
+
+                                        Text(statusLabel)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+
+                                        if isInIntermediateState {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                                .id("loading-progress")
                                         }
-                                        
-                                        Spacer()
-                                        
+
+                                        Spacer(minLength: 8)
+
                                         Toggle("", isOn: toggleBinding)
-                                            .tint(.accentColor)
+                                            .tint(toggleTint)
                                             .allowsHitTesting(false)
+                                    }
+
+                                    if let onDemandCaption {
+                                        Text(onDemandCaption)
+                                            .font(.system(size: 13))
+                                            .foregroundColor(.secondary)
+                                            .multilineTextAlignment(.center)
+                                            .frame(maxWidth: .infinity)
                                     }
                                 }
                                 .padding()
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                             }
-                            .disabled(tunnelStatus == .starting)
+                            .disabled(tunnelStatus == .starting && !tunnelManager.hasOnDemandRules)
                             .buttonStyle(.plain)
                             .background(Color(.systemGray6))
                             .cornerRadius(24)
@@ -320,8 +407,7 @@ struct HomeTabView: View {
                                 .buttonStyle(.plain)
                             }
                             
-                            // Organization section (hidden when session expired)
-                            if !authManager.sessionExpired, let org = authManager.currentOrg {
+                            if let org = authManager.currentOrg {
                                 VStack(alignment: .leading, spacing: 12) {
                                     // Organization section header
                                     Text("Organization")
@@ -338,6 +424,43 @@ struct HomeTabView: View {
                                             
                                             VStack(alignment: .leading, spacing: 4) {
                                                 Text(org.name)
+                                                    .font(.headline)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.secondary)
+                                                .font(.caption)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            
+                            // Exit node section (hidden when session expired or the org has none;
+                            // shown even if the name list hasn't loaded yet as long as there's an
+                            // active selection to display, so it doesn't flash away and back)
+                            if !authManager.sessionExpired,
+                                !tunnelManager.availableExitNodes.isEmpty || tunnelManager.activeExitNodeId != nil {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    // Exit node section header
+                                    Text("Exit Node")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.secondary)
+                                    
+                                    // Exit node button
+                                    Button(action: {
+                                        showExitNodePicker = true
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "globe")
+                                                .foregroundColor(.accentColor)
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(activeExitNodeDisplayText)
                                                     .font(.headline)
                                             }
                                             
@@ -545,6 +668,9 @@ struct AccountManagementView: View {
     }
     
     private var shouldDisableAccountButton: Bool {
+        if !tunnelManager.isNEConnected && tunnelManager.status != .starting {
+            return false
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true
@@ -669,6 +795,98 @@ struct AccountManagementView: View {
     }
 }
 
+// MARK: - Exit Node Picker
+
+struct ExitNodePickerView: View {
+    @ObservedObject var tunnelManager: TunnelManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var isApplying = false
+    
+    private var shouldDisableButtons: Bool {
+        switch tunnelManager.status {
+        case .starting, .registering:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button(action: {
+                        Task {
+                            isApplying = true
+                            await tunnelManager.disableExitNode()
+                            isApplying = false
+                            dismiss()
+                        }
+                    }) {
+                        HStack {
+                            Text("None")
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            if tunnelManager.activeExitNodeId == nil {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                    }
+                    .disabled(shouldDisableButtons || tunnelManager.activeExitNodeId == nil)
+                    
+                    ForEach(tunnelManager.availableExitNodes) { node in
+                        Button(action: {
+                            Task {
+                                isApplying = true
+                                await tunnelManager.selectExitNode(node)
+                                isApplying = false
+                                dismiss()
+                            }
+                        }) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(node.name)
+                                        .foregroundColor(.primary)
+                                    if let siteNames = node.siteNames, !siteNames.isEmpty {
+                                        Text(siteNames.joined(separator: ", "))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                if tunnelManager.activeExitNodeId == node.siteResourceId {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                        .disabled(shouldDisableButtons || tunnelManager.activeExitNodeId == node.siteResourceId)
+                    }
+                } header: {
+                    Text("Route All Traffic Through")
+                }
+            }
+            .navigationTitle("Exit Node")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .overlay {
+                LoadingOverlay(isLoading: isApplying, successMessage: nil)
+            }
+        }
+    }
+}
+
 // MARK: - Organization Picker
 
 struct OrganizationPickerView: View {
@@ -687,6 +905,9 @@ struct OrganizationPickerView: View {
     }
     
     private var shouldDisableOrgButtons: Bool {
+        if !tunnelManager.isNEConnected && tunnelManager.status != .starting {
+            return false
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true

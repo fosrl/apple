@@ -47,6 +47,7 @@ class AuthManager: ObservableObject {
         self.configManager = configManager
         self.accountManager = accountManager
         self.secretManager = secretManager
+        apiClient.updateSessionCookieName(configManager.getSessionCookieName())
         apiClient.onUnauthorized = { [weak self] in
             Task { @MainActor in
                 self?.markSessionExpiredFromConnection()
@@ -81,6 +82,7 @@ class AuthManager: ObservableObject {
             if healthCheckFailed {
                 // Server is down, but show last known user info
                 isServerDown = true
+                restoreCachedOrganization(from: activeAccount)
                 // Keep showing the last known user if we have it
                 if currentUser == nil {
                     // Try to load user from stored account info
@@ -106,6 +108,7 @@ class AuthManager: ObservableObject {
                     sessionExpired = true
                     isAuthenticated = true
                     errorMessage = "Session expired. Please sign in again."
+                    restoreCachedOrganization(from: activeAccount)
                 } else {
                     isAuthenticated = false
                 }
@@ -121,6 +124,7 @@ class AuthManager: ObservableObject {
         let loginApiClient: APIClient
         if let hostname = hostnameOverride {
             loginApiClient = APIClient(baseURL: hostname, sessionToken: nil)
+            loginApiClient.updateSessionCookieName(configManager.getSessionCookieName())
         } else {
             loginApiClient = apiClient
         }
@@ -319,12 +323,39 @@ class AuthManager: ObservableObject {
         sessionExpired = false
         startDeviceAuthImmediately = false
 
-        // Fetch server info
-        await fetchServerInfo()
+        // Setting isAuthenticated swaps the login view out on iOS, and its onDisappear
+        // cancels the login task. Run the rest in its own task so that cancellation
+        // doesn't abort the requests below mid-flight.
+        await Task {
+            await fetchServerInfo()
+
+            // Session and org exist now. Rewrite the on-demand start blob so a later
+            // system start does not keep the previous account's config.
+            if let tunnelManager {
+                await ensureOlmCredentials(userId: user.userId)
+                await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+            }
+        }.value
     }
 
     func markSessionExpiredFromConnection() {
         sessionExpired = true
+        if let account = accountManager.activeAccount {
+            restoreCachedOrganization(from: account)
+        }
+    }
+
+    /// Restores `currentOrg` from the locally cached account org ID when the server is unreachable
+    /// or the session is expired. Keeps a known display name when the id already matches.
+    private func restoreCachedOrganization(from account: Account) {
+        guard !account.orgId.isEmpty else { return }
+        if currentOrg?.orgId != account.orgId {
+            currentOrg = Organization(orgId: account.orgId, name: account.orgId, isOwner: nil)
+        }
+        guard let currentOrg, currentOrg.orgId == account.orgId else { return }
+        if !organizations.contains(where: { $0.orgId == account.orgId }) {
+            organizations.append(currentOrg)
+        }
     }
 
     private func ensureOrgIsSelected(preferredOrgId: String? = nil) async throws -> String {
@@ -387,6 +418,12 @@ class AuthManager: ObservableObject {
                 // Current org no longer exists, clear selection
                 currentOrg = nil
                 accountManager.setUserOrganization(userId: userId, orgId: "")
+            } else if let cachedOrgId = accountManager.activeAccount?.orgId,
+                !cachedOrgId.isEmpty,
+                let matched = newOrgs.first(where: { $0.orgId == cachedOrgId })
+            {
+                // Restore selection from cached account org after offline startup
+                currentOrg = matched
             }
 
             // Update organizations list
@@ -468,6 +505,7 @@ class AuthManager: ObservableObject {
             // Server is down, show message but keep account switched
             isServerDown = true
             errorMessage = "The server appears to be down."
+            restoreCachedOrganization(from: accountToSwitchTo)
             // currentUser is already cleared above, so UI will show account email
             return
         }
@@ -488,18 +526,15 @@ class AuthManager: ObservableObject {
                 errorMessage = "Failed to fetch user information: \(error.errorDescription ?? error.localizedDescription)"
             }
             currentUser = nil
-            currentOrg = nil
-            organizations = []
+            restoreCachedOrganization(from: accountToSwitchTo)
         } catch {
             // Error fetching user, but keep account switched
             os_log(
                 "Error fetching user when switching accounts: %{public}@", log: logger, type: .error,
                 error.localizedDescription)
             errorMessage = "Failed to fetch user information: \(error.localizedDescription)"
-            // Clear current user/org since we can't fetch them for this account
             currentUser = nil
-            currentOrg = nil
-            organizations = []
+            restoreCachedOrganization(from: accountToSwitchTo)
         }
 
         // Try to select organization (non-fatal if it fails)
@@ -515,6 +550,7 @@ class AuthManager: ObservableObject {
                 error.localizedDescription)
             selectedOrgId = accountToSwitchTo.orgId
             accountManager.setUserOrganization(userId: userId, orgId: selectedOrgId)
+            restoreCachedOrganization(from: accountToSwitchTo)
         }
         
         // Fetch server info (non-fatal if it fails)
@@ -639,6 +675,7 @@ class AuthManager: ObservableObject {
         // Switch org in tunnel if connected
         if let tunnelManager = tunnelManager {
             await tunnelManager.switchOrg(orgId: org.orgId)
+            await tunnelManager.refreshExitNodes()
         }
 
         // If access is granted and the tunnel switches,
@@ -734,6 +771,8 @@ class AuthManager: ObservableObject {
                     }
                 }
             } catch {
+                // A cancelled caller isn't a failure worth alerting about
+                if Task.isCancelled { return }
                 // Show error alert to user
                 await MainActor.run {
                     AlertManager.shared.showErrorDialog(error)
@@ -742,27 +781,26 @@ class AuthManager: ObservableObject {
         }
     }
 
+    /// Whether the account still has a saved session. Without one it has to log
+    /// in again before it can connect.
+    func hasSession(userId: String) -> Bool {
+        secretManager.getSessionToken(userId: userId) != nil
+    }
+
+    /// Removes an account from this device. Everything local happens right away,
+    /// so this works with the server unreachable; revoking the session on the
+    /// server is attempted in the background and never waited on.
     func deleteAccount(userId: String) async {
-        guard accountManager.accounts[userId] != nil else {
+        guard let account = accountManager.accounts[userId] else {
             return
         }
 
         let isActiveAccount = accountManager.activeAccount?.userId == userId
-        let remainingAccounts = accountManager.accounts.filter { $0.key != userId }
-        let hasOtherAccounts = !remainingAccounts.isEmpty
+        let token = secretManager.getSessionToken(userId: userId)
 
         // If deleting the active account, disconnect tunnel first
-        if isActiveAccount {
-            if let tunnelManager = tunnelManager {
-                await tunnelManager.disconnect()
-            }
-
-            // Try to call logout endpoint (ignore errors)
-            do {
-                try await apiClient.logout()
-            } catch {
-                // Ignore errors - still clear local data
-            }
+        if isActiveAccount, let tunnelManager = tunnelManager {
+            await tunnelManager.disconnect()
         }
 
         // Clear local data
@@ -771,67 +809,57 @@ class AuthManager: ObservableObject {
 
         accountManager.removeAccount(userId: userId)
 
-        // If we deleted the active account, switch to another or logout
-        if isActiveAccount {
-            if hasOtherAccounts, let nextAccount = remainingAccounts.values.first {
-                // Switch to the first available account
-                await switchAccount(userId: nextAccount.userId)
-            } else {
-                // No other accounts, fully log out
-                apiClient.updateSessionToken(nil)
+        if let token {
+            signOutOnServerInBackground(hostname: account.hostname, token: token)
+        }
 
-                isAuthenticated = false
-                currentOrg = nil
-                organizations = []
-                errorMessage = nil
-                deviceAuthCode = nil
-                deviceAuthLoginURL = nil
-            }
+        if isActiveAccount {
+            await activateNextAccountOrSignOut()
         }
     }
 
+    /// Removes the active account. See `deleteAccount(userId:)`.
     func logout() async {
         guard let activeAccount = accountManager.activeAccount else {
             return
         }
+        await deleteAccount(userId: activeAccount.userId)
+    }
 
-        let userId = activeAccount.userId
+    /// After the active account is removed: switch to the first remaining account
+    /// by name, or clear the signed-in state if none are left.
+    private func activateNextAccountOrSignOut() async {
+        let nextAccount = accountManager.accounts.values.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }.first
 
-        // Check if there are other accounts before removing this one
-        let remainingAccounts = accountManager.accounts.filter { $0.key != userId }
-        let hasOtherAccounts = !remainingAccounts.isEmpty
-
-        // Disconnect tunnel before logging out
-        if let tunnelManager = tunnelManager {
-            await tunnelManager.disconnect()
-        }
-
-        // Try to call logout endpoint (ignore errors)
-        do {
-            try await apiClient.logout()
-        } catch {
-            // Ignore errors - still clear local data
-        }
-
-        // Clear local data
-        _ = secretManager.deleteSessionToken(userId: userId)
-
-        accountManager.removeAccount(userId: userId)
-
-        // If there are other accounts, switch to one of them
-        if hasOtherAccounts, let nextAccount = remainingAccounts.values.first {
-            // Switch to the first available account
+        if let nextAccount {
             await switchAccount(userId: nextAccount.userId)
-        } else {
-            // No other accounts, fully log out
-            apiClient.updateSessionToken(nil)
+            return
+        }
 
-            isAuthenticated = false
-            currentOrg = nil
-            organizations = []
-            errorMessage = nil
-            deviceAuthCode = nil
-            deviceAuthLoginURL = nil
+        // No other accounts, fully log out
+        apiClient.updateSessionToken(nil)
+
+        isAuthenticated = false
+        currentUser = nil
+        currentOrg = nil
+        organizations = []
+        serverInfo = nil
+        errorMessage = nil
+        isServerDown = false
+        sessionExpired = false
+        deviceAuthCode = nil
+        deviceAuthLoginURL = nil
+    }
+
+    /// Best-effort logout call for a removed account. Uses its own client so the
+    /// shared one's token and 401 handling are unaffected; failures are ignored.
+    private func signOutOnServerInBackground(hostname: String, token: String) {
+        let client = APIClient(baseURL: hostname, sessionToken: token)
+        client.updateSessionCookieName(configManager.getSessionCookieName())
+        Task {
+            try? await client.logout()
         }
     }
 }

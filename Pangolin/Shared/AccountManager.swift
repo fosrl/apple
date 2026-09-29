@@ -102,6 +102,21 @@ class AccountManager: ObservableObject {
         _ = save()
     }
     
+    /// The resource ID of userId's selected exit node, or nil if none is selected or the
+    /// account doesn't exist.
+    func getExitNode(userId: String) -> Int? {
+        return store.accounts[userId]?.exitNodeResourceId
+    }
+
+    /// Records the selected exit node (a gateway resource) for userId; a nil resourceId clears it.
+    func setExitNode(userId: String, resourceId: Int?) {
+        if var account = store.accounts[userId] {
+            account.exitNodeResourceId = resourceId
+            store.accounts[userId] = account
+            _ = save()
+        }
+    }
+
     func updateAccountUserInfo(userId: String, username: String?, name: String?) {
         if var account = store.accounts[userId] {
             account.username = username

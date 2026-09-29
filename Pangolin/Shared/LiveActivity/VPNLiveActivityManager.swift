@@ -1,0 +1,212 @@
+#if os(iOS)
+    import ActivityKit
+    import Foundation
+    import os.log
+    import UIKit
+
+    @MainActor
+    final class VPNLiveActivityManager {
+        static let shared = VPNLiveActivityManager()
+
+        /// Absent means enabled, so existing installs keep the Live Activity.
+        static let enabledDefaultsKey = "net.pangolin.Pangolin.liveActivityEnabled"
+
+        static var isEnabled: Bool {
+            guard UserDefaults.standard.object(forKey: enabledDefaultsKey) != nil else {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: enabledDefaultsKey)
+        }
+
+        private var activity: Activity<PangolinVPNAttributes>?
+        private var resignObserver: NSObjectProtocol?
+        private var activeObserver: NSObjectProtocol?
+        /// Org to use once we're allowed to start (typically after leaving the foreground).
+        private var pendingStartOrganizationName: String?
+        /// Kept while connected so turning the preference back on can start again.
+        private var connectedOrganizationName: String?
+        private var isConnected = false
+        private var endedActivityIDs: Set<String> = []
+
+        private let logger = OSLog(
+            subsystem: Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin",
+            category: "VPNLiveActivity"
+        )
+
+        private init() {
+            // Starting while foreground shows a banner that later morphs into a shared
+            // Dynamic Island (jitter when Music/etc. already owns the island). Defer the
+            // Activity.request until resign-active so it lands directly in the island.
+            resignObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.willResignActiveNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                Task { @MainActor in
+                    VPNLiveActivityManager.shared.startPendingIfNeeded()
+                }
+            }
+
+            activeObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.didBecomeActiveNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                Task { @MainActor in
+                    // Retry a failed background-adjacent start once we're active again
+                    // only if still connected and still missing an activity — still defer
+                    // the actual request until the next resign.
+                    VPNLiveActivityManager.shared.adoptExistingActivityIfNeeded()
+                }
+            }
+        }
+
+        func handleStatusChange(
+            status: TunnelStatus,
+            organizationName: String?
+        ) {
+            switch status {
+            case .connected:
+                isConnected = true
+                let org = organizationName?.isEmpty == false ? organizationName! : "Pangolin"
+                connectedOrganizationName = org
+                pendingStartOrganizationName = org
+                // If we're already inactive/background, start immediately.
+                if UIApplication.shared.applicationState != .active {
+                    startPendingIfNeeded()
+                }
+            // else: wait for willResignActive so the island presentation isn't a morph
+            // from an in-app banner into a crowded Dynamic Island.
+            case .disconnected:
+                isConnected = false
+                pendingStartOrganizationName = nil
+                connectedOrganizationName = nil
+                endActivity()
+            case .starting, .registering:
+                break
+            }
+        }
+
+        func reconcileOnLaunch(
+            status: TunnelStatus,
+            organizationName: String?
+        ) {
+            adoptExistingActivityIfNeeded()
+            if !Self.isEnabled {
+                endActivity()
+            }
+
+            handleStatusChange(
+                status: status,
+                organizationName: organizationName
+            )
+        }
+
+        /// Applies the Preferences toggle. UserDefaults is already updated by the control.
+        func applyEnabledPreference() {
+            if Self.isEnabled {
+                guard isConnected, let org = connectedOrganizationName else { return }
+                pendingStartOrganizationName = org
+                if UIApplication.shared.applicationState != .active {
+                    startPendingIfNeeded()
+                }
+            } else {
+                endActivity()
+            }
+        }
+
+        private func adoptExistingActivityIfNeeded() {
+            guard activity == nil else { return }
+            activity = Activity<PangolinVPNAttributes>.activities.first { existing in
+                !endedActivityIDs.contains(existing.id)
+                    && existing.activityState != .ended
+                    && existing.activityState != .dismissed
+            }
+        }
+
+        private func startPendingIfNeeded() {
+            guard Self.isEnabled else { return }
+            guard isConnected,
+                let organizationName = pendingStartOrganizationName
+            else { return }
+            startActivity(organizationName: organizationName)
+        }
+
+        private func startActivity(organizationName: String) {
+            guard Self.isEnabled else { return }
+
+            guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+                os_log("Live Activities are disabled", log: logger, type: .info)
+                return
+            }
+
+            adoptExistingActivityIfNeeded()
+
+            // Already running — leave content alone. ActivityKit updates redraw the
+            // Dynamic Island and cause visible jitter even when values barely change.
+            if activity != nil {
+                pendingStartOrganizationName = nil
+                return
+            }
+
+            let attributes = PangolinVPNAttributes(organizationName: organizationName)
+            let state = PangolinVPNAttributes.ContentState(
+                statusText: TunnelStatus.connected.displayText
+            )
+
+            do {
+                activity = try Activity.request(
+                    attributes: attributes,
+                    content: ActivityContent(
+                        state: state,
+                        staleDate: nil,
+                        // Lowest allowed score — yield the primary island slot to others.
+                        relevanceScore: 0
+                    ),
+                    pushType: nil
+                )
+                pendingStartOrganizationName = nil
+                os_log(
+                    "Live Activity started: %{public}@", log: logger, type: .info,
+                    activity?.id ?? "")
+            } catch {
+                // Keep pending so a later resign-active can retry.
+                os_log(
+                    "Failed to start Live Activity: %{public}@", log: logger, type: .error,
+                    error.localizedDescription)
+            }
+        }
+
+        private func endActivity() {
+            adoptExistingActivityIfNeeded()
+            let activities: [Activity<PangolinVPNAttributes>]
+            if let activity {
+                activities = [activity]
+            } else {
+                activities = Array(Activity<PangolinVPNAttributes>.activities)
+            }
+            self.activity = nil
+
+            guard !activities.isEmpty else { return }
+
+            for activity in activities {
+                endedActivityIDs.insert(activity.id)
+            }
+
+            let finalState = PangolinVPNAttributes.ContentState(
+                statusText: TunnelStatus.disconnected.displayText
+            )
+
+            Task {
+                for activity in activities {
+                    await activity.end(
+                        ActivityContent(
+                            state: finalState, staleDate: nil, relevanceScore: 0),
+                        dismissalPolicy: .immediate
+                    )
+                }
+                os_log("Live Activity ended", log: logger, type: .info)
+            }
+        }
+    }
+#endif

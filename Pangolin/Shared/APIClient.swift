@@ -45,7 +45,7 @@ enum APIError: Error, LocalizedError {
 class APIClient: ObservableObject {
     private var baseURL: String
     private var sessionToken: String?
-    private let sessionCookieName = "p_session_token"
+    private var sessionCookieName = "p_session_token"
     private let csrfToken = "x-csrf-protection"
 
     /// Called when a request made with a session token returns 401 or 403. Set by AuthManager to mark session expired.
@@ -94,6 +94,14 @@ class APIClient: ObservableObject {
     
     func updateSessionToken(_ token: String?) {
         self.sessionToken = token
+    }
+
+    /// Overrides the cookie name the session token is sent and read under. An empty/whitespace-only
+    /// name is a no-op, keeping the current (default) name.
+    func updateSessionCookieName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        self.sessionCookieName = trimmed
     }
     
     private static func normalizeBaseURL(_ url: String) -> String {
@@ -374,6 +382,31 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    /// Every gateway-mode site resource (exit node) in the org that can be selected, fetching all
+    /// pages. Disabled resources and ones with no sites are dropped since they can't carry traffic.
+    func listGatewayResources(orgId: String) async throws -> [SiteResource] {
+        let pageSize = 100
+        var gateways: [SiteResource] = []
+        var page = 1
+        while true {
+            let (data, response) = try await makeRequest(
+                method: "GET", path: "/org/\(orgId)/site-resources",
+                queryParams: ["mode": "gateway", "page": String(page), "pageSize": String(pageSize)])
+            let result: ListSiteResourcesResponse = try parseResponse(data, response)
+
+            // Servers that predate gateway mode ignore the unknown filter value and return
+            // every resource, so filter again here.
+            gateways.append(
+                contentsOf: result.siteResources.filter {
+                    $0.mode == "gateway" && $0.enabled && !$0.siteIds.isEmpty
+                })
+
+            if result.siteResources.count < pageSize { break }
+            page += 1
+        }
+        return gateways
+    }
+
     func createOlm(userId: String, name: String) async throws -> CreateOlmResponse {
         let requestBody = CreateOlmRequest(name: name)
         let bodyData = try JSONEncoder().encode(requestBody)

@@ -4,6 +4,8 @@ import AppKit
 struct PreferencesWindow: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var authManager: AuthManager
     @State private var selectedSection: PreferencesSection = .preferences
     
     var body: some View {
@@ -15,7 +17,9 @@ struct PreferencesWindow: View {
             PreferencesDetailView(
                 selectedSection: selectedSection,
                 configManager: configManager,
-                tunnelManager: tunnelManager
+                tunnelManager: tunnelManager,
+                accountManager: accountManager,
+                authManager: authManager
             )
         }
         .frame(minWidth: 600, minHeight: 400)
@@ -25,8 +29,13 @@ struct PreferencesWindow: View {
         .onAppear {
             handleWindowAppear()
         }
-        .onChange(of: selectedSection) { _ in
+        .onChange(of: selectedSection) {
             updateWindowTitle()
+        }
+        .onReceive(PreferencesNavigation.shared.$requestedSection) { section in
+            guard let section else { return }
+            selectedSection = section
+            PreferencesNavigation.shared.requestedSection = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             if let window = notification.object as? NSWindow, window.identifier?.rawValue == "preferences" {
@@ -46,22 +55,42 @@ struct PreferencesWindow: View {
     }
     
     private func handleWindowAppear() {
-        // Show app in dock when window appears
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            guard NSApp.activationPolicy() != .regular else { return }
-            NSApp.setActivationPolicy(.regular)
-            
-            // Ensure window identifier is set and close duplicates
-            if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
-                configureWindow(window)
-                
-                // Close any other windows with the same identifier
-                let duplicates = NSApplication.shared.windows.filter { w in
-                    w.identifier?.rawValue == "preferences" && w != window
-                }
-                for duplicate in duplicates {
-                    duplicate.close()
-                }
+            showAppInDock()
+            closeDuplicatePreferencesWindows()
+        }
+        // Launch hides the Dock icon shortly after this window is restored.
+        // Re-apply once that has run, if the window is still open.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard isPreferencesWindowShown() else { return }
+            showAppInDock()
+        }
+    }
+
+    private func showAppInDock() {
+        guard NSApp.activationPolicy() != .regular else { return }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func isPreferencesWindowShown() -> Bool {
+        NSApplication.shared.windows.contains { window in
+            let isShown = window.isVisible || window.isMiniaturized
+            guard isShown else { return false }
+            if window.identifier?.rawValue == "preferences" { return true }
+            return PreferencesSection.allCases.contains { $0.rawValue == window.title }
+        }
+    }
+
+    private func closeDuplicatePreferencesWindows() {
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
+            configureWindow(window)
+
+            let duplicates = NSApplication.shared.windows.filter { w in
+                w.identifier?.rawValue == "preferences" && w != window
+            }
+            for duplicate in duplicates {
+                duplicate.close()
             }
         }
     }
@@ -70,7 +99,7 @@ struct PreferencesWindow: View {
         // Hide app from dock when window closes (if no other windows)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             let hasOtherWindows = NSApplication.shared.windows.contains { window in
-                window.isVisible && (window.identifier?.rawValue == "main" || window.identifier?.rawValue == "preferences")
+                window.isVisible && window.identifier?.rawValue == "preferences"
             }
             if !hasOtherWindows {
                 guard NSApp.activationPolicy() != .accessory else { return }
@@ -110,26 +139,39 @@ struct PreferencesWindow: View {
     
     private func updateWindowTitle() {
         if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
-            window.title = selectedSection.rawValue
-        }
+        window.title = selectedSection.rawValue
+        window.titlebarSeparatorStyle = selectedSection == .olmStatus ? .none : .automatic
+    }
     }
     
     private func hideMenuBarItems() {
         guard let mainMenu = NSApp.mainMenu else { return }
         
-        // Hide all menu items except the app name (first item)
+        // Hide all menu items except the app name (first item).
+        // Hidden items ignore key equivalents unless this flag is set, which
+        // would disable Select All, copy, and paste in text fields.
         for (index, menuItem) in mainMenu.items.enumerated() {
             if index == 0 {
                 // Keep the app name menu but hide its submenu items
                 if let submenu = menuItem.submenu {
                     for submenuItem in submenu.items {
+                        submenuItem.allowsKeyEquivalentWhenHidden = true
                         submenuItem.isHidden = true
                     }
                 }
             } else {
                 // Hide all other menu items (File, Edit, View, etc.)
+                allowKeyEquivalentsWhenHidden(menuItem)
                 menuItem.isHidden = true
             }
+        }
+    }
+
+    private func allowKeyEquivalentsWhenHidden(_ menuItem: NSMenuItem) {
+        menuItem.allowsKeyEquivalentWhenHidden = true
+        guard let submenu = menuItem.submenu else { return }
+        for submenuItem in submenu.items {
+            allowKeyEquivalentsWhenHidden(submenuItem)
         }
     }
     
@@ -152,13 +194,13 @@ struct PreferencesWindow: View {
 
 struct PreferencesSidebar: View {
     @Binding var selectedSection: PreferencesSection
-    
+
     var body: some View {
         List(PreferencesSection.allCases, selection: $selectedSection) { section in
             Label(section.rawValue, systemImage: section.icon)
                 .tag(section)
         }
-        .navigationSplitViewColumnWidth(min: 200, ideal: 200)
+        .navigationSplitViewColumnWidth(min: 192, ideal: 192)
     }
 }
 
@@ -168,15 +210,29 @@ struct PreferencesDetailView: View {
     let selectedSection: PreferencesSection
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
+    let accountManager: AccountManager
+    let authManager: AuthManager
     
     var body: some View {
         // Content
         Group {
             switch selectedSection {
             case .preferences:
-                PreferencesContentView(configManager: configManager)
+                PreferencesContentView(
+                    configManager: configManager,
+                    tunnelManager: tunnelManager
+                )
+            case .accounts:
+                AccountsContentView(
+                    accountManager: accountManager,
+                    authManager: authManager,
+                    tunnelManager: tunnelManager
+                )
             case .olmStatus:
-                OLMStatusContentView(olmStatusManager: tunnelManager.olmStatusManager)
+                OLMStatusContentView(
+                    olmStatusManager: tunnelManager.olmStatusManager,
+                    exitNodes: tunnelManager.availableExitNodes
+                )
             case .about:
                 AboutContentView()
             }

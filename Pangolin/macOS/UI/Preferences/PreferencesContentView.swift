@@ -1,7 +1,10 @@
 import SwiftUI
+import AppKit
 
 struct PreferencesContentView: View {
     @ObservedObject var configManager: ConfigManager
+    @ObservedObject var tunnelManager: TunnelManager
+    @StateObject private var launchAtLoginManager = LaunchAtLoginManager()
     @State private var showPrimaryDNSModal = false
     @State private var showSecondaryDNSModal = false
     @State private var showMTUModal = false
@@ -9,6 +12,7 @@ struct PreferencesContentView: View {
     @State private var editingSecondaryDNS = ""
     @State private var editingMTU = ""
     @State private var showEnableDNSOverrideAlert = false
+    @State private var showLaunchAtLoginErrorAlert = false
 
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
@@ -17,6 +21,10 @@ struct PreferencesContentView: View {
     private var dnsTunnelEnabled: Bool {
 		configManager.getDNSTunnelEnabled()
 	}
+
+    private var exitNodeTakesPrecedence: Bool {
+        configManager.getExitNodeTakesPrecedence()
+    }
     
     private var primaryDNSServer: String {
         configManager.getPrimaryDNSServer()
@@ -44,18 +52,34 @@ struct PreferencesContentView: View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
-                    Section(header: Text("Help")) {
-                        Link(destination: Self.docsConfigureClientURL) {
-                            HStack {
-                                Text("See docs for more info on these settings")
-                                Spacer()
-                                Image(systemName: "arrow.up.forward")
+                    Section(header: Text("General")) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Start at Login")
+                                    .font(.system(size: 13))
+                                Text("Automatically open Pangolin when you log in to your Mac.")
+                                    .font(.system(size: 11))
                                     .foregroundColor(.secondary)
-                                    .font(.caption)
                             }
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { launchAtLoginManager.isEnabled },
+                                set: { newValue in
+                                    launchAtLoginManager.setEnabled(newValue)
+                                    if launchAtLoginManager.errorMessage != nil {
+                                        showLaunchAtLoginErrorAlert = true
+                                    }
+                                }
+                            ))
+                            .toggleStyle(.switch)
+                            .labelsHidden()
                         }
-                        .foregroundColor(.accentColor)
                     }
+
+                    OnDemandActivationSection(
+                        configManager: configManager,
+                        tunnelManager: tunnelManager
+                    )
 
                     Section(header: Text("DNS Settings")) {
                         HStack {
@@ -133,6 +157,25 @@ struct PreferencesContentView: View {
                     }
 
                     Section(header: Text("Advanced")) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Exit Node Takes Precedence Over Resources")
+                                    .font(.system(size: 13))
+                                Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { exitNodeTakesPrecedence },
+                                set: { newValue in
+                                    _ = configManager.setExitNodeTakesPrecedence(newValue)
+                                }
+                            ))
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        }
+
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
                                 Text("MTU")
@@ -153,6 +196,19 @@ struct PreferencesContentView: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
+                    }
+
+                    Section(header: Text("Help")) {
+                        Link(destination: Self.docsConfigureClientURL) {
+                            HStack {
+                                Text("See docs for more info on these settings")
+                                Spacer()
+                                Image(systemName: "arrow.up.forward")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                        .foregroundColor(.accentColor)
                     }
                 }
                 .formStyle(.grouped)
@@ -194,6 +250,19 @@ struct PreferencesContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Set a Primary or Secondary Upstream DNS Server before enabling Aliases (DNS Override).")
+        }
+        .alert("Start at Login", isPresented: $showLaunchAtLoginErrorAlert) {
+            Button("OK", role: .cancel) {
+                launchAtLoginManager.errorMessage = nil
+            }
+        } message: {
+            Text(launchAtLoginManager.errorMessage ?? "Unable to update the Start at Login setting.")
+        }
+        .onAppear {
+            launchAtLoginManager.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            launchAtLoginManager.refresh()
         }
     }
 }
