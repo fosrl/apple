@@ -3,8 +3,8 @@ module github.com/fosrl/apple
 go 1.26.0
 
 require (
-	github.com/fosrl/newt v1.16.0
-	github.com/fosrl/olm v1.9.1
+	github.com/fosrl/newt v1.18.0
+	github.com/fosrl/olm v1.10.0
 )
 
 require (
@@ -36,6 +36,5 @@ require (
 )
 
 // Uncomment when developing dependencies.
-replace github.com/fosrl/olm => ../../olm
-
-replace github.com/fosrl/newt => ../../newt
+//replace github.com/fosrl/olm => ../../olm
+//replace github.com/fosrl/newt => ../../newt
