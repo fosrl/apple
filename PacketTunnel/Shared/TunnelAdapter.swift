@@ -465,6 +465,15 @@ public class TunnelAdapter {
         // Poll the version number first (lightweight)
         let currentVersion = PangolinGo.getNetworkSettingsVersion()
 
+        // Go reports version 0 once its tunnel is no longer running. Whatever we
+        // last applied (notably DNS pointing at the now-dead in-tunnel proxy)
+        // must not outlive it.
+        if currentVersion == 0 && lastAppliedSettings != nil {
+            os_log("Go tunnel no longer running, clearing network settings", log: logger, type: .info)
+            clearNetworkSettings()
+            return
+        }
+
         // Only fetch full settings if version has changed
         if currentVersion > lastSeenVersion {
             os_log(
@@ -505,6 +514,15 @@ public class TunnelAdapter {
                 let newSettings = convertJSONToNetworkSettings(
                     settingsJSON, mergingWith: lastAppliedSettings)
             else {
+                // Go cleared its settings (e.g. on terminate or auth error, see
+                // network.ClearNetworkSettings). The extension may keep running
+                // (Always On / on-demand, with no app around to stop it), so
+                // drop what the OS has applied - otherwise system DNS stays
+                // pointed at the stopped DNS proxy and all resolution breaks.
+                if lastAppliedSettings != nil {
+                    os_log("Network settings cleared by Go, clearing applied settings", log: logger, type: .info)
+                    clearNetworkSettings()
+                }
                 return
             }
 
@@ -681,6 +699,24 @@ public class TunnelAdapter {
             } else {
                 os_log("Network settings updated successfully", log: self.logger, type: .debug)
                 self.lastAppliedSettings = settings
+            }
+        }
+    }
+
+    // Removes all applied tunnel network settings (DNS, addresses, routes).
+    // lastAppliedSettings is reset up front so the poller doesn't re-issue this
+    // on every tick, and so later settings aren't merged onto the stale ones.
+    private func clearNetworkSettings() {
+        lastAppliedSettings = nil
+        packetTunnelProvider?.setTunnelNetworkSettings(nil) { [weak self] error in
+            guard let self = self else { return }
+
+            if let error = error {
+                os_log(
+                    "Failed to clear network settings: %{public}@", log: self.logger, type: .error,
+                    error.localizedDescription)
+            } else {
+                os_log("Network settings cleared", log: self.logger, type: .info)
             }
         }
     }
