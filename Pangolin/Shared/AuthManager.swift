@@ -323,15 +323,19 @@ class AuthManager: ObservableObject {
         sessionExpired = false
         startDeviceAuthImmediately = false
 
-        // Fetch server info
-        await fetchServerInfo()
+        // Setting isAuthenticated swaps the login view out on iOS, and its onDisappear
+        // cancels the login task. Run the rest in its own task so that cancellation
+        // doesn't abort the requests below mid-flight.
+        await Task {
+            await fetchServerInfo()
 
-        // Session and org exist now. Rewrite the on-demand start blob so a later
-        // system start does not keep the previous account's config.
-        if let tunnelManager {
-            await ensureOlmCredentials(userId: user.userId)
-            await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
-        }
+            // Session and org exist now. Rewrite the on-demand start blob so a later
+            // system start does not keep the previous account's config.
+            if let tunnelManager {
+                await ensureOlmCredentials(userId: user.userId)
+                await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
+            }
+        }.value
     }
 
     func markSessionExpiredFromConnection() {
@@ -767,6 +771,8 @@ class AuthManager: ObservableObject {
                     }
                 }
             } catch {
+                // A cancelled caller isn't a failure worth alerting about
+                if Task.isCancelled { return }
                 // Show error alert to user
                 await MainActor.run {
                     AlertManager.shared.showErrorDialog(error)
