@@ -541,7 +541,6 @@ struct SiteResource: Codable, Identifiable, Equatable {
     let mode: String
     let enabled: Bool
     let siteIds: [Int]
-    let siteNames: [String]?
 }
 
 struct ListSiteResourcesResponse: Codable {

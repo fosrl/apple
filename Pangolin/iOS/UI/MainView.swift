@@ -847,15 +847,8 @@ struct ExitNodePickerView: View {
                             }
                         }) {
                             HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(node.name)
-                                        .foregroundColor(.primary)
-                                    if let siteNames = node.siteNames, !siteNames.isEmpty {
-                                        Text(siteNames.joined(separator: ", "))
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
+                                Text(node.name)
+                                    .foregroundColor(.primary)
                                 
                                 Spacer()
                                 
