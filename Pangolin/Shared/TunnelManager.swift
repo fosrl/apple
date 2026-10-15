@@ -846,7 +846,7 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     /// Rebuilds and saves the on-demand start blob when Always On is configured.
-    /// Call on connect (via connect path), launch, and foreground.
+    /// Call on connect (via connect path), launch, foreground, and exit node changes.
     func refreshProviderConfigurationIfOnDemandEnabled() async {
         guard configManager.onDemandOptionFromConfig() != .off else { return }
 
@@ -1107,6 +1107,10 @@ class TunnelManager: NSObject, ObservableObject {
             self.accountManager.setExitNode(userId: userId, resourceId: node.siteResourceId)
             self.savedExitNodeResourceId = node.siteResourceId
         }
+
+        // On-demand starts read the saved start blob, not the account, so rewrite it now.
+        // Otherwise an OS-initiated reconnect after the app is killed drops the exit node.
+        await refreshProviderConfigurationIfOnDemandEnabled()
     }
 
     /// Stops routing traffic through an exit node and forgets the saved choice.
@@ -1139,6 +1143,9 @@ class TunnelManager: NSObject, ObservableObject {
             }
             self.savedExitNodeResourceId = nil
         }
+
+        // Keep the on-demand start blob in sync (see selectExitNode).
+        await refreshProviderConfigurationIfOnDemandEnabled()
     }
 
     /// Turns the saved exit node into the resource and site IDs to establish when connecting, or
@@ -1158,6 +1165,19 @@ class TunnelManager: NSObject, ObservableObject {
                 "Saved exit node no longer exists or is disabled; not using it", log: logger,
                 type: .info)
         } catch {
+            // Fall back to the last list fetched for this org. Without this, a failed lookup
+            // (e.g. while traffic is moving to a new exit node) rewrites the on-demand start
+            // blob without the exit node and the next OS-initiated start drops it.
+            let cached = await MainActor.run { () -> SiteResource? in
+                guard self.gatewayResourcesOrgId == orgId else { return nil }
+                return self.gatewayResources.first(where: { $0.siteResourceId == resourceId })
+            }
+            if let cached {
+                os_log(
+                    "Could not look up saved exit node (%{public}@); using cached exit node list",
+                    log: logger, type: .error, error.localizedDescription)
+                return cached
+            }
             os_log(
                 "Could not look up saved exit node (%{public}@); connecting without it",
                 log: logger, type: .error, error.localizedDescription)
