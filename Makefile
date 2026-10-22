@@ -24,6 +24,10 @@ REAL_GOROOT := $(shell go env GOROOT 2>/dev/null)
 GOROOT := $(BUILDDIR)/goroot
 GOROOT_ABS := $(CURDIR)/$(GOROOT)
 
+# Version of the embedded olm module, reported to the server separately from the app version
+OLM_VERSION := $(shell cd $(GO_DIR) && go list -m -f '{{.Version}}' github.com/fosrl/olm | sed 's/^v//')
+GO_LDFLAGS := -X main.olmVersionOverride=$(OLM_VERSION)
+
 # Platform detection (can be overridden)
 PLATFORM_NAME ?= macosx
 SDKROOT ?= $(shell xcrun --sdk $(PLATFORM_NAME) --show-sdk-path 2>/dev/null || echo "")
@@ -68,7 +72,7 @@ build-arm64: $(ARCHIVE_ARM64)
 
 $(ARCHIVE_ARM64): $(GO_DIR)/main.go $(GO_DIR)/go.mod $(GOROOT)/.prepared
 	@echo "Building Go library for macOS arm64..."
-	cd $(GO_DIR) && CGO_ENABLED=1 GOROOT="$(GOROOT_ABS)" GOARCH=arm64 GOOS=darwin go build -tags nosysresolver --buildmode=c-archive -o $(LIB_NAME)_arm64.a
+	cd $(GO_DIR) && CGO_ENABLED=1 GOROOT="$(GOROOT_ABS)" GOARCH=arm64 GOOS=darwin go build -tags nosysresolver --buildmode=c-archive -ldflags "$(GO_LDFLAGS)" -o $(LIB_NAME)_arm64.a
 	@echo "macOS arm64 build complete: $(ARCHIVE_ARM64)"
 
 # Build for x86_64 (Intel macOS)
@@ -76,7 +80,7 @@ build-x86_64: $(ARCHIVE_X86_64)
 
 $(ARCHIVE_X86_64): $(GO_DIR)/main.go $(GO_DIR)/go.mod $(GOROOT)/.prepared
 	@echo "Building Go library for macOS x86_64..."
-	cd $(GO_DIR) && CGO_ENABLED=1 GOROOT="$(GOROOT_ABS)" GOARCH=amd64 GOOS=darwin go build -tags nosysresolver --buildmode=c-archive -o $(LIB_NAME)_x86_64.a
+	cd $(GO_DIR) && CGO_ENABLED=1 GOROOT="$(GOROOT_ABS)" GOARCH=amd64 GOOS=darwin go build -tags nosysresolver --buildmode=c-archive -ldflags "$(GO_LDFLAGS)" -o $(LIB_NAME)_x86_64.a
 	@echo "macOS x86_64 build complete: $(ARCHIVE_X86_64)"
 
 # Build for iOS device (arm64)
@@ -94,7 +98,7 @@ $(ARCHIVE_IOS_ARM64): $(GO_DIR)/main.go $(GO_DIR)/go.mod $(GOROOT)/.prepared
 	CC="$$CC" \
 	CGO_CFLAGS="-isysroot $$SDKROOT -arch arm64 -miphoneos-version-min=15.0" \
 	CGO_LDFLAGS="-isysroot $$SDKROOT -arch arm64 -miphoneos-version-min=15.0" \
-	go build --buildmode=c-archive -o $(LIB_NAME)_ios_arm64.a
+	go build --buildmode=c-archive -ldflags "$(GO_LDFLAGS)" -o $(LIB_NAME)_ios_arm64.a
 	@echo "iOS arm64 build complete: $(ARCHIVE_IOS_ARM64)"
 
 # Build for iOS simulator arm64 (Apple Silicon Macs)
@@ -112,7 +116,7 @@ $(ARCHIVE_IOS_SIM_ARM64): $(GO_DIR)/main.go $(GO_DIR)/go.mod $(GOROOT)/.prepared
 	CC="$$CC" \
 	CGO_CFLAGS="-isysroot $$SDKROOT -arch arm64 -mios-simulator-version-min=15.0" \
 	CGO_LDFLAGS="-isysroot $$SDKROOT -arch arm64 -mios-simulator-version-min=15.0" \
-	go build --buildmode=c-archive -o $(LIB_NAME)_ios_sim_arm64.a
+	go build --buildmode=c-archive -ldflags "$(GO_LDFLAGS)" -o $(LIB_NAME)_ios_sim_arm64.a
 	@echo "iOS simulator arm64 build complete: $(ARCHIVE_IOS_SIM_ARM64)"
 
 # Build for iOS simulator x86_64 (Intel Macs)
@@ -130,7 +134,7 @@ $(ARCHIVE_IOS_SIM_X86_64): $(GO_DIR)/main.go $(GO_DIR)/go.mod $(GOROOT)/.prepare
 	CC="$$CC" \
 	CGO_CFLAGS="-isysroot $$SDKROOT -arch x86_64 -mios-simulator-version-min=15.0" \
 	CGO_LDFLAGS="-isysroot $$SDKROOT -arch x86_64 -mios-simulator-version-min=15.0" \
-	go build --buildmode=c-archive -o $(LIB_NAME)_ios_sim_x86_64.a
+	go build --buildmode=c-archive -ldflags "$(GO_LDFLAGS)" -o $(LIB_NAME)_ios_sim_x86_64.a
 	@echo "iOS simulator x86_64 build complete: $(ARCHIVE_IOS_SIM_X86_64)"
 
 # Build iOS device only (no simulators)
