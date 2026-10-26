@@ -60,6 +60,14 @@ struct Config: Codable {
 // MARK: - Account Types
 
 struct Account: Identifiable, Codable, Hashable {
+    struct OrgSettings: Codable, Hashable {
+        var exitNodeResourceId: Int? = nil
+
+        var isEmpty: Bool {
+            exitNodeResourceId == nil
+        }
+    }
+
     var id: String { userId }
 
     let userId: String
@@ -68,12 +76,7 @@ struct Account: Identifiable, Codable, Hashable {
     var orgId: String
     var username: String?
     var name: String?
-    /// The exit node (a gateway-mode site resource) selected for this account, re-applied on
-    /// the next connect. It can differ per account, so it's stored here rather than on the root
-    /// config, and it belongs to the account's currently selected org (orgId above). Only the
-    /// resource ID is stored (not the niceId, which can be renamed); its sites are looked up
-    /// from the server on every connect so they can't go stale.
-    var exitNodeResourceId: Int?
+    var orgSettings: [String: OrgSettings]? = nil
 }
 
 extension Account {
