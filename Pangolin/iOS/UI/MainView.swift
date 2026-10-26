@@ -969,6 +969,10 @@ struct ExitNodePickerView: View {
             .overlay {
                 LoadingOverlay(isLoading: isApplying, successMessage: nil)
             }
+            // Match macOS menu open: refetch so newly created exit nodes appear.
+            .task {
+                await tunnelManager.refreshExitNodes()
+            }
         }
     }
 }
@@ -1048,6 +1052,10 @@ struct OrganizationPickerView: View {
             }
             .overlay {
                 LoadingOverlay(isLoading: isSwitchingOrg, successMessage: showSuccessMessage)
+            }
+            // Match macOS menu open: refetch so newly created orgs appear.
+            .task {
+                await authManager.refreshOrganizations()
             }
         }
     }
