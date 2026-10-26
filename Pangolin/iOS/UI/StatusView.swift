@@ -10,6 +10,7 @@ struct StatusView: View {
     @ObservedObject var olmStatusManager: OLMStatusManager
     /// The org's exit nodes, used to name the active one.
     let exitNodes: [SiteResource]
+    var splitLeadingInset: Bool = false
     @AppStorage("net.pangolin.Pangolin.statusDisplayMode") private var displayMode: DisplayMode = .formatted
     @State private var showCopyConfirmation = false
     @State private var selectedSiteID: String?
@@ -41,58 +42,71 @@ struct StatusView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Picker(selection: $displayMode) {
-                        ForEach(DisplayMode.allCases, id: \.self) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    } label: {
-                        Text("Display Mode")
-                    }
-                    .pickerStyle(.menu)
-                } header: {
-                    Text("View")
-                }
+            statusForm
+        }
+    }
 
-                if displayMode == .json {
-                    jsonContent
-                } else {
-                    formattedContent
+    @ViewBuilder
+    private var statusForm: some View {
+        let form = Form {
+            Section {
+                Picker(selection: $displayMode) {
+                    ForEach(DisplayMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                } label: {
+                    Text("Display Mode")
                 }
+                .pickerStyle(.menu)
+            } header: {
+                Text("View")
             }
-            .navigationTitle("Status")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if displayMode == .json {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            UIPasteboard.general.string = displayedJSON
-                            showCopyConfirmation = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                showCopyConfirmation = false
-                            }
-                        }) {
-                            if showCopyConfirmation {
-                                Label("Copied", systemImage: "checkmark")
-                            } else {
-                                Label("Copy", systemImage: "doc.on.doc")
-                            }
+
+            if displayMode == .json {
+                jsonContent
+            } else {
+                formattedContent
+            }
+        }
+        .navigationTitle("Status")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if displayMode == .json {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        UIPasteboard.general.string = displayedJSON
+                        showCopyConfirmation = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            showCopyConfirmation = false
+                        }
+                    }) {
+                        if showCopyConfirmation {
+                            Label("Copied", systemImage: "checkmark")
+                        } else {
+                            Label("Copy", systemImage: "doc.on.doc")
                         }
                     }
                 }
             }
-            .onAppear {
-                olmStatusManager.startPolling()
+        }
+        .onAppear {
+            olmStatusManager.startPolling()
+        }
+        .onDisappear {
+            olmStatusManager.stopPolling()
+        }
+        .sheet(isPresented: siteSheetPresented) {
+            if let selectedSiteID {
+                SiteStatusSheet(siteID: selectedSiteID, olmStatusManager: olmStatusManager)
             }
-            .onDisappear {
-                olmStatusManager.stopPolling()
-            }
-            .sheet(isPresented: siteSheetPresented) {
-                if let selectedSiteID {
-                    SiteStatusSheet(siteID: selectedSiteID, olmStatusManager: olmStatusManager)
-                }
-            }
+        }
+
+        if splitLeadingInset {
+            form
+                .contentMargins(.leading, 20, for: .scrollContent)
+                .modifier(StatusLeadingSectionMargins(length: 20))
+        } else {
+            form
         }
     }
 
@@ -233,6 +247,19 @@ struct StatusView: View {
             }
         } else {
             return "Disconnected"
+        }
+    }
+}
+
+/// Insets Form/List sections from the leading edge (iOS 26+). No-op on older OS.
+private struct StatusLeadingSectionMargins: ViewModifier {
+    let length: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.listSectionMargins(.leading, length)
+        } else {
+            content
         }
     }
 }
