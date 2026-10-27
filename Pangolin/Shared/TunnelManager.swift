@@ -120,7 +120,8 @@ class TunnelManager: NSObject, ObservableObject {
         #if os(macOS)
             self.fingerprintManager.startCacheRefresh(interval: 3 * 3600)
         #endif
-        self.savedExitNodeResourceId = accountManager.activeAccount.flatMap { accountManager.getExitNode(userId: $0.userId) }
+        self.savedExitNodeResourceId = Self.savedExitNode(
+            accountManager: accountManager, orgId: accountManager.activeAccount?.orgId)
         super.init()
 
         // Observe VPN status changes
@@ -846,7 +847,7 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     /// Rebuilds and saves the on-demand start blob when Always On is configured.
-    /// Call on connect (via connect path), launch, and foreground.
+    /// Call on connect (via connect path), launch, foreground, and exit node changes.
     func refreshProviderConfigurationIfOnDemandEnabled() async {
         guard configManager.onDemandOptionFromConfig() != .off else { return }
 
@@ -1051,7 +1052,26 @@ class TunnelManager: NSObject, ObservableObject {
             return olmGatewayResourceId
         }
         guard let resourceId = savedExitNodeResourceId else { return nil }
-        return availableExitNodes.first(where: { $0.siteResourceId == resourceId })?.siteResourceId
+        // While this org's list hasn't loaded (e.g. right after an org/account switch), trust
+        // the saved ID so the picker shows "…" instead of flashing "None".
+        guard gatewayResourcesOrgId == authManager.currentOrg?.orgId else {
+            return resourceId
+        }
+        return availableExitNodes.contains(where: { $0.siteResourceId == resourceId })
+            ? resourceId : nil
+    }
+
+    /// Reloads `savedExitNodeResourceId` from the account store for the current org. Call after
+    /// switching accounts or orgs so the picker restores that context's last choice.
+    func reloadSavedExitNode() {
+        let orgId = authManager.currentOrg?.orgId ?? accountManager.activeAccount?.orgId
+        savedExitNodeResourceId = Self.savedExitNode(
+            accountManager: accountManager, orgId: orgId)
+    }
+
+    private static func savedExitNode(accountManager: AccountManager, orgId: String?) -> Int? {
+        guard let account = accountManager.activeAccount, let orgId else { return nil }
+        return accountManager.getExitNode(userId: account.userId, orgId: orgId)
     }
 
     /// Reloads the org's exit nodes from the server.
@@ -1074,10 +1094,54 @@ class TunnelManager: NSObject, ObservableObject {
         }
     }
 
+    /// After an org switch: reload the saved choice for the new org, refresh the list, and if
+    /// the tunnel is up apply that choice live without wiping other orgs' saved nodes.
+    func syncExitNodeAfterOrgSwitch() async {
+        await MainActor.run { reloadSavedExitNode() }
+        await refreshExitNodes()
+
+        guard isNEConnected else { return }
+
+        if let resourceId = savedExitNodeResourceId,
+            let node = availableExitNodes.first(where: { $0.siteResourceId == resourceId })
+        {
+            do {
+                _ = try await socketManager.selectGateway(
+                    siteResourceId: node.siteResourceId, siteIds: node.siteIds)
+                await MainActor.run {
+                    self.gatewayUpdateGeneration += 1
+                    self.hasOlmGatewayStatus = true
+                    self.olmGatewayResourceId = node.siteResourceId
+                }
+            } catch {
+                os_log(
+                    "Error applying saved exit node after org switch: %{public}@", log: logger,
+                    type: .error, error.localizedDescription)
+            }
+        } else {
+            do {
+                _ = try await socketManager.disableGateway()
+                await MainActor.run {
+                    self.gatewayUpdateGeneration += 1
+                    self.hasOlmGatewayStatus = true
+                    self.olmGatewayResourceId = nil
+                }
+            } catch {
+                os_log(
+                    "Error clearing exit node after org switch: %{public}@", log: logger,
+                    type: .error, error.localizedDescription)
+            }
+        }
+
+        await refreshProviderConfigurationIfOnDemandEnabled()
+    }
+
     /// Routes all traffic through the given exit node. With the tunnel up it takes effect
     /// immediately; otherwise the choice is saved and applied on the next connect.
     func selectExitNode(_ node: SiteResource) async {
-        guard authManager.currentOrg?.orgId != nil, let userId = accountManager.activeAccount?.userId else { return }
+        guard let orgId = authManager.currentOrg?.orgId,
+            let userId = accountManager.activeAccount?.userId
+        else { return }
 
         if isNEConnected {
             do {
@@ -1104,12 +1168,17 @@ class TunnelManager: NSObject, ObservableObject {
         }
 
         await MainActor.run {
-            self.accountManager.setExitNode(userId: userId, resourceId: node.siteResourceId)
+            self.accountManager.setExitNode(
+                userId: userId, orgId: orgId, resourceId: node.siteResourceId)
             self.savedExitNodeResourceId = node.siteResourceId
         }
+
+        // On-demand starts read the saved start blob, not the account, so rewrite it now.
+        // Otherwise an OS-initiated reconnect after the app is killed drops the exit node.
+        await refreshProviderConfigurationIfOnDemandEnabled()
     }
 
-    /// Stops routing traffic through an exit node and forgets the saved choice.
+    /// Stops routing traffic through an exit node and forgets the saved choice for the current org.
     func disableExitNode() async {
         if isNEConnected {
             do {
@@ -1134,19 +1203,25 @@ class TunnelManager: NSObject, ObservableObject {
         }
 
         await MainActor.run {
-            if let userId = self.accountManager.activeAccount?.userId {
-                self.accountManager.setExitNode(userId: userId, resourceId: nil)
+            if let userId = self.accountManager.activeAccount?.userId,
+                let orgId = self.authManager.currentOrg?.orgId
+                    ?? self.accountManager.activeAccount?.orgId
+            {
+                self.accountManager.setExitNode(userId: userId, orgId: orgId, resourceId: nil)
             }
             self.savedExitNodeResourceId = nil
         }
+
+        // Keep the on-demand start blob in sync (see selectExitNode).
+        await refreshProviderConfigurationIfOnDemandEnabled()
     }
 
     /// Turns the saved exit node into the resource and site IDs to establish when connecting, or
-    /// nil to connect without one. Only the resource ID is saved (scoped to the account's org),
+    /// nil to connect without one. Only the resource ID is saved (scoped to account + org),
     /// so a deleted, disabled or site-less resource is skipped.
     private func resolveSavedExitNode(orgId: String) async -> SiteResource? {
         guard let userId = accountManager.activeAccount?.userId,
-            let resourceId = accountManager.getExitNode(userId: userId)
+            let resourceId = accountManager.getExitNode(userId: userId, orgId: orgId)
         else { return nil }
 
         do {
@@ -1158,6 +1233,19 @@ class TunnelManager: NSObject, ObservableObject {
                 "Saved exit node no longer exists or is disabled; not using it", log: logger,
                 type: .info)
         } catch {
+            // Fall back to the last list fetched for this org. Without this, a failed lookup
+            // (e.g. while traffic is moving to a new exit node) rewrites the on-demand start
+            // blob without the exit node and the next OS-initiated start drops it.
+            let cached = await MainActor.run { () -> SiteResource? in
+                guard self.gatewayResourcesOrgId == orgId else { return nil }
+                return self.gatewayResources.first(where: { $0.siteResourceId == resourceId })
+            }
+            if let cached {
+                os_log(
+                    "Could not look up saved exit node (%{public}@); using cached exit node list",
+                    log: logger, type: .error, error.localizedDescription)
+                return cached
+            }
             os_log(
                 "Could not look up saved exit node (%{public}@); connecting without it",
                 log: logger, type: .error, error.localizedDescription)

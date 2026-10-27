@@ -333,6 +333,8 @@ class AuthManager: ObservableObject {
             // system start does not keep the previous account's config.
             if let tunnelManager {
                 await ensureOlmCredentials(userId: user.userId)
+                tunnelManager.reloadSavedExitNode()
+                await tunnelManager.refreshExitNodes()
                 await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
             }
         }.value
@@ -477,6 +479,8 @@ class AuthManager: ObservableObject {
             apiClient.updateSessionToken(nil)
             apiClient.updateBaseURL(accountToSwitchTo.hostname)
             errorMessage = "No session token found for this account. Please log in again."
+            restoreCachedOrganization(from: accountToSwitchTo)
+            tunnelManager?.reloadSavedExitNode()
             return
         }
         
@@ -506,6 +510,7 @@ class AuthManager: ObservableObject {
             isServerDown = true
             errorMessage = "The server appears to be down."
             restoreCachedOrganization(from: accountToSwitchTo)
+            tunnelManager?.reloadSavedExitNode()
             // currentUser is already cleared above, so UI will show account email
             return
         }
@@ -551,6 +556,13 @@ class AuthManager: ObservableObject {
             selectedOrgId = accountToSwitchTo.orgId
             accountManager.setUserOrganization(userId: userId, orgId: selectedOrgId)
             restoreCachedOrganization(from: accountToSwitchTo)
+        }
+
+        // Restore this account/org's last exit node into the tunnel manager cache and refresh
+        // the available list so the picker doesn't stay stuck on the previous account's choice.
+        if let tunnelManager = tunnelManager {
+            tunnelManager.reloadSavedExitNode()
+            await tunnelManager.refreshExitNodes()
         }
         
         // Fetch server info (non-fatal if it fails)
@@ -672,15 +684,15 @@ class AuthManager: ObservableObject {
 
         currentOrg = org
 
-        // Switch org in tunnel if connected
+        // Persist org first so exit-node lookups keyed by orgId see the right context.
+        accountManager.setUserOrganization(userId: currentUser.userId, orgId: org.orgId)
+
+        // Switch org in the tunnel if connected, then restore this org's saved exit node
+        // (without overwriting other orgs' choices) and refresh the picker list.
         if let tunnelManager = tunnelManager {
             await tunnelManager.switchOrg(orgId: org.orgId)
-            await tunnelManager.refreshExitNodes()
+            await tunnelManager.syncExitNodeAfterOrgSwitch()
         }
-
-        // If access is granted and the tunnel switches,
-        // proceed with persisting the selection
-        accountManager.setUserOrganization(userId: currentUser.userId, orgId: org.orgId)
     }
 
     func ensureOlmCredentials(userId: String) async {

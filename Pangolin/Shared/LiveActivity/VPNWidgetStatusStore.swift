@@ -20,7 +20,7 @@ struct VPNWidgetStatusSnapshot: Equatable, Sendable {
         isConnected || isBusy || isOnDemandEnabled
     }
 
-    static let empty = VPNWidgetStatusSnapshot(
+    nonisolated static let empty = VPNWidgetStatusSnapshot(
         statusText: "Disconnected",
         isConnected: false,
         isBusy: false,
@@ -63,7 +63,8 @@ enum VPNWidgetPendingAction: String, Sendable {
     case connect
     case disconnect
 
-    private static let key = "vpnWidget.pendingAction"
+    // nonisolated: set/take run from Control Center intents (not MainActor).
+    nonisolated private static let key = "vpnWidget.pendingAction"
 
     nonisolated private static var defaults: UserDefaults? {
         UserDefaults(suiteName: VPNWidgetStatusStore.appGroupID)
@@ -83,24 +84,25 @@ enum VPNWidgetPendingAction: String, Sendable {
 
 /// Reads/writes VPN status for the Home Screen widget via the shared App Group.
 enum VPNWidgetStatusStore {
-    static let appGroupID = "group.net.pangolin.Pangolin"
-    static let widgetKind = "net.pangolin.Pangolin.VPNStatusWidget"
-    static let controlKind = "net.pangolin.Pangolin.VPNControl"
+    // Immutable App Group / kind IDs — safe from any isolation (widget, tunnel, intents).
+    nonisolated static let appGroupID = "group.net.pangolin.Pangolin"
+    nonisolated static let widgetKind = "net.pangolin.Pangolin.VPNStatusWidget"
+    nonisolated static let controlKind = "net.pangolin.Pangolin.VPNControl"
 
-    private static let statusTextKey = "vpnWidget.statusText"
-    private static let isConnectedKey = "vpnWidget.isConnected"
-    private static let isBusyKey = "vpnWidget.isBusy"
-    private static let isOnDemandEnabledKey = "vpnWidget.isOnDemandEnabled"
-    private static let organizationNameKey = "vpnWidget.organizationName"
-    private static let serverHostnameKey = "vpnWidget.serverHostname"
-    private static let connectedAtKey = "vpnWidget.connectedAt"
-    private static let updatedAtKey = "vpnWidget.updatedAt"
+    nonisolated private static let statusTextKey = "vpnWidget.statusText"
+    nonisolated private static let isConnectedKey = "vpnWidget.isConnected"
+    nonisolated private static let isBusyKey = "vpnWidget.isBusy"
+    nonisolated private static let isOnDemandEnabledKey = "vpnWidget.isOnDemandEnabled"
+    nonisolated private static let organizationNameKey = "vpnWidget.organizationName"
+    nonisolated private static let serverHostnameKey = "vpnWidget.serverHostname"
+    nonisolated private static let connectedAtKey = "vpnWidget.connectedAt"
+    nonisolated private static let updatedAtKey = "vpnWidget.updatedAt"
 
-    private static var defaults: UserDefaults? {
+    nonisolated private static var defaults: UserDefaults? {
         UserDefaults(suiteName: appGroupID)
     }
 
-    static func write(
+    nonisolated static func write(
         statusText: String,
         isConnected: Bool,
         isBusy: Bool,
@@ -122,7 +124,7 @@ enum VPNWidgetStatusStore {
 
     /// Called from the packet tunnel when the OS starts/stops the VPN (including on-demand).
     /// Preserves org/hostname and on-demand engagement when not explicitly overridden.
-    static func publishFromTunnelExtension(
+    nonisolated static func publishFromTunnelExtension(
         isConnected: Bool,
         isBusy: Bool,
         serverHostname: String? = nil
@@ -149,7 +151,7 @@ enum VPNWidgetStatusStore {
         reloadTimelines()
     }
 
-    static func reloadTimelines() {
+    nonisolated static func reloadTimelines() {
         #if canImport(WidgetKit)
         WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
         if #available(iOS 18.0, *) {
@@ -159,7 +161,7 @@ enum VPNWidgetStatusStore {
     }
 
     /// Strips `http(s)://` and trailing slashes so the widget shows just the host.
-    static func displayHostname(from raw: String?) -> String? {
+    nonisolated static func displayHostname(from raw: String?) -> String? {
         guard var value = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
             return nil
         }
@@ -176,7 +178,7 @@ enum VPNWidgetStatusStore {
         return value.isEmpty ? nil : value
     }
 
-    static func read() -> VPNWidgetStatusSnapshot {
+    nonisolated static func read() -> VPNWidgetStatusSnapshot {
         guard let defaults else { return .empty }
         let updatedAt: Date
         if defaults.object(forKey: updatedAtKey) != nil {
@@ -195,7 +197,9 @@ enum VPNWidgetStatusStore {
         )
     }
 
-    private static func setOptionalString(_ value: String?, forKey key: String, in defaults: UserDefaults) {
+    nonisolated private static func setOptionalString(
+        _ value: String?, forKey key: String, in defaults: UserDefaults
+    ) {
         if let value, !value.isEmpty {
             defaults.set(value, forKey: key)
         } else {

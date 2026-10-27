@@ -26,7 +26,13 @@ final class OnboardingViewModel: ObservableObject {
     func refreshPages() async {
         hasSeenWelcome = onboardingState.hasSeenWelcome
         hasAcknowledgedPrivacy = onboardingState.hasAcknowledgedPrivacy
+        #if targetEnvironment(simulator)
+        // Network Extension VPN profiles cannot be installed in the Simulator.
+        vpnInstalled = true
+        onboardingState.markCompletedVPNInstallOnboarding()
+        #else
         vpnInstalled = await tunnelManager.isVPNProfileInstalled()
+        #endif
 
         // Show onboarding whenever any step is incomplete.
         let needsWelcome = !hasSeenWelcome
@@ -70,6 +76,15 @@ final class OnboardingViewModel: ObservableObject {
             onboardingState.markCompletedVPNInstallOnboarding()
         }
     }
+
+    #if DEBUG
+    /// Lets DEBUG builds dismiss the VPN step when profile install is unavailable
+    /// (e.g. Simulator) or blocked during local development.
+    func handleSkipVPNInstallForDebug() {
+        vpnInstalled = true
+        onboardingState.markCompletedVPNInstallOnboarding()
+    }
+    #endif
 
     func handleDoneTapped() {
         isPresenting = false
@@ -119,6 +134,13 @@ struct OnboardingFlowView: View {
                         Task {
                             await viewModel.handleVPNInstallTapped()
                         }
+                    },
+                    skipAction: {
+                        #if DEBUG
+                        withAnimation {
+                            viewModel.handleSkipVPNInstallForDebug()
+                        }
+                        #endif
                     },
                     doneAction: {
                         withAnimation {
@@ -295,6 +317,7 @@ private struct OnboardingInstallVPNPage: View {
     let hasAcknowledgedPrivacy: Bool
     let isInstalling: Bool
     let installAction: () -> Void
+    let skipAction: () -> Void
     let doneAction: () -> Void
 
     var body: some View {
@@ -342,21 +365,30 @@ private struct OnboardingInstallVPNPage: View {
                 // Extra bottom padding so dots don't overlap the button
                 .padding(.bottom, 56)
             } else {
-                Button(action: installAction) {
-                    HStack {
-                        if isInstalling {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                VStack(spacing: 12) {
+                    Button(action: installAction) {
+                        HStack {
+                            if isInstalling {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            }
+                            Text(isInstalling ? "Installing…" : "Install")
                         }
-                        Text(isInstalling ? "Installing…" : "Install")
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(isInstalling || !hasAcknowledgedPrivacy)
+
+                    #if DEBUG
+                    Button("Skip (Debug)", action: skipAction)
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .disabled(!hasAcknowledgedPrivacy)
+                    #endif
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(isInstalling || !hasAcknowledgedPrivacy)
-                    // Extra bottom padding so dots don't overlap the button
-                    .padding(.bottom, 56)
+                // Extra bottom padding so dots don't overlap the button
+                .padding(.bottom, 56)
             }
         }
     }

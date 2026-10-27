@@ -74,6 +74,13 @@ class AccountManager: ObservableObject {
     }
 
     func addAccount(_ account: Account, makeActive: Bool = false) {
+        var account = account
+        // Re-login replaces the Account struct; keep any previously saved per-org settings.
+        if let existing = store.accounts[account.userId],
+            let settings = existing.orgSettings, !settings.isEmpty
+        {
+            account.orgSettings = settings
+        }
         store.accounts[account.userId] = account
 
         if makeActive {
@@ -101,19 +108,40 @@ class AccountManager: ObservableObject {
 
         _ = save()
     }
-    
-    /// The resource ID of userId's selected exit node, or nil if none is selected or the
-    /// account doesn't exist.
-    func getExitNode(userId: String) -> Int? {
-        return store.accounts[userId]?.exitNodeResourceId
+
+    /// Settings for an org under the given account, or empty defaults if none are stored /
+    /// the account is missing.
+    func getOrgSettings(userId: String, orgId: String) -> Account.OrgSettings {
+        store.accounts[userId]?.orgSettings?[orgId] ?? Account.OrgSettings()
     }
 
-    /// Records the selected exit node (a gateway resource) for userId; a nil resourceId clears it.
-    func setExitNode(userId: String, resourceId: Int?) {
-        if var account = store.accounts[userId] {
-            account.exitNodeResourceId = resourceId
-            store.accounts[userId] = account
-            _ = save()
+    /// Updates settings for an org under the given account. Empty settings remove that
+    /// org's entry. Org IDs are only unique within the account, so the map lives on Account.
+    func updateOrgSettings(
+        userId: String, orgId: String, _ body: (inout Account.OrgSettings) -> Void
+    ) {
+        guard var account = store.accounts[userId] else { return }
+
+        var settings = account.orgSettings ?? [:]
+        var org = settings[orgId] ?? Account.OrgSettings()
+        body(&org)
+        if org.isEmpty {
+            settings.removeValue(forKey: orgId)
+        } else {
+            settings[orgId] = org
+        }
+        account.orgSettings = settings.isEmpty ? nil : settings
+        store.accounts[userId] = account
+        _ = save()
+    }
+
+    func getExitNode(userId: String, orgId: String) -> Int? {
+        getOrgSettings(userId: userId, orgId: orgId).exitNodeResourceId
+    }
+
+    func setExitNode(userId: String, orgId: String, resourceId: Int?) {
+        updateOrgSettings(userId: userId, orgId: orgId) { settings in
+            settings.exitNodeResourceId = resourceId
         }
     }
 

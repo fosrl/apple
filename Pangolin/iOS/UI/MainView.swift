@@ -25,7 +25,7 @@ struct MainView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeTabView(
+            HomeStatusArrangementView(
                 configManager: configManager,
                 authManager: authManager,
                 accountManager: accountManager,
@@ -125,6 +125,84 @@ struct MainView: View {
     }
 }
 
+/// True when ArrangementView's horizontal split is active: regular width and
+/// wider than tall (matches `.split.axes(.horizontal)`). Folded compact stays false.
+private func isHomeStatusSideBySide(
+    horizontalSizeClass: UserInterfaceSizeClass?,
+    size: CGSize
+) -> Bool {
+    horizontalSizeClass == .regular && size.width > size.height
+}
+
+/// Home tab root: ArrangementView with horizontal-only split on iOS 27.1+, else Home alone.
+/// Panes omit their own NavigationStack so the primary half does not reserve an empty
+/// trailing column that looks like a sidebar gutter.
+struct HomeStatusArrangementView: View {
+    @ObservedObject var configManager: ConfigManager
+    @ObservedObject var authManager: AuthManager
+    @ObservedObject var accountManager: AccountManager
+    @ObservedObject var tunnelManager: TunnelManager
+    @Binding var showAccountPicker: Bool
+    @Binding var showOrganizationPicker: Bool
+    @Binding var showExitNodePicker: Bool
+    @Binding var showLoginView: Bool
+    @Binding var startDeviceAuthImmediately: Bool
+    @Binding var selectedTab: TabSelection
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    var body: some View {
+        if #available(iOS 27.1, *) {
+            // Measure the full arrangement (not a single pane): half-width Home
+            // can be taller than wide even while Status is beside it.
+            GeometryReader { geo in
+                let sideBySide = isHomeStatusSideBySide(
+                    horizontalSizeClass: horizontalSizeClass,
+                    size: geo.size
+                )
+                // No NavigationStack around the panes: a stack in the primary half
+                // reserves an empty trailing column that reads as a sidebar gutter.
+                ArrangementView {
+                    homeTab(
+                        embedsNavigationStack: false,
+                        showsStatusDetailsLink: !sideBySide
+                    )
+                } secondary: {
+                    StatusView(
+                        olmStatusManager: tunnelManager.olmStatusManager,
+                        exitNodes: tunnelManager.availableExitNodes,
+                        splitLeadingInset: true
+                    )
+                }
+                .arrangementViewStyle(.split.axes(.horizontal))
+                .frame(width: geo.size.width, height: geo.size.height)
+            }
+        } else {
+            homeTab(embedsNavigationStack: true, showsStatusDetailsLink: true)
+        }
+    }
+
+    @ViewBuilder
+    private func homeTab(
+        embedsNavigationStack: Bool,
+        showsStatusDetailsLink: Bool
+    ) -> some View {
+        HomeTabView(
+            configManager: configManager,
+            authManager: authManager,
+            accountManager: accountManager,
+            tunnelManager: tunnelManager,
+            showAccountPicker: $showAccountPicker,
+            showOrganizationPicker: $showOrganizationPicker,
+            showExitNodePicker: $showExitNodePicker,
+            showLoginView: $showLoginView,
+            startDeviceAuthImmediately: $startDeviceAuthImmediately,
+            selectedTab: $selectedTab,
+            embedsNavigationStack: embedsNavigationStack,
+            showsStatusDetailsLink: showsStatusDetailsLink
+        )
+    }
+}
+
 // MARK: - Home Tab View
 
 struct HomeTabView: View {
@@ -138,7 +216,11 @@ struct HomeTabView: View {
     @Binding var showLoginView: Bool
     @Binding var startDeviceAuthImmediately: Bool
     @Binding var selectedTab: TabSelection
-    
+    /// When false, content is hosted inside an outer NavigationStack (Duo arrangement).
+    var embedsNavigationStack: Bool = true
+    /// When false, Status is already visible beside Home (Duo unfolded landscape).
+    var showsStatusDetailsLink: Bool = true
+
     private var tunnelStatus: TunnelStatus {
         tunnelManager.status
     }
@@ -220,8 +302,17 @@ struct HomeTabView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        Group {
+            if embedsNavigationStack {
+                NavigationStack { homeScrollContent }
+            } else {
+                homeScrollContent
+            }
+        }
+    }
+
+    private var homeScrollContent: some View {
+        ScrollView {
                 VStack(spacing: 24) {
                     // Logo
                     Image("PangolinLogo")
@@ -335,8 +426,11 @@ struct HomeTabView: View {
                             .cornerRadius(24)
                         }
                         
-                        // Status page dropdown button (only when connected and not session expired)
-                        if !authManager.sessionExpired, tunnelStatus == .connected {
+                        // Status page dropdown button (only when connected and not session expired;
+                        // hidden when Status is already shown beside Home)
+                        if showsStatusDetailsLink,
+                           !authManager.sessionExpired,
+                           tunnelStatus == .connected {
                             Button(action: {
                                 selectedTab = .status
                             }) {
@@ -589,7 +683,6 @@ struct HomeTabView: View {
                 .padding()
                 .frame(maxWidth: 600)
                 .frame(maxWidth: .infinity)
-            }
         }
     }
 }
@@ -876,6 +969,10 @@ struct ExitNodePickerView: View {
             .overlay {
                 LoadingOverlay(isLoading: isApplying, successMessage: nil)
             }
+            // Match macOS menu open: refetch so newly created exit nodes appear.
+            .task {
+                await tunnelManager.refreshExitNodes()
+            }
         }
     }
 }
@@ -955,6 +1052,10 @@ struct OrganizationPickerView: View {
             }
             .overlay {
                 LoadingOverlay(isLoading: isSwitchingOrg, successMessage: showSuccessMessage)
+            }
+            // Match macOS menu open: refetch so newly created orgs appear.
+            .task {
+                await authManager.refreshOrganizations()
             }
         }
     }
