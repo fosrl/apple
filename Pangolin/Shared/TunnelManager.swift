@@ -121,7 +121,7 @@ class TunnelManager: NSObject, ObservableObject {
             self.fingerprintManager.startCacheRefresh(interval: 3 * 3600)
         #endif
         self.savedExitNodeResourceId = Self.savedExitNode(
-            accountManager: accountManager, orgId: accountManager.activeAccount?.orgId)
+            configManager: configManager, accountManager: accountManager, orgId: accountManager.activeAccount?.orgId)
         super.init()
 
         // Observe VPN status changes
@@ -703,6 +703,8 @@ class TunnelManager: NSObject, ObservableObject {
             return nil
         }
 
+        await refreshClientSettings()
+
         var tunnelOptions: [String: NSObject] = [:]
 
         tunnelOptions["endpoint"] = activeAccount.hostname as NSString
@@ -1066,12 +1068,57 @@ class TunnelManager: NSObject, ObservableObject {
     func reloadSavedExitNode() {
         let orgId = authManager.currentOrg?.orgId ?? accountManager.activeAccount?.orgId
         savedExitNodeResourceId = Self.savedExitNode(
-            accountManager: accountManager, orgId: orgId)
+            configManager: configManager, accountManager: accountManager, orgId: orgId)
     }
 
-    private static func savedExitNode(accountManager: AccountManager, orgId: String?) -> Int? {
+    /// The exit node the org connects with: one the server locks always wins; next the user's
+    /// own selection, then the org's section of pangolin.json, and last the server's default.
+    private static func savedExitNode(
+        configManager: ConfigManager, accountManager: AccountManager, orgId: String?
+    ) -> Int? {
         guard let account = accountManager.activeAccount, let orgId else { return nil }
-        return accountManager.getExitNode(userId: account.userId, orgId: orgId)
+        let server = accountManager.getServerSettings(userId: account.userId, orgId: orgId)
+        return server?.lockedExitNode
+            ?? accountManager.getExitNode(userId: account.userId, orgId: orgId)
+            ?? configManager.orgConfig(orgId: orgId)?.exitNodeResourceId
+            ?? server?.exitNodeSiteResourceId
+    }
+
+    /// Whether the org's server forces the exit node, so the user can't change it.
+    var isExitNodeLocked: Bool {
+        configManager.serverSettings?.lockedExitNode != nil
+    }
+
+    /// Fetches the settings the current org's server manages and applies them. Runs on every
+    /// connect and when Preferences opens. If the server can't be reached the last fetched
+    /// settings keep applying.
+    func refreshClientSettings() async {
+        guard let org = authManager.currentOrg, let userId = accountManager.activeAccount?.userId
+        else {
+            await MainActor.run {
+                configManager.setActiveOrg(id: nil, name: nil, serverSettings: nil)
+            }
+            return
+        }
+
+        do {
+            let settings = try await authManager.apiClient.getMyClientSettings(orgId: org.orgId)
+            await MainActor.run {
+                accountManager.setServerSettings(
+                    userId: userId, orgId: org.orgId, settings: settings)
+            }
+        } catch {
+            os_log(
+                "Failed to fetch client settings: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
+        }
+
+        await MainActor.run {
+            configManager.setActiveOrg(
+                id: org.orgId, name: org.name,
+                serverSettings: accountManager.getServerSettings(userId: userId, orgId: org.orgId))
+            reloadSavedExitNode()
+        }
     }
 
     /// Reloads the org's exit nodes from the server.
@@ -1097,7 +1144,7 @@ class TunnelManager: NSObject, ObservableObject {
     /// After an org switch: reload the saved choice for the new org, refresh the list, and if
     /// the tunnel is up apply that choice live without wiping other orgs' saved nodes.
     func syncExitNodeAfterOrgSwitch() async {
-        await MainActor.run { reloadSavedExitNode() }
+        await refreshClientSettings()
         await refreshExitNodes()
 
         guard isNEConnected else { return }
@@ -1140,7 +1187,8 @@ class TunnelManager: NSObject, ObservableObject {
     /// immediately; otherwise the choice is saved and applied on the next connect.
     func selectExitNode(_ node: SiteResource) async {
         guard let orgId = authManager.currentOrg?.orgId,
-            let userId = accountManager.activeAccount?.userId
+            let userId = accountManager.activeAccount?.userId,
+            !isExitNodeLocked
         else { return }
 
         if isNEConnected {
@@ -1180,6 +1228,8 @@ class TunnelManager: NSObject, ObservableObject {
 
     /// Stops routing traffic through an exit node and forgets the saved choice for the current org.
     func disableExitNode() async {
+        guard !isExitNodeLocked else { return }
+
         if isNEConnected {
             do {
                 _ = try await socketManager.disableGateway()
@@ -1220,8 +1270,9 @@ class TunnelManager: NSObject, ObservableObject {
     /// nil to connect without one. Only the resource ID is saved (scoped to account + org),
     /// so a deleted, disabled or site-less resource is skipped.
     private func resolveSavedExitNode(orgId: String) async -> SiteResource? {
-        guard let userId = accountManager.activeAccount?.userId,
-            let resourceId = accountManager.getExitNode(userId: userId, orgId: orgId)
+        guard
+            let resourceId = Self.savedExitNode(
+                configManager: configManager, accountManager: accountManager, orgId: orgId)
         else { return nil }
 
         do {

@@ -4,6 +4,24 @@ struct PreferencesView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
     @AppStorage(VPNLiveActivityManager.enabledDefaultsKey) private var liveActivityEnabled = true
+    @State private var pendingScopedChange: ((SettingsScope) -> Void)?
+
+    /// Applies a change, asking first whether it's global or for this org when that's not known.
+    private func applyScoped(_ change: @escaping (SettingsScope) -> Void) {
+        configManager.applyScoped(change) { pendingScopedChange = $0 }
+    }
+
+    /// Same as `applyScoped` for the DNS and MTU screens. The question can't be presented until
+    /// the pushed screen has finished popping back here.
+    private func applyScopedAfterPop(_ change: @escaping (SettingsScope) -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            applyScoped(change)
+        }
+    }
+
+    private var serverSettings: ClientSettings? {
+        configManager.serverSettings
+    }
 
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
@@ -38,6 +56,8 @@ struct PreferencesView: View {
     var body: some View {
         NavigationStack {
             Form {
+                OrgSettingsModeSection(configManager: configManager)
+
                 Section(header: Text("General")) {
                     Toggle(isOn: $liveActivityEnabled) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -63,7 +83,9 @@ struct PreferencesView: View {
                     Toggle(isOn: Binding(
                         get: { dnsOverrideEnabled },
                         set: { newValue in
-                            _ = configManager.setDNSOverrideEnabled(newValue)
+                            applyScoped { scope in
+                                _ = configManager.setDNSOverrideEnabled(newValue, scope: scope)
+                            }
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -75,11 +97,14 @@ struct PreferencesView: View {
                         }
                     }
                     .tint(.accentColor)
+                    .disabled(serverSettings?.overrideDns != nil)
 
                     Toggle(isOn: Binding(
                         get: { dnsTunnelEnabled },
                         set: { newValue in
-                            _ = configManager.setDNSTunnelEnabled(newValue)
+                            applyScoped { scope in
+                                _ = configManager.setDNSTunnelEnabled(newValue, scope: scope)
+                            }
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -91,7 +116,7 @@ struct PreferencesView: View {
                         }
                     }
                     .tint(.accentColor)
-                    .disabled(!dnsOverrideEnabled)
+                    .disabled(!dnsOverrideEnabled || serverSettings?.tunnelDns != nil)
 
                     if dnsOverrideEnabled {
                         NavigationLink {
@@ -99,7 +124,9 @@ struct PreferencesView: View {
                                 title: "Primary Upstream DNS Server",
                                 initialValue: primaryDNSServer,
                                 onSave: { newValue in
-                                    _ = configManager.setPrimaryDNSServer(newValue)
+                                    applyScopedAfterPop { scope in
+                                        _ = configManager.setPrimaryDNSServer(newValue, scope: scope)
+                                    }
                                 }
                             )
                         } label: {
@@ -110,13 +137,16 @@ struct PreferencesView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .disabled(serverSettings?.managesUpstreamDNS == true)
 
                         NavigationLink {
                             DNSServerModalView(
                                 title: "Secondary Upstream DNS Server",
                                 initialValue: secondaryDNSServer,
                                 onSave: { newValue in
-                                    _ = configManager.setSecondaryDNSServer(newValue)
+                                    applyScopedAfterPop { scope in
+                                        _ = configManager.setSecondaryDNSServer(newValue, scope: scope)
+                                    }
                                 }
                             )
                         } label: {
@@ -127,6 +157,7 @@ struct PreferencesView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .disabled(serverSettings?.managesUpstreamDNS == true)
                     }
                 }
 
@@ -134,7 +165,9 @@ struct PreferencesView: View {
                     Toggle(isOn: Binding(
                         get: { exitNodeTakesPrecedence },
                         set: { newValue in
-                            _ = configManager.setExitNodeTakesPrecedence(newValue)
+                            applyScoped { scope in
+                                _ = configManager.setExitNodeTakesPrecedence(newValue, scope: scope)
+                            }
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -146,13 +179,16 @@ struct PreferencesView: View {
                         }
                     }
                     .tint(.accentColor)
+                    .disabled(serverSettings?.exitNodeTakesPrecedence != nil)
 
                     NavigationLink {
                         MTUModalView(
                             title: "MTU",
                             initialValue: tunnelMTUDisplay,
                             onSave: { newValue in
-                                _ = configManager.setTunnelMTUFromString(newValue)
+                                applyScopedAfterPop { scope in
+                                    _ = configManager.setTunnelMTUFromString(newValue, scope: scope)
+                                }
                             }
                         )
                     } label: {
@@ -169,6 +205,7 @@ struct PreferencesView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .disabled(serverSettings?.mtu != nil)
                 }
 
                 Section(header: Text("Help")) {
@@ -182,9 +219,15 @@ struct PreferencesView: View {
                         }
                     }
                 }
+
+                OrgSettingsResetSection(configManager: configManager)
             }
             .navigationTitle("Preferences")
             .navigationBarTitleDisplayMode(.inline)
+            .modifier(SettingsScopePrompt(configManager: configManager, pendingChange: $pendingScopedChange))
+            .task {
+                await tunnelManager.refreshClientSettings()
+            }
         }
     }
 }

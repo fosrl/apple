@@ -896,6 +896,9 @@ struct ExitNodePickerView: View {
     @State private var isApplying = false
     
     private var shouldDisableButtons: Bool {
+        if tunnelManager.isExitNodeLocked {
+            return true
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true

@@ -382,6 +382,19 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    /// The settings the org manages for the current user, or nil if it manages none. Servers
+    /// that predate client settings answer 404, which means the same thing.
+    func getMyClientSettings(orgId: String) async throws -> ClientSettings? {
+        do {
+            let (data, response) = try await makeRequest(
+                method: "GET", path: "/org/\(orgId)/my-client-settings")
+            let result: MyClientSettingsResponse = try parseResponse(data, response)
+            return result.settings
+        } catch APIError.httpError(404, _) {
+            return nil
+        }
+    }
+
     /// Every gateway-mode site resource (exit node) in the org that can be selected, fetching all
     /// pages. Disabled resources and ones with no sites are dropped since they can't carry traffic.
     func listGatewayResources(orgId: String) async throws -> [SiteResource] {

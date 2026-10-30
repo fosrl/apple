@@ -13,6 +13,24 @@ struct PreferencesContentView: View {
     @State private var editingMTU = ""
     @State private var showEnableDNSOverrideAlert = false
     @State private var showLaunchAtLoginErrorAlert = false
+    @State private var pendingScopedChange: ((SettingsScope) -> Void)?
+
+    /// Applies a change, asking first whether it's global or for this org when that's not known.
+    private func applyScoped(_ change: @escaping (SettingsScope) -> Void) {
+        configManager.applyScoped(change) { pendingScopedChange = $0 }
+    }
+
+    /// Same as `applyScoped` for the DNS and MTU sheets. The question can't be presented until
+    /// the sheet has finished closing.
+    private func applyScopedAfterSheet(_ change: @escaping (SettingsScope) -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            applyScoped(change)
+        }
+    }
+
+    private var serverSettings: ClientSettings? {
+        configManager.serverSettings
+    }
 
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
@@ -52,6 +70,8 @@ struct PreferencesContentView: View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
+                    OrgSettingsModeSection(configManager: configManager)
+
                     Section(header: Text("General")) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
@@ -94,13 +114,16 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { dnsOverrideEnabled },
                                 set: { newValue in
-                                    if !configManager.setDNSOverrideEnabled(newValue) {
-                                        showEnableDNSOverrideAlert = true
+                                    applyScoped { scope in
+                                        if !configManager.setDNSOverrideEnabled(newValue, scope: scope) {
+                                            showEnableDNSOverrideAlert = true
+                                        }
                                     }
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
+                            .disabled(serverSettings?.overrideDns != nil)
                         }
 
                         HStack {
@@ -115,12 +138,14 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { dnsTunnelEnabled },
                                 set: { newValue in
-                                    _ = configManager.setDNSTunnelEnabled(newValue)
+                                    applyScoped { scope in
+                                        _ = configManager.setDNSTunnelEnabled(newValue, scope: scope)
+                                    }
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
-                            .disabled(!dnsOverrideEnabled)
+                            .disabled(!dnsOverrideEnabled || serverSettings?.tunnelDns != nil)
                         }
                         
                         if dnsOverrideEnabled {
@@ -137,6 +162,7 @@ struct PreferencesContentView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                .disabled(serverSettings?.managesUpstreamDNS == true)
                             }
                             
                             HStack {
@@ -152,6 +178,7 @@ struct PreferencesContentView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                .disabled(serverSettings?.managesUpstreamDNS == true)
                             }
                         }
                     }
@@ -169,11 +196,14 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { exitNodeTakesPrecedence },
                                 set: { newValue in
-                                    _ = configManager.setExitNodeTakesPrecedence(newValue)
+                                    applyScoped { scope in
+                                        _ = configManager.setExitNodeTakesPrecedence(newValue, scope: scope)
+                                    }
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
+                            .disabled(serverSettings?.exitNodeTakesPrecedence != nil)
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -190,6 +220,7 @@ struct PreferencesContentView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                .disabled(serverSettings?.mtu != nil)
                             }
 
                             Text("Your sites must be configured to use the same MTU value.")
@@ -210,19 +241,27 @@ struct PreferencesContentView: View {
                         }
                         .foregroundColor(.accentColor)
                     }
+
+                    OrgSettingsResetSection(configManager: configManager)
                 }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(SettingsScopePrompt(configManager: configManager, pendingChange: $pendingScopedChange))
+        .task {
+            await tunnelManager.refreshClientSettings()
+        }
         .sheet(isPresented: $showPrimaryDNSModal) {
             DNSServerModalView(
                 title: "Primary Upstream DNS Server:",
                 dnsServer: $editingPrimaryDNS,
                 isPresented: $showPrimaryDNSModal,
                 onSave: { newValue in
-                    _ = configManager.setPrimaryDNSServer(newValue)
+                    applyScopedAfterSheet { scope in
+                        _ = configManager.setPrimaryDNSServer(newValue, scope: scope)
+                    }
                 }
             )
         }
@@ -232,7 +271,9 @@ struct PreferencesContentView: View {
                 dnsServer: $editingSecondaryDNS,
                 isPresented: $showSecondaryDNSModal,
                 onSave: { newValue in
-                    _ = configManager.setSecondaryDNSServer(newValue)
+                    applyScopedAfterSheet { scope in
+                        _ = configManager.setSecondaryDNSServer(newValue, scope: scope)
+                    }
                 }
             )
         }
@@ -242,7 +283,9 @@ struct PreferencesContentView: View {
                 mtuValue: $editingMTU,
                 isPresented: $showMTUModal,
                 onSave: { newValue in
-                    _ = configManager.setTunnelMTUFromString(newValue)
+                    applyScopedAfterSheet { scope in
+                        _ = configManager.setTunnelMTUFromString(newValue, scope: scope)
+                    }
                 }
             )
         }
@@ -263,6 +306,7 @@ struct PreferencesContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchAtLoginManager.refresh()
+            Task { await tunnelManager.refreshClientSettings() }
         }
     }
 }

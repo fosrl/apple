@@ -38,6 +38,10 @@ struct Config: Codable {
     /// SSIDs for only/except modes.
     var onDemandSSIDs: [String]?
 
+    /// Per-org overrides, keyed by org ID. Precedence when connecting to an org: server
+    /// settings, then its entry here, then the global settings above.
+    var orgs: [String: OrgConfig]?
+
     enum CodingKeys: String, CodingKey {
         case dnsOverrideEnabled
         case dnsTunnelEnabled
@@ -54,7 +58,74 @@ struct Config: Codable {
         case onDemandSSIDOption
         case onDemandSSIDs
         case sessionCookieName
+        case orgs
     }
+}
+
+/// The `orgs` section of pangolin.json: the settings of `Config` that can be set per org, plus
+/// `exitNodeResourceId`. An exit node only means something within one org, so it has no global
+/// equivalent.
+struct OrgConfig: Codable {
+    var dnsOverrideEnabled: Bool?
+    var dnsTunnelEnabled: Bool?
+    var primaryDNSServer: String?
+    var secondaryDNSServer: String?
+    var tunnelMTU: Int?
+    var matchDomains: [String]?
+    var exitNodeTakesPrecedence: Bool?
+    var exitNodeResourceId: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case dnsOverrideEnabled
+        case dnsTunnelEnabled
+        case primaryDNSServer
+        case secondaryDNSServer
+        case tunnelMTU
+        case matchDomains = "dnsMatchDomains"
+        case exitNodeTakesPrecedence
+        case exitNodeResourceId
+    }
+
+    var isEmpty: Bool {
+        dnsOverrideEnabled == nil && dnsTunnelEnabled == nil && primaryDNSServer == nil
+            && secondaryDNSServer == nil && tunnelMTU == nil && matchDomains == nil
+            && exitNodeTakesPrecedence == nil && exitNodeResourceId == nil
+    }
+}
+
+/// The server's GET /org/:orgId/my-client-settings response. A nil field isn't managed by the
+/// server.
+struct ClientSettings: Codable, Hashable {
+    var overrideDns: Bool?
+    var mtu: Int?
+    var tunnelDns: Bool?
+    var primaryDns: String?
+    var secondaryDns: String?
+    var exitNodeTakesPrecedence: Bool?
+    var exitNodeSiteResourceId: Int?
+    var exitNodeLocked: Bool?
+    var matchDomains: [String]?
+    var preferLocalRoutes: Bool?
+
+    /// The exit node the server forces, or nil if it forces none.
+    var lockedExitNode: Int? {
+        exitNodeLocked == true ? exitNodeSiteResourceId : nil
+    }
+
+    /// The upstream DNS servers are managed together, since they form one list.
+    var managesUpstreamDNS: Bool {
+        primaryDns != nil || secondaryDns != nil
+    }
+}
+
+struct MyClientSettingsResponse: Codable {
+    let settings: ClientSettings?
+}
+
+/// Where a change to a setting that can differ per org is saved.
+enum SettingsScope {
+    case global
+    case org
 }
 
 // MARK: - Account Types
@@ -62,9 +133,13 @@ struct Config: Codable {
 struct Account: Identifiable, Codable, Hashable {
     struct OrgSettings: Codable, Hashable {
         var exitNodeResourceId: Int? = nil
+        /// The settings the org's server manages for this user, as last fetched from it.
+        /// Refreshed on every connect and when Preferences opens; only kept here so they still
+        /// apply if the server can't be reached.
+        var serverSettings: ClientSettings? = nil
 
         var isEmpty: Bool {
-            exitNodeResourceId == nil
+            exitNodeResourceId == nil && serverSettings == nil
         }
     }
 

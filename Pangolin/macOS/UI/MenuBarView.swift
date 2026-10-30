@@ -937,6 +937,9 @@ struct ExitNodeSubmenu: View {
     }
 
     private var isDisabled: Bool {
+        if tunnelManager.isExitNodeLocked {
+            return true
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true

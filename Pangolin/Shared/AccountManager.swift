@@ -135,6 +135,16 @@ class AccountManager: ObservableObject {
         _ = save()
     }
 
+    func getServerSettings(userId: String, orgId: String) -> ClientSettings? {
+        getOrgSettings(userId: userId, orgId: orgId).serverSettings
+    }
+
+    func setServerSettings(userId: String, orgId: String, settings: ClientSettings?) {
+        updateOrgSettings(userId: userId, orgId: orgId) { orgSettings in
+            orgSettings.serverSettings = settings
+        }
+    }
+
     func getExitNode(userId: String, orgId: String) -> Int? {
         getOrgSettings(userId: userId, orgId: orgId).exitNodeResourceId
     }
