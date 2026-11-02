@@ -48,7 +48,6 @@ class APIClient: ObservableObject {
     private var sessionCookieName = "p_session_token"
     private let csrfToken = "x-csrf-protection"
 
-    /// Called when a request made with a session token returns 401 or 403. Set by AuthManager to mark session expired.
     var onUnauthorized: (() -> Void)?
 
     private var agentName: String {
@@ -223,7 +222,7 @@ class APIClient: ObservableObject {
     }
     
     private func notifyUnauthorizedIfNeeded(statusCode: Int) {
-        guard (statusCode == 401 || statusCode == 403), sessionToken != nil else { return }
+        guard statusCode == 401, sessionToken != nil else { return }
         onUnauthorized?()
     }
 

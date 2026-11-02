@@ -701,7 +701,11 @@ struct MenuBarView: View {
             // await tunnelManager.disconnect()
         } catch let error as APIError {
             if case .httpError(let statusCode, _) = error, statusCode == 401 || statusCode == 403 {
-                // Session expired; leave isLoggedOut false so "Account Locked" / "Log In" show
+                if statusCode == 403 {
+                    await MainActor.run {
+                        authManager.markSessionExpiredFromConnection()
+                    }
+                }
             } else {
                 await MainActor.run {
                     isLoggedOut = true

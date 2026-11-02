@@ -1087,9 +1087,14 @@ class TunnelManager: NSObject, ObservableObject {
                 self.gatewayResourcesOrgId = orgId
             }
         } catch {
-            // Keep whatever we had; the server may just be unreachable.
+            if case APIError.httpError(403, _) = error {
+                await MainActor.run {
+                    self.gatewayResources = []
+                    self.gatewayResourcesOrgId = orgId
+                }
+            }
             os_log(
-                "Failed to list exit nodes: %{public}@", log: logger, type: .error,
+                "Failed to list exit nodes: %{public}@", log: logger, type: .debug,
                 error.localizedDescription)
         }
     }
