@@ -32,7 +32,9 @@ class SecretManager: ObservableObject {
         return status == errSecSuccess
     }
 
-    private func getSecret(key: String) -> String? {
+    // Keychain reads are thread-safe; nonisolated so the CLI companion server
+    // can read secrets off the main thread.
+    nonisolated private func getSecret(key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -67,7 +69,7 @@ class SecretManager: ObservableObject {
 
     // MARK: - Session Tokens
 
-    func getSessionToken(userId: String) -> String? {
+    nonisolated func getSessionToken(userId: String) -> String? {
         return getSecret(key: "session-token-\(userId)")
     }
 
@@ -81,11 +83,11 @@ class SecretManager: ObservableObject {
 
     // MARK: - OLM Credentials
 
-    func getOlmId(userId: String) -> String? {
+    nonisolated func getOlmId(userId: String) -> String? {
         return getSecret(key: "olm-id-\(userId)")
     }
 
-    func getOlmSecret(userId: String) -> String? {
+    nonisolated func getOlmSecret(userId: String) -> String? {
         return getSecret(key: "olm-secret-\(userId)")
     }
 

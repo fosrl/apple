@@ -129,9 +129,21 @@ struct AnimatedLoadingIcon: View {
 }
 
 final class PangolinAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// Serves this app's session to the Pangolin CLI in companion mode.
+    private var cliSecretsServer: CLISecretsServer?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
         PangolinAppShortcuts.updateAppShortcutParameters()
+
+        let server = CLISecretsServer(
+            secretManager: SecretManager(), socketPath: CLISecretsServer.defaultSocketPath)
+        server.start()
+        cliSecretsServer = server
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        cliSecretsServer?.stop()
     }
 
     func userNotificationCenter(
