@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AboutView: View {
+    var splitLeadingInset: Bool = false
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
@@ -85,6 +87,7 @@ struct AboutView: View {
             }
             .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)
+            .splitPaneLeadingInset(splitLeadingInset)
         }
     }
 }

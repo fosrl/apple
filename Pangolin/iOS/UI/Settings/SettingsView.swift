@@ -211,6 +211,7 @@ struct ConnectionSettingsView: View {
 struct SettingsView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
+    var splitLeadingInset: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -240,6 +241,8 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
         }
+        // Outside the stack so pushed settings pages get the inset too.
+        .splitPaneLeadingInset(splitLeadingInset)
     }
 }
 
