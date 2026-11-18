@@ -124,6 +124,7 @@
 				iOS/UI/MainView.swift,
 				iOS/UI/OnboardingFlowView.swift,
 				iOS/UI/Settings/DNSServerModalView.swift,
+				iOS/UI/Settings/LogsView.swift,
 				iOS/UI/Settings/MTUModalView.swift,
 				iOS/UI/Settings/SettingsView.swift,
 				iOS/UI/StatusView.swift,
@@ -145,6 +146,7 @@
 				iOS/UI/MainView.swift,
 				iOS/UI/OnboardingFlowView.swift,
 				iOS/UI/Settings/DNSServerModalView.swift,
+				iOS/UI/Settings/LogsView.swift,
 				iOS/UI/Settings/MTUModalView.swift,
 				iOS/UI/Settings/SettingsView.swift,
 				iOS/UI/StatusView.swift,
@@ -169,6 +171,8 @@
 				Shared/LiveActivity/TogglePangolinVPNControlIntent.swift,
 				Shared/LiveActivity/VPNLiveActivityManager.swift,
 				Shared/LiveActivity/VPNWidgetStatusStore.swift,
+				Shared/Logging/LogStore.swift,
+				Shared/Logging/PangolinLog.swift,
 				Shared/Model/Models.swift,
 				Shared/OLMStatusManager.swift,
 				Shared/OnboardingStateManager.swift,
@@ -224,8 +228,16 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Shared/LiveActivity/VPNWidgetStatusStore.swift,
+				Shared/Logging/PangolinLog.swift,
 			);
 			target = 907A6C7B2F05AE620097F387 /* PacketTunneliOS */;
+		};
+		90PT010F2F1000020097F387 /* Exceptions for "Pangolin" folder in "PacketTunnel" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Shared/Logging/PangolinLog.swift,
+			);
+			target = 90D197382EC96BEC00912E68 /* PacketTunnel */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -248,6 +260,7 @@
 				901FF5E22EC7EE9900711D4E /* Exceptions for "Pangolin" folder in "Pangolin" target */,
 				907A6C6C2F05ADBB0097F387 /* Exceptions for "Pangolin" folder in "PangoliniOS" target */,
 				90PT010E2F1000020097F387 /* Exceptions for "Pangolin" folder in "PacketTunneliOS" target */,
+				90PT010F2F1000020097F387 /* Exceptions for "Pangolin" folder in "PacketTunnel" target */,
 				90LA010D2F1000010097F387 /* Exceptions for "Pangolin" folder in "PangolinLiveActivity" target */,
 			);
 			path = Pangolin;

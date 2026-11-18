@@ -15,9 +15,9 @@ class OLMStatusManager: ObservableObject {
     private var pollingClients = 0
     private let socketPollInterval: TimeInterval = 1.0 
     
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "OLMStatusManager")
+        return PangolinLog(subsystem: subsystem, category: "OLMStatusManager")
     }()
     
     init(socketManager: SocketManager) {

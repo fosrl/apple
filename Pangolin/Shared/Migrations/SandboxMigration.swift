@@ -5,9 +5,9 @@ import os.log
 /// Handles migration of data from sandboxed container to non-sandboxed location.
 /// This migration is needed when upgrading from a sandboxed version to a non-sandboxed version.
 enum SandboxMigration {
-    private static let logger: OSLog = {
+    private static let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "SandboxMigration")
+        return PangolinLog(subsystem: subsystem, category: "SandboxMigration")
     }()
 
     /// Migrates data from sandboxed location to non-sandboxed location if needed.

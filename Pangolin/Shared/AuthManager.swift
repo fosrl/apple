@@ -32,9 +32,9 @@ class AuthManager: ObservableObject {
 
     private var deviceAuthTask: Task<Void, Error>?
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "AuthManager")
+        return PangolinLog(subsystem: subsystem, category: "AuthManager")
     }()
 
     init(

@@ -32,9 +32,9 @@ class SocketManager {
     private let socketPath: String
     private let timeout: TimeInterval
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "SocketManager")
+        return PangolinLog(subsystem: subsystem, category: "SocketManager")
     }()
 
     init(socketPath: String? = nil, timeout: TimeInterval = 5.0) {

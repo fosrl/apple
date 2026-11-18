@@ -73,12 +73,10 @@ struct ConnectionSettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Enable Aliases (DNS Override)")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.overrideDns != nil)
                                 Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a Pangolin resource will be forwarded to your configured Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
-                                if serverSettings?.overrideDns != nil {
-                                    ManagedSettingCaption()
-                                }
                             }
                             Spacer()
                             Toggle("", isOn: Binding(
@@ -99,12 +97,10 @@ struct ConnectionSettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("DNS Over Tunnel")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.tunnelDns != nil)
                                 Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a Pangolin resource and enter its address as an Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
-                                if serverSettings?.tunnelDns != nil {
-                                    ManagedSettingCaption()
-                                }
                             }
                             Spacer()
                             Toggle("", isOn: Binding(
@@ -123,6 +119,7 @@ struct ConnectionSettingsView: View {
                             HStack {
                                 Text("Primary Upstream DNS Server")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.managesUpstreamDNS == true)
                                 Spacer()
                                 Text(displayPrimaryDNS)
                                     .font(.system(size: 13))
@@ -140,6 +137,7 @@ struct ConnectionSettingsView: View {
                             HStack {
                                 Text("Secondary Upstream DNS Server")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.managesUpstreamDNS == true)
                                 Spacer()
                                 Text(displaySecondaryDNS)
                                     .font(.system(size: 13))
@@ -153,12 +151,6 @@ struct ConnectionSettingsView: View {
                                 .disabled(serverSettings?.managesUpstreamDNS == true)
                             }
                             .managedSettingHelp(serverSettings?.managesUpstreamDNS == true, orgName: orgName)
-
-                            // One caption for both servers, since they're managed together.
-                            if serverSettings?.managesUpstreamDNS == true {
-                                ManagedSettingCaption()
-                                    .managedSettingHelp(true, orgName: orgName)
-                            }
                         }
                     }
 
@@ -167,12 +159,10 @@ struct ConnectionSettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Exit Node Takes Precedence Over Resources")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.exitNodeTakesPrecedence != nil)
                                 Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
-                                if serverSettings?.exitNodeTakesPrecedence != nil {
-                                    ManagedSettingCaption()
-                                }
                             }
                             Spacer()
                             Toggle("", isOn: Binding(
@@ -191,6 +181,7 @@ struct ConnectionSettingsView: View {
                             HStack {
                                 Text("MTU")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.mtu != nil)
                                 Spacer()
                                 Text(tunnelMTUDisplay)
                                     .font(.system(size: 13))
@@ -207,9 +198,6 @@ struct ConnectionSettingsView: View {
                             Text("Your sites must be configured to use the same MTU value.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
-                            if serverSettings?.mtu != nil {
-                                ManagedSettingCaption()
-                            }
                         }
                         .managedSettingHelp(serverSettings?.mtu != nil, orgName: orgName)
                     }

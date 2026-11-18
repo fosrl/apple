@@ -63,12 +63,10 @@ struct ConnectionSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Enable Aliases (DNS Override)")
                             .font(.body)
+                            .managedLock(serverSettings?.overrideDns != nil)
                         Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a Pangolin resource will be forwarded to your configured Upstream DNS Server.")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        if serverSettings?.overrideDns != nil {
-                            ManagedSettingCaption()
-                        }
                     }
                 }
                 .tint(.accentColor)
@@ -83,12 +81,10 @@ struct ConnectionSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("DNS Over Tunnel")
                             .font(.body)
+                            .managedLock(serverSettings?.tunnelDns != nil)
                         Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a Pangolin resource and enter its address as an Upstream DNS Server.")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        if serverSettings?.tunnelDns != nil {
-                            ManagedSettingCaption()
-                        }
                     }
                 }
                 .tint(.accentColor)
@@ -106,6 +102,7 @@ struct ConnectionSettingsView: View {
                     } label: {
                         HStack {
                             Text("Primary Upstream DNS Server")
+                                .managedLock(serverSettings?.managesUpstreamDNS == true)
                             Spacer()
                             Text(primaryDNSServer)
                                 .foregroundColor(.secondary)
@@ -124,17 +121,13 @@ struct ConnectionSettingsView: View {
                     } label: {
                         HStack {
                             Text("Secondary Upstream DNS Server")
+                                .managedLock(serverSettings?.managesUpstreamDNS == true)
                             Spacer()
                             Text(displaySecondaryDNS)
                                 .foregroundColor(.secondary)
                         }
                     }
                     .disabled(serverSettings?.managesUpstreamDNS == true)
-
-                    // One caption for both servers, since they're managed together.
-                    if serverSettings?.managesUpstreamDNS == true {
-                        ManagedSettingCaption()
-                    }
                 }
             }
 
@@ -148,12 +141,10 @@ struct ConnectionSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Exit Node Takes Precedence Over Resources")
                             .font(.body)
+                            .managedLock(serverSettings?.exitNodeTakesPrecedence != nil)
                         Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources.")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        if serverSettings?.exitNodeTakesPrecedence != nil {
-                            ManagedSettingCaption()
-                        }
                     }
                 }
                 .tint(.accentColor)
@@ -172,12 +163,10 @@ struct ConnectionSettingsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("MTU")
                                 .font(.body)
+                                .managedLock(serverSettings?.mtu != nil)
                             Text("Your sites must be configured to use the same MTU value.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            if serverSettings?.mtu != nil {
-                                ManagedSettingCaption()
-                            }
                         }
                         Spacer()
                         Text(tunnelMTUDisplay)

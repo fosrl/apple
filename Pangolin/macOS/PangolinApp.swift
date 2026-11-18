@@ -158,9 +158,9 @@ struct PangolinApp: App {
 
     private static let sparkleMinimumCheckInterval: TimeInterval = 3600
 
-    private static let logger: OSLog = {
+    private static let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "PangolinApp")
+        return PangolinLog(subsystem: subsystem, category: "PangolinApp")
     }()
 
     init() {

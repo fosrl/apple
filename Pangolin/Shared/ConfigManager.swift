@@ -18,9 +18,9 @@ class ConfigManager: ObservableObject {
     static let defaultTunnelMTU = 1280
     private static let tunnelMTURange = 576...65535
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "ConfigManager")
+        return PangolinLog(subsystem: subsystem, category: "ConfigManager")
     }()
 
     init() {

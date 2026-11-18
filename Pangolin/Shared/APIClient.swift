@@ -65,9 +65,9 @@ class APIClient: ObservableObject {
     
     private let session: URLSession
     
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "APIClient")
+        return PangolinLog(subsystem: subsystem, category: "APIClient")
     }()
     
     var currentBaseURL: String {

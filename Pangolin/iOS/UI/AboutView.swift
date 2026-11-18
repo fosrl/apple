@@ -84,6 +84,18 @@ struct AboutView: View {
                 } header: {
                     Text("Legal")
                 }
+
+                Section {
+                    NavigationLink {
+                        LogsView()
+                    } label: {
+                        Text("Logs")
+                    }
+                } header: {
+                    Text("Troubleshooting")
+                } footer: {
+                    Text("Messages from the app and the tunnel. Share them when reporting a problem.")
+                }
             }
             .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)

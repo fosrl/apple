@@ -22,9 +22,9 @@ class AccountManager: ObservableObject {
         store.activeUserId
     }
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "AccountManager")
+        return PangolinLog(subsystem: subsystem, category: "AccountManager")
     }()
 
     init() {

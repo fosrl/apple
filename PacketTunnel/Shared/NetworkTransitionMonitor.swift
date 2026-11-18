@@ -36,9 +36,9 @@ class NetworkTransitionMonitor {
     private var lastInterfaceType: NWInterface.InterfaceType?
     private var wasUnsatisfied = false
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
-        return OSLog(subsystem: subsystem, category: "NetworkTransitionMonitor")
+        return PangolinLog(subsystem: subsystem, category: "NetworkTransitionMonitor")
     }()
 
     /// Called when a network transition requires socket rebinding
@@ -163,9 +163,9 @@ class NetworkTransitionMonitor {
         onSystemDNSChanged?(servers)
     }
 
-    private static let staticLogger: OSLog = {
+    private static let staticLogger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
-        return OSLog(subsystem: subsystem, category: "NetworkTransitionMonitor")
+        return PangolinLog(subsystem: subsystem, category: "NetworkTransitionMonitor")
     }()
 
     #if os(macOS)

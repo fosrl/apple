@@ -73,9 +73,9 @@ class TunnelManager: NSObject, ObservableObject {
     // Fingerprint/posture checking poller
     let fingerprintManager: FingerprintManager
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "TunnelManager")
+        return PangolinLog(subsystem: subsystem, category: "TunnelManager")
     }()
 
     // Socket polling

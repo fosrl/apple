@@ -127,20 +127,6 @@ enum ManagedSettingText {
     }
 }
 
-/// The caption on a setting the org's administrator manages. The banner above the settings
-/// names the org, so this doesn't.
-struct ManagedSettingCaption: View {
-    var body: some View {
-        Label("Managed by your administrator", systemImage: "lock.fill")
-            #if os(macOS)
-                .font(.system(size: 11))
-            #else
-                .font(.caption)
-            #endif
-            .foregroundColor(.secondary)
-    }
-}
-
 extension View {
     /// Text size for the banners above the connection settings: the same as the settings' names,
     /// so they read as part of the page rather than fine print.
@@ -150,6 +136,23 @@ extension View {
         #else
             font(.subheadline)
         #endif
+    }
+
+    /// Puts a lock after a setting's name when the org's administrator manages it. The banner
+    /// above the settings explains what the lock means.
+    @ViewBuilder
+    func managedLock(_ isManaged: Bool) -> some View {
+        if isManaged {
+            HStack(spacing: 4) {
+                self
+                Image(systemName: "lock.fill")
+                    .imageScale(.small)
+                    .foregroundColor(.secondary)
+                    .accessibilityLabel("Managed by your administrator")
+            }
+        } else {
+            self
+        }
     }
 
     /// Explains on hover why a setting the org's administrator manages can't be changed.

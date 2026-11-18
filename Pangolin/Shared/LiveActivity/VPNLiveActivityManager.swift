@@ -28,7 +28,7 @@
         private var isConnected = false
         private var endedActivityIDs: Set<String> = []
 
-        private let logger = OSLog(
+        private let logger = PangolinLog(
             subsystem: Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin",
             category: "VPNLiveActivity"
         )
