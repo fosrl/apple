@@ -21,7 +21,9 @@ struct OrgSettingsModeSection: View {
                     }
                 #else
                     modeText(orgName: orgName)
+                        .fullWidthRowSeparator()
                     modeButton(orgName: orgName)
+                        .fullWidthRowSeparator()
                 #endif
 
                 let managedCount = configManager.managedPreferenceCount
@@ -31,6 +33,7 @@ struct OrgSettingsModeSection: View {
                         detail: ManagedSettingText.summary(count: managedCount),
                         systemImage: "lock.fill"
                     )
+                    .fullWidthRowSeparator()
                 }
             }
             .alert(
@@ -90,22 +93,20 @@ extension OrgSettingsModeSection {
     }
 }
 
-/// A banner row at the top of a settings page: a bold title and secondary detail, with an icon.
+/// A banner row at the top of a settings page: an icon and bold title, with secondary detail
+/// below.
 struct SettingsBannerText: View {
     let title: String
     let detail: String
     let systemImage: String
 
+    /// The icon sits on the title's line, and the detail runs underneath both at full width.
     var body: some View {
-        Label {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .fontWeight(.semibold)
-                Text(detail)
-                    .foregroundColor(.secondary)
-            }
-        } icon: {
-            Image(systemName: systemImage)
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: systemImage)
+                .fontWeight(.semibold)
+            Text(detail)
+                .foregroundColor(.secondary)
         }
         .settingsBannerFont()
     }
@@ -135,6 +136,17 @@ extension View {
             font(.system(size: 13))
         #else
             font(.subheadline)
+        #endif
+    }
+
+    /// Starts the divider under an iOS list row at the row's leading edge. By default it starts
+    /// where the row's text does, which in the banner rows is after the icon, so the banner's
+    /// dividers would start at different points than the button row's. No effect on macOS.
+    fileprivate func fullWidthRowSeparator() -> some View {
+        #if os(iOS)
+            alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+        #else
+            self
         #endif
     }
 
