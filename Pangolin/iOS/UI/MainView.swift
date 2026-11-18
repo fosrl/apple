@@ -3,7 +3,7 @@ import SwiftUI
 enum TabSelection: Int {
     case home = 0
     case status = 1
-    case preferences = 2
+    case settings = 2
     case about = 3
 }
 
@@ -51,11 +51,11 @@ struct MainView: View {
                 }
             .tag(TabSelection.status)
             
-            PreferencesView(configManager: configManager, tunnelManager: tunnelManager)
+            SettingsView(configManager: configManager, tunnelManager: tunnelManager)
                 .tabItem {
-                    Label("Preferences", systemImage: "gearshape.fill")
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
-            .tag(TabSelection.preferences)
+            .tag(TabSelection.settings)
             
             AboutView()
                 .tabItem {

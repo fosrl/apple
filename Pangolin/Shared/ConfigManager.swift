@@ -140,27 +140,50 @@ class ConfigManager: ObservableObject {
         activeOrgId.flatMap { orgConfig(orgId: $0) }
     }
 
-    /// Whether the active org has its own settings rather than using the global ones.
+    /// Whether the active org has its own settings rather than using the ones for all
+    /// organizations. Its chosen exit node and match domains don't count: they aren't part of
+    /// the settings the user switches between.
     var isOrgMode: Bool {
-        !(activeOrgConfig?.isEmpty ?? true)
+        activeOrgConfig?.hasOwnSettings ?? false
     }
 
-    /// Where a change goes without asking: an org with its own settings keeps its changes, and
-    /// with no org only the global settings exist. Nil means the user has to choose.
-    var knownScope: SettingsScope? {
-        if activeOrgId == nil { return .global }
-        return isOrgMode ? .org : nil
+    /// Where changes in Settings are saved: the active org's own settings once it has them,
+    /// otherwise the ones for all organizations.
+    var activeScope: SettingsScope {
+        activeOrgId != nil && isOrgMode ? .org : .global
     }
 
-    /// Removes the active org's own settings so it uses the global settings again.
-    func resetActiveOrgSettings() -> Bool {
-        guard let activeOrgId else { return true }
-        var updatedConfig = config ?? Config()
-        updatedConfig.orgs?.removeValue(forKey: activeOrgId)
-        if updatedConfig.orgs?.isEmpty == true {
-            updatedConfig.orgs = nil
+    /// Gives the active org its own settings, starting as a copy of the ones it uses now, so
+    /// nothing changes until the user edits them. Every setting is copied, so later changes to
+    /// the settings for all organizations don't affect it. Values the org's administrator sets
+    /// aren't copied: they still apply on top.
+    func giveActiveOrgOwnSettings() -> Bool {
+        guard activeOrgId != nil else { return false }
+        let global = config
+        let globalMTU = global?.tunnelMTU.flatMap { Self.tunnelMTURange.contains($0) ? $0 : nil }
+        return update(scope: .org, global: { _ in }) { org in
+            org.dnsOverrideEnabled = org.dnsOverrideEnabled ?? global?.dnsOverrideEnabled ?? true
+            org.dnsTunnelEnabled = org.dnsTunnelEnabled ?? global?.dnsTunnelEnabled ?? false
+            org.primaryDNSServer = org.primaryDNSServer ?? global?.primaryDNSServer ?? ""
+            org.secondaryDNSServer = org.secondaryDNSServer ?? global?.secondaryDNSServer ?? ""
+            org.exitNodeTakesPrecedence =
+                org.exitNodeTakesPrecedence ?? global?.exitNodeTakesPrecedence ?? false
+            org.tunnelMTU = org.tunnelMTU ?? globalMTU ?? Self.defaultTunnelMTU
         }
-        return save(updatedConfig)
+    }
+
+    /// Removes the active org's own settings so it uses the ones for all organizations again.
+    /// Its chosen exit node and match domains aren't part of them, so they're kept.
+    func resetActiveOrgSettings() -> Bool {
+        guard activeOrgId != nil else { return true }
+        return update(scope: .org, global: { _ in }) { org in
+            org.dnsOverrideEnabled = nil
+            org.dnsTunnelEnabled = nil
+            org.primaryDNSServer = nil
+            org.secondaryDNSServer = nil
+            org.exitNodeTakesPrecedence = nil
+            org.tunnelMTU = nil
+        }
     }
 
     /// Saves a change to the global settings or the active org's own.

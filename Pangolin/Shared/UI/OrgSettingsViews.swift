@@ -1,78 +1,184 @@
 import SwiftUI
 
-/// Whether the current org is using the global settings or its own, shown above the settings.
+/// Shown above the connection settings: whether the current org uses the settings for all
+/// organizations or its own, with a button to switch, and how many settings the org's
+/// administrator manages for the user's role. On macOS the button sits on the right like the
+/// settings below it; on iOS there isn't room, so it gets its own row under the text.
 struct OrgSettingsModeSection: View {
     @ObservedObject var configManager: ConfigManager
+    @State private var confirmReset = false
 
     var body: some View {
         if let orgName = configManager.activeOrgName {
             Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(
-                        configManager.isOrgMode
-                            ? "\(orgName) is using its own settings."
-                            : "\(orgName) is using your global settings."
-                    )
-                    if configManager.serverSettings != nil {
-                        Text("Settings set by your organization can't be changed.")
-                            .foregroundColor(.secondary)
+                #if os(macOS)
+                    HStack(alignment: .center, spacing: 12) {
+                        modeText(orgName: orgName)
+                        Spacer()
+                        modeButton(orgName: orgName)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
                     }
+                #else
+                    modeText(orgName: orgName)
+                    modeButton(orgName: orgName)
+                #endif
+
+                let managedCount = configManager.managedPreferenceCount
+                if managedCount > 0 {
+                    SettingsBannerText(
+                        title: ManagedSettingText.title(orgName: orgName),
+                        detail: ManagedSettingText.summary(count: managedCount),
+                        systemImage: "lock.fill"
+                    )
                 }
-                .font(.footnote)
             }
-        }
-    }
-}
-
-/// Switches the current org back to the global settings, shown below the settings.
-struct OrgSettingsResetSection: View {
-    @ObservedObject var configManager: ConfigManager
-
-    var body: some View {
-        if configManager.isOrgMode, let orgName = configManager.activeOrgName {
-            Section {
-                Button("Use Global Settings for \(orgName)") {
+            .alert(
+                "Reset \(orgName) to settings for all organizations?",
+                isPresented: $confirmReset
+            ) {
+                Button("Reset", role: .destructive) {
                     _ = configManager.resetActiveOrgSettings()
                 }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "\(orgName) will use your settings for all organizations again. Settings you changed for \(orgName) will be removed."
+                )
             }
         }
     }
 }
 
-/// Asks whether a setting change applies everywhere or just to the current org. Settings apply
-/// as soon as they change, so this is asked when a setting changes rather than on a save button.
-struct SettingsScopePrompt: ViewModifier {
-    @ObservedObject var configManager: ConfigManager
-    @Binding var pendingChange: ((SettingsScope) -> Void)?
+extension OrgSettingsModeSection {
+    @ViewBuilder
+    fileprivate func modeText(orgName: String) -> some View {
+        if configManager.isOrgMode {
+            SettingsBannerText(
+                title: "\(orgName) has its own settings",
+                detail: "Changes are saved only for \(orgName). Other organizations use your settings for all organizations.",
+                systemImage: "building.2"
+            )
+        } else {
+            SettingsBannerText(
+                title: "\(orgName) uses your settings for all organizations",
+                detail: "Changes apply to every organization. Own settings for \(orgName) start as a copy of these.",
+                systemImage: "globe"
+            )
+        }
+    }
 
-    func body(content: Content) -> some View {
-        content.confirmationDialog(
-            "Apply this change to all organizations, or only to \(configManager.activeOrgName ?? "this organization")?",
-            isPresented: Binding(
-                get: { pendingChange != nil },
-                set: { if !$0 { pendingChange = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingChange
-        ) { change in
-            Button("All Organizations") { change(.global) }
-            Button("Only \(configManager.activeOrgName ?? "This Organization")") { change(.org) }
-            Button("Cancel", role: .cancel) {}
+    /// Short labels on macOS, where the button sits next to the text that explains it; fuller
+    /// ones on iOS, where it's a row of its own.
+    @ViewBuilder
+    fileprivate func modeButton(orgName: String) -> some View {
+        if configManager.isOrgMode {
+            #if os(macOS)
+                Button("Reset…") { confirmReset = true }
+            #else
+                Button("Reset to Settings for All Organizations…") { confirmReset = true }
+            #endif
+        } else {
+            #if os(macOS)
+                Button("Use Own Settings") { _ = configManager.giveActiveOrgOwnSettings() }
+            #else
+                Button("Use Own Settings for \(orgName)") {
+                    _ = configManager.giveActiveOrgOwnSettings()
+                }
+            #endif
+        }
+    }
+}
+
+/// A banner row at the top of a settings page: a bold title and secondary detail, with an icon.
+struct SettingsBannerText: View {
+    let title: String
+    let detail: String
+    let systemImage: String
+
+    var body: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .fontWeight(.semibold)
+                Text(detail)
+                    .foregroundColor(.secondary)
+            }
+        } icon: {
+            Image(systemName: systemImage)
+        }
+        .settingsBannerFont()
+    }
+}
+
+enum ManagedSettingText {
+    static func title(orgName: String) -> String {
+        "Managed by your administrator in \(orgName)"
+    }
+
+    static func summary(count: Int) -> String {
+        let settings = count == 1 ? "1 of these settings" : "\(count) of these settings"
+        let pronoun = count == 1 ? "it" : "them"
+        return "Your administrator set \(settings) for your role. To change \(pronoun), contact your administrator."
+    }
+
+    static func explanation(orgName: String) -> String {
+        "Your administrator in \(orgName) set this for your role. To change it, contact your administrator."
+    }
+}
+
+/// The caption on a setting the org's administrator manages. The banner above the settings
+/// names the org, so this doesn't.
+struct ManagedSettingCaption: View {
+    var body: some View {
+        Label("Managed by your administrator", systemImage: "lock.fill")
+            #if os(macOS)
+                .font(.system(size: 11))
+            #else
+                .font(.caption)
+            #endif
+            .foregroundColor(.secondary)
+    }
+}
+
+extension View {
+    /// Text size for the banners above the connection settings: the same as the settings' names,
+    /// so they read as part of the page rather than fine print.
+    fileprivate func settingsBannerFont() -> some View {
+        #if os(macOS)
+            font(.system(size: 13))
+        #else
+            font(.subheadline)
+        #endif
+    }
+
+    /// Explains on hover why a setting the org's administrator manages can't be changed.
+    @ViewBuilder
+    func managedSettingHelp(_ isManaged: Bool, orgName: String) -> some View {
+        if isManaged {
+            help(ManagedSettingText.explanation(orgName: orgName))
+        } else {
+            self
         }
     }
 }
 
 extension ConfigManager {
-    /// Runs a change right away if its scope is already known, or hands it to `ask` so the user
-    /// can pick one with `SettingsScopePrompt`.
-    func applyScoped(
-        _ change: @escaping (SettingsScope) -> Void,
-        ask: (@escaping (SettingsScope) -> Void) -> Void
-    ) {
-        if let scope = knownScope {
-            change(scope)
-        } else {
-            ask(change)
-        }
+    /// The name used in "Managed by your administrator in …".
+    var managingOrgName: String {
+        activeOrgName ?? "your organization"
+    }
+
+    /// How many of the settings shown in Settings the org's administrator manages. The two
+    /// upstream DNS servers count as one, and only while they're shown (DNS override is on).
+    var managedPreferenceCount: Int {
+        guard let serverSettings else { return 0 }
+        return [
+            serverSettings.overrideDns != nil,
+            serverSettings.tunnelDns != nil,
+            serverSettings.managesUpstreamDNS && getDNSOverrideEnabled(),
+            serverSettings.exitNodeTakesPrecedence != nil,
+            serverSettings.mtu != nil,
+        ].filter { $0 }.count
     }
 }

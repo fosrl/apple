@@ -86,6 +86,13 @@ struct OrgConfig: Codable {
         case exitNodeResourceId
     }
 
+    /// Whether any of the settings the user can switch between all organizations and this org's
+    /// own are set here.
+    var hasOwnSettings: Bool {
+        dnsOverrideEnabled != nil || dnsTunnelEnabled != nil || primaryDNSServer != nil
+            || secondaryDNSServer != nil || tunnelMTU != nil || exitNodeTakesPrecedence != nil
+    }
+
     var isEmpty: Bool {
         dnsOverrideEnabled == nil && dnsTunnelEnabled == nil && primaryDNSServer == nil
             && secondaryDNSServer == nil && tunnelMTU == nil && matchDomains == nil
@@ -134,7 +141,7 @@ struct Account: Identifiable, Codable, Hashable {
     struct OrgSettings: Codable, Hashable {
         var exitNodeResourceId: Int? = nil
         /// The settings the org's server manages for this user, as last fetched from it.
-        /// Refreshed on every connect and when Preferences opens; only kept here so they still
+        /// Refreshed on every connect and when Settings opens; only kept here so they still
         /// apply if the server can't be reached.
         var serverSettings: ClientSettings? = nil
 

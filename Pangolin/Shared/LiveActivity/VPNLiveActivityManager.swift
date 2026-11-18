@@ -102,7 +102,7 @@
             )
         }
 
-        /// Applies the Preferences toggle. UserDefaults is already updated by the control.
+        /// Applies the Settings toggle. UserDefaults is already updated by the control.
         func applyEnabledPreference() {
             if Self.isEnabled {
                 guard isConnected, let org = connectedOrganizationName else { return }

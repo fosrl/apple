@@ -1090,7 +1090,7 @@ class TunnelManager: NSObject, ObservableObject {
     }
 
     /// Fetches the settings the current org's server manages and applies them. Runs on every
-    /// connect and when Preferences opens. If the server can't be reached the last fetched
+    /// connect and when Settings opens. If the server can't be reached the last fetched
     /// settings keep applying.
     func refreshClientSettings() async {
         guard let org = authManager.currentOrg, let userId = accountManager.activeAccount?.userId

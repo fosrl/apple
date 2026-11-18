@@ -333,6 +333,8 @@ class AuthManager: ObservableObject {
             // system start does not keep the previous account's config.
             if let tunnelManager {
                 await ensureOlmCredentials(userId: user.userId)
+                // The org changed, so Settings must show (and save to) the new one.
+                await tunnelManager.refreshClientSettings()
                 tunnelManager.reloadSavedExitNode()
                 await tunnelManager.refreshExitNodes()
                 await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
@@ -480,6 +482,8 @@ class AuthManager: ObservableObject {
             apiClient.updateBaseURL(accountToSwitchTo.hostname)
             errorMessage = "No session token found for this account. Please log in again."
             restoreCachedOrganization(from: accountToSwitchTo)
+            // Can't reach the server: loads the org's cached administrator settings instead.
+            await tunnelManager?.refreshClientSettings()
             tunnelManager?.reloadSavedExitNode()
             return
         }
@@ -510,6 +514,8 @@ class AuthManager: ObservableObject {
             isServerDown = true
             errorMessage = "The server appears to be down."
             restoreCachedOrganization(from: accountToSwitchTo)
+            // Can't reach the server: loads the org's cached administrator settings instead.
+            await tunnelManager?.refreshClientSettings()
             tunnelManager?.reloadSavedExitNode()
             // currentUser is already cleared above, so UI will show account email
             return
@@ -561,6 +567,9 @@ class AuthManager: ObservableObject {
         // Restore this account/org's last exit node into the tunnel manager cache and refresh
         // the available list so the picker doesn't stay stuck on the previous account's choice.
         if let tunnelManager = tunnelManager {
+            // The org changed with the account, so Settings must show (and save to) the new
+            // one, with its administrator's settings.
+            await tunnelManager.refreshClientSettings()
             tunnelManager.reloadSavedExitNode()
             await tunnelManager.refreshExitNodes()
         }
@@ -884,6 +893,9 @@ class AuthManager: ObservableObject {
         sessionExpired = false
         deviceAuthCode = nil
         deviceAuthLoginURL = nil
+
+        // No org anymore: clears Settings' org banner and where changes are saved.
+        await tunnelManager?.refreshClientSettings()
     }
 
     /// Best-effort logout call for a removed account. Uses its own client so the
