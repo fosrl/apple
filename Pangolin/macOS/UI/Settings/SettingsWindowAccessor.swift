@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 // Helper view to access NSWindow
-struct PreferencesWindowAccessor: NSViewRepresentable {
+struct SettingsWindowAccessor: NSViewRepresentable {
     var callback: (NSWindow) -> Void
     
     func makeNSView(context: Context) -> NSView {

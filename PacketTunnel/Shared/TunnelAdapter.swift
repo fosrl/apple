@@ -76,9 +76,9 @@ private struct IPv6RouteJSON: Codable {
 // Adapter class that handles tunnel file descriptor discovery and management
 public class TunnelAdapter {
     private weak var packetTunnelProvider: NEPacketTunnelProvider?
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
-        return OSLog(subsystem: subsystem, category: "TunnelAdapter")
+        return PangolinLog(subsystem: subsystem, category: "TunnelAdapter")
     }()
 
     private var lastAppliedSettings: NEPacketTunnelNetworkSettings?
@@ -89,6 +89,11 @@ public class TunnelAdapter {
     private var networkTransitionMonitor: NetworkTransitionMonitor?
     public init(with packetTunnelProvider: NEPacketTunnelProvider) {
         self.packetTunnelProvider = packetTunnelProvider
+        // Write Go's log messages to the log file too, for the app's Logs view.
+        goLoggerSetFileSink { level, message in
+            guard let message else { return }
+            LogFileWriter.shared.write(LogSeverity(goLevel: level), String(cString: message))
+        }
         // Set log level for Go logger to debug
         PangolinGo.setLogLevel(Int32(LogLevel.debug.rawValue))
 

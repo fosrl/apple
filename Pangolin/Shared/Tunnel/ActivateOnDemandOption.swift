@@ -58,7 +58,7 @@ extension ActivateOnDemandOption {
     }
 
     private static func create(from rules: [NEOnDemandRule]) -> ActivateOnDemandOption {
-        let logger = OSLog(
+        let logger = PangolinLog(
             subsystem: Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin",
             category: "ActivateOnDemandOption")
 

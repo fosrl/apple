@@ -4,9 +4,9 @@ import PangolinGo
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     private var tunnelAdapter: TunnelAdapter?
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin.PacketTunnel"
-        let log = OSLog(subsystem: subsystem, category: "PacketTunnelProvider")
+        let log = PangolinLog(subsystem: subsystem, category: "PacketTunnelProvider")
         // Log the subsystem being used for debugging
         os_log("PacketTunnelProvider initialized with subsystem: %{public}@", log: log, type: .debug, subsystem)
         return log

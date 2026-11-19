@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AboutView: View {
+    var splitLeadingInset: Bool = false
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
@@ -82,9 +84,22 @@ struct AboutView: View {
                 } header: {
                     Text("Legal")
                 }
+
+                Section {
+                    NavigationLink {
+                        LogsView()
+                    } label: {
+                        Text("Logs")
+                    }
+                } header: {
+                    Text("Troubleshooting")
+                } footer: {
+                    Text("Messages from the app and the tunnel. Share them when reporting a problem.")
+                }
             }
             .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)
+            .splitPaneLeadingInset(splitLeadingInset)
         }
     }
 }

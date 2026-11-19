@@ -48,7 +48,6 @@ class APIClient: ObservableObject {
     private var sessionCookieName = "p_session_token"
     private let csrfToken = "x-csrf-protection"
 
-    /// Called when a request made with a session token returns 401 or 403. Set by AuthManager to mark session expired.
     var onUnauthorized: (() -> Void)?
 
     private var agentName: String {
@@ -65,9 +64,9 @@ class APIClient: ObservableObject {
     
     private let session: URLSession
     
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "APIClient")
+        return PangolinLog(subsystem: subsystem, category: "APIClient")
     }()
     
     var currentBaseURL: String {
@@ -223,7 +222,7 @@ class APIClient: ObservableObject {
     }
     
     private func notifyUnauthorizedIfNeeded(statusCode: Int) {
-        guard (statusCode == 401 || statusCode == 403), sessionToken != nil else { return }
+        guard statusCode == 401, sessionToken != nil else { return }
         onUnauthorized?()
     }
 
@@ -382,6 +381,19 @@ class APIClient: ObservableObject {
         return try parseResponse(data, response)
     }
     
+    /// The settings the org manages for the current user, or nil if it manages none. Servers
+    /// that predate client settings answer 404, which means the same thing.
+    func getMyClientSettings(orgId: String) async throws -> ClientSettings? {
+        do {
+            let (data, response) = try await makeRequest(
+                method: "GET", path: "/org/\(orgId)/my-client-settings")
+            let result: MyClientSettingsResponse = try parseResponse(data, response)
+            return result.settings
+        } catch APIError.httpError(404, _) {
+            return nil
+        }
+    }
+
     /// Every gateway-mode site resource (exit node) in the org that can be selected, fetching all
     /// pages. Disabled resources and ones with no sites are dropped since they can't carry traffic.
     func listGatewayResources(orgId: String) async throws -> [SiteResource] {

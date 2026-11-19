@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// On-Demand Activation block shared by macOS and iOS Preferences.
+/// On-Demand Activation block shared by macOS and iOS Settings.
 struct OnDemandActivationSection: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager

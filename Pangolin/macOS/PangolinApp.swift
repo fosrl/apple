@@ -94,11 +94,11 @@ struct MenuBarLabel: View {
             }
     }
 
-    /// Login, preferences, and onboarding windows that should keep the app in the Dock.
+    /// Login, settings, and onboarding windows that should keep the app in the Dock.
     private static func hasVisibleAppWindow() -> Bool {
-        let knownIds: Set<String> = ["preferences", "onboarding"]
+        let knownIds: Set<String> = ["settings", "onboarding"]
         var knownTitles: Set<String> = ["Pangolin Setup"]
-        knownTitles.formUnion(PreferencesSection.allCases.map(\.rawValue))
+        knownTitles.formUnion(SettingsSection.allCases.map(\.rawValue))
 
         return NSApp.windows.contains { window in
             let isShown = window.isVisible || window.isMiniaturized
@@ -158,9 +158,9 @@ struct PangolinApp: App {
 
     private static let sparkleMinimumCheckInterval: TimeInterval = 3600
 
-    private static let logger: OSLog = {
+    private static let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "PangolinApp")
+        return PangolinLog(subsystem: subsystem, category: "PangolinApp")
     }()
 
     init() {
@@ -291,15 +291,15 @@ struct PangolinApp: App {
         .defaultSize(width: 560, height: 520)
         .windowResizability(.contentSize)
 
-        // Preferences Window
-        WindowGroup("Preferences", id: "preferences") {
-            PreferencesWindow(
+        // Settings Window
+        WindowGroup("Settings", id: "settings") {
+            SettingsWindow(
                 configManager: configManager,
                 tunnelManager: tunnelManager,
                 accountManager: accountManager,
                 authManager: authManager
             )
-            .handlesExternalEvents(preferring: ["preferences"], allowing: ["preferences"])
+            .handlesExternalEvents(preferring: ["settings"], allowing: ["settings"])
         }
         .defaultSize(width: 800, height: 600)
         .windowResizability(.contentSize)

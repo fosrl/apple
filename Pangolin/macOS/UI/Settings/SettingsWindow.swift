@@ -1,20 +1,20 @@
 import SwiftUI
 import AppKit
 
-struct PreferencesWindow: View {
+struct SettingsWindow: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
     @ObservedObject var accountManager: AccountManager
     @ObservedObject var authManager: AuthManager
-    @State private var selectedSection: PreferencesSection = .preferences
+    @State private var selectedSection: SettingsSection = .general
     
     var body: some View {
         NavigationSplitView {
             // Sidebar
-            PreferencesSidebar(selectedSection: $selectedSection)
+            SettingsSidebar(selectedSection: $selectedSection)
         } detail: {
             // Detail view
-            PreferencesDetailView(
+            SettingsDetailView(
                 selectedSection: selectedSection,
                 configManager: configManager,
                 tunnelManager: tunnelManager,
@@ -23,7 +23,7 @@ struct PreferencesWindow: View {
             )
         }
         .frame(minWidth: 600, minHeight: 400)
-        .background(PreferencesWindowAccessor { window in
+        .background(SettingsWindowAccessor { window in
             configureWindow(window)
         })
         .onAppear {
@@ -32,19 +32,19 @@ struct PreferencesWindow: View {
         .onChange(of: selectedSection) {
             updateWindowTitle()
         }
-        .onReceive(PreferencesNavigation.shared.$requestedSection) { section in
+        .onReceive(SettingsNavigation.shared.$requestedSection) { section in
             guard let section else { return }
             selectedSection = section
-            PreferencesNavigation.shared.requestedSection = nil
+            SettingsNavigation.shared.requestedSection = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
-            if let window = notification.object as? NSWindow, window.identifier?.rawValue == "preferences" {
+            if let window = notification.object as? NSWindow, window.identifier?.rawValue == "settings" {
                 configureWindow(window)
                 hideMenuBarItems()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
-            if let window = notification.object as? NSWindow, window.identifier?.rawValue == "preferences" {
+            if let window = notification.object as? NSWindow, window.identifier?.rawValue == "settings" {
                 restoreMenuBarItems()
             }
         }
@@ -57,12 +57,12 @@ struct PreferencesWindow: View {
     private func handleWindowAppear() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             showAppInDock()
-            closeDuplicatePreferencesWindows()
+            closeDuplicateSettingsWindows()
         }
         // Launch hides the Dock icon shortly after this window is restored.
         // Re-apply once that has run, if the window is still open.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            guard isPreferencesWindowShown() else { return }
+            guard isSettingsWindowShown() else { return }
             showAppInDock()
         }
     }
@@ -73,21 +73,21 @@ struct PreferencesWindow: View {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func isPreferencesWindowShown() -> Bool {
+    private func isSettingsWindowShown() -> Bool {
         NSApplication.shared.windows.contains { window in
             let isShown = window.isVisible || window.isMiniaturized
             guard isShown else { return false }
-            if window.identifier?.rawValue == "preferences" { return true }
-            return PreferencesSection.allCases.contains { $0.rawValue == window.title }
+            if window.identifier?.rawValue == "settings" { return true }
+            return SettingsSection.allCases.contains { $0.rawValue == window.title }
         }
     }
 
-    private func closeDuplicatePreferencesWindows() {
-        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
+    private func closeDuplicateSettingsWindows() {
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "settings" }) {
             configureWindow(window)
 
             let duplicates = NSApplication.shared.windows.filter { w in
-                w.identifier?.rawValue == "preferences" && w != window
+                w.identifier?.rawValue == "settings" && w != window
             }
             for duplicate in duplicates {
                 duplicate.close()
@@ -99,7 +99,7 @@ struct PreferencesWindow: View {
         // Hide app from dock when window closes (if no other windows)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             let hasOtherWindows = NSApplication.shared.windows.contains { window in
-                window.isVisible && window.identifier?.rawValue == "preferences"
+                window.isVisible && window.identifier?.rawValue == "settings"
             }
             if !hasOtherWindows {
                 guard NSApp.activationPolicy() != .accessory else { return }
@@ -110,8 +110,8 @@ struct PreferencesWindow: View {
     
     private func configureWindow(_ window: NSWindow) {
         // Set identifier if not set
-        if window.identifier?.rawValue != "preferences" {
-            window.identifier = NSUserInterfaceItemIdentifier("preferences")
+        if window.identifier?.rawValue != "settings" {
+            window.identifier = NSUserInterfaceItemIdentifier("settings")
         }
         
         // Configure window style: allow close, minimize, and maximize
@@ -133,12 +133,12 @@ struct PreferencesWindow: View {
         // Update window title based on current section
         updateWindowTitle()
         
-        // Hide menu bar items when preferences window is key
+        // Hide menu bar items when settings window is key
         hideMenuBarItems()
     }
     
     private func updateWindowTitle() {
-        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "preferences" }) {
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "settings" }) {
         window.title = selectedSection.rawValue
         window.titlebarSeparatorStyle = selectedSection == .olmStatus ? .none : .automatic
     }
@@ -192,11 +192,11 @@ struct PreferencesWindow: View {
 
 // MARK: - Sidebar
 
-struct PreferencesSidebar: View {
-    @Binding var selectedSection: PreferencesSection
+struct SettingsSidebar: View {
+    @Binding var selectedSection: SettingsSection
 
     var body: some View {
-        List(PreferencesSection.allCases, selection: $selectedSection) { section in
+        List(SettingsSection.allCases, selection: $selectedSection) { section in
             Label(section.rawValue, systemImage: section.icon)
                 .tag(section)
         }
@@ -206,8 +206,8 @@ struct PreferencesSidebar: View {
 
 // MARK: - Detail View
 
-struct PreferencesDetailView: View {
-    let selectedSection: PreferencesSection
+struct SettingsDetailView: View {
+    let selectedSection: SettingsSection
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
     let accountManager: AccountManager
@@ -217,8 +217,13 @@ struct PreferencesDetailView: View {
         // Content
         Group {
             switch selectedSection {
-            case .preferences:
-                PreferencesContentView(
+            case .general:
+                GeneralSettingsView(
+                    configManager: configManager,
+                    tunnelManager: tunnelManager
+                )
+            case .connection:
+                ConnectionSettingsView(
                     configManager: configManager,
                     tunnelManager: tunnelManager
                 )

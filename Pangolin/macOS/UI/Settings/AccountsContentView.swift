@@ -68,9 +68,9 @@ struct AccountsContentView: View {
                 "You'll be logged out of \(Self.host(of: account)) on this Mac. You can add the account again at any time."
             )
         }
-        .onReceive(PreferencesNavigation.shared.$requestedLogin) { request in
+        .onReceive(SettingsNavigation.shared.$requestedLogin) { request in
             guard let request else { return }
-            PreferencesNavigation.shared.requestedLogin = nil
+            SettingsNavigation.shared.requestedLogin = nil
             loginRequest = request
         }
     }

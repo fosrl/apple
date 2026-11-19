@@ -32,9 +32,9 @@ class AuthManager: ObservableObject {
 
     private var deviceAuthTask: Task<Void, Error>?
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "AuthManager")
+        return PangolinLog(subsystem: subsystem, category: "AuthManager")
     }()
 
     init(
@@ -333,6 +333,8 @@ class AuthManager: ObservableObject {
             // system start does not keep the previous account's config.
             if let tunnelManager {
                 await ensureOlmCredentials(userId: user.userId)
+                // The org changed, so Settings must show (and save to) the new one.
+                await tunnelManager.refreshClientSettings()
                 tunnelManager.reloadSavedExitNode()
                 await tunnelManager.refreshExitNodes()
                 await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
@@ -480,6 +482,8 @@ class AuthManager: ObservableObject {
             apiClient.updateBaseURL(accountToSwitchTo.hostname)
             errorMessage = "No session token found for this account. Please log in again."
             restoreCachedOrganization(from: accountToSwitchTo)
+            // Can't reach the server: loads the org's cached administrator settings instead.
+            await tunnelManager?.refreshClientSettings()
             tunnelManager?.reloadSavedExitNode()
             return
         }
@@ -510,6 +514,8 @@ class AuthManager: ObservableObject {
             isServerDown = true
             errorMessage = "The server appears to be down."
             restoreCachedOrganization(from: accountToSwitchTo)
+            // Can't reach the server: loads the org's cached administrator settings instead.
+            await tunnelManager?.refreshClientSettings()
             tunnelManager?.reloadSavedExitNode()
             // currentUser is already cleared above, so UI will show account email
             return
@@ -561,6 +567,9 @@ class AuthManager: ObservableObject {
         // Restore this account/org's last exit node into the tunnel manager cache and refresh
         // the available list so the picker doesn't stay stuck on the previous account's choice.
         if let tunnelManager = tunnelManager {
+            // The org changed with the account, so Settings must show (and save to) the new
+            // one, with its administrator's settings.
+            await tunnelManager.refreshClientSettings()
             tunnelManager.reloadSavedExitNode()
             await tunnelManager.refreshExitNodes()
         }
@@ -713,24 +722,28 @@ class AuthManager: ObservableObject {
                         os_log(
                             "OLM mismatch - returned olmId: %{public}@, userId: %{public}@, stored olmId: %{public}@",
                             log: logger, type: .error, olm.olmId, olm.userId, olmIdString)
-                        // Clear invalid credentials
                         _ = secretManager.deleteOlmCredentials(userId: userId)
                     }
                 } catch let error as APIError {
                     if case .httpError(let statusCode, _) = error, statusCode == 401 || statusCode == 403 {
                         markSessionExpiredFromConnection()
                     }
-                    os_log(
-                        "Failed to verify OLM credentials: %{public}@", log: logger, type: .error,
-                        error.localizedDescription)
-                    _ = secretManager.deleteOlmCredentials(userId: userId)
+                    if case .httpError(404, _) = error {
+                        os_log(
+                            "Stored OLM no longer exists on server, discarding",
+                            log: logger, type: .default)
+                        _ = secretManager.deleteOlmCredentials(userId: userId)
+                    } else {
+                        os_log(
+                            "Could not verify OLM credentials, keeping stored credentials: %{public}@",
+                            log: logger, type: .default, error.localizedDescription)
+                        return
+                    }
                 } catch {
-                    // If getting OLM fails, the OLM might not exist
                     os_log(
-                        "Failed to verify OLM credentials: %{public}@", log: logger, type: .error,
-                        error.localizedDescription)
-                    // Clear invalid credentials so we can try to create new ones
-                    _ = secretManager.deleteOlmCredentials(userId: userId)
+                        "Could not verify OLM credentials, keeping stored credentials: %{public}@",
+                        log: logger, type: .default, error.localizedDescription)
+                    return
                 }
             } else {
                 // No olmId found, clear credentials
@@ -752,9 +765,26 @@ class AuthManager: ObservableObject {
 
                 return
             }
-
+            os_log(
+                "No platform fingerprint available for OLM recovery",
+                log: logger, type: .error)
+            return
+        } catch let error as APIError {
+            if case .httpError(404, _) = error {
+                os_log(
+                    "No OLM matches this device fingerprint, creating a new one",
+                    log: logger, type: .info)
+            } else {
+                os_log(
+                    "Failed to recover OLM from fingerprint: %{public}@",
+                    log: logger, type: .error, error.localizedDescription)
+                return
+            }
         } catch {
-
+            os_log(
+                "Failed to recover OLM from fingerprint: %{public}@",
+                log: logger, type: .error, error.localizedDescription)
+            return
         }
 
         // If credentials don't exist or were cleared/not recovered, create new ones
@@ -863,6 +893,9 @@ class AuthManager: ObservableObject {
         sessionExpired = false
         deviceAuthCode = nil
         deviceAuthLoginURL = nil
+
+        // No org anymore: clears Settings' org banner and where changes are saved.
+        await tunnelManager?.refreshClientSettings()
     }
 
     /// Best-effort logout call for a removed account. Uses its own client so the

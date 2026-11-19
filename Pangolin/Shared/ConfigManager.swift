@@ -6,15 +6,21 @@ import os.log
 class ConfigManager: ObservableObject {
     @Published var config: Config?
 
+    /// The org the org-specific getters below resolve for, and what its server manages. Set by
+    /// `TunnelManager.refreshClientSettings`.
+    @Published private(set) var activeOrgId: String?
+    @Published private(set) var activeOrgName: String?
+    @Published private(set) var serverSettings: ClientSettings?
+
     static let defaultHostname = "https://app.pangolin.net"
 
     private let configPath: URL
     static let defaultTunnelMTU = 1280
     private static let tunnelMTURange = 576...65535
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "ConfigManager")
+        return PangolinLog(subsystem: subsystem, category: "ConfigManager")
     }()
 
     init() {
@@ -118,10 +124,92 @@ class ConfigManager: ObservableObject {
         }
     }
 
+    // MARK: - Org Settings
+
+    func setActiveOrg(id: String?, name: String?, serverSettings: ClientSettings?) {
+        activeOrgId = id
+        activeOrgName = name
+        self.serverSettings = serverSettings
+    }
+
+    func orgConfig(orgId: String) -> OrgConfig? {
+        config?.orgs?[orgId]
+    }
+
+    private var activeOrgConfig: OrgConfig? {
+        activeOrgId.flatMap { orgConfig(orgId: $0) }
+    }
+
+    /// Whether the active org has its own settings rather than using the ones for all
+    /// organizations. Its chosen exit node and match domains don't count: they aren't part of
+    /// the settings the user switches between.
+    var isOrgMode: Bool {
+        activeOrgConfig?.hasOwnSettings ?? false
+    }
+
+    /// Where changes in Settings are saved: the active org's own settings once it has them,
+    /// otherwise the ones for all organizations.
+    var activeScope: SettingsScope {
+        activeOrgId != nil && isOrgMode ? .org : .global
+    }
+
+    /// Gives the active org its own settings, starting as a copy of the ones it uses now, so
+    /// nothing changes until the user edits them. Every setting is copied, so later changes to
+    /// the settings for all organizations don't affect it. Values the org's administrator sets
+    /// aren't copied: they still apply on top.
+    func giveActiveOrgOwnSettings() -> Bool {
+        guard activeOrgId != nil else { return false }
+        let global = config
+        let globalMTU = global?.tunnelMTU.flatMap { Self.tunnelMTURange.contains($0) ? $0 : nil }
+        return update(scope: .org, global: { _ in }) { org in
+            org.dnsOverrideEnabled = org.dnsOverrideEnabled ?? global?.dnsOverrideEnabled ?? true
+            org.dnsTunnelEnabled = org.dnsTunnelEnabled ?? global?.dnsTunnelEnabled ?? false
+            org.primaryDNSServer = org.primaryDNSServer ?? global?.primaryDNSServer ?? ""
+            org.secondaryDNSServer = org.secondaryDNSServer ?? global?.secondaryDNSServer ?? ""
+            org.exitNodeTakesPrecedence =
+                org.exitNodeTakesPrecedence ?? global?.exitNodeTakesPrecedence ?? false
+            org.tunnelMTU = org.tunnelMTU ?? globalMTU ?? Self.defaultTunnelMTU
+        }
+    }
+
+    /// Removes the active org's own settings so it uses the ones for all organizations again.
+    /// Its chosen exit node and match domains aren't part of them, so they're kept.
+    func resetActiveOrgSettings() -> Bool {
+        guard activeOrgId != nil else { return true }
+        return update(scope: .org, global: { _ in }) { org in
+            org.dnsOverrideEnabled = nil
+            org.dnsTunnelEnabled = nil
+            org.primaryDNSServer = nil
+            org.secondaryDNSServer = nil
+            org.exitNodeTakesPrecedence = nil
+            org.tunnelMTU = nil
+        }
+    }
+
+    /// Saves a change to the global settings or the active org's own.
+    private func update(
+        scope: SettingsScope,
+        global: (inout Config) -> Void,
+        org: (inout OrgConfig) -> Void
+    ) -> Bool {
+        var updatedConfig = config ?? Config()
+        if scope == .org, let activeOrgId {
+            var orgs = updatedConfig.orgs ?? [:]
+            var entry = orgs[activeOrgId] ?? OrgConfig()
+            org(&entry)
+            orgs[activeOrgId] = entry.isEmpty ? nil : entry
+            updatedConfig.orgs = orgs.isEmpty ? nil : orgs
+        } else {
+            global(&updatedConfig)
+        }
+        return save(updatedConfig)
+    }
+
     // MARK: - DNS Settings
 
     func getDNSOverrideEnabled() -> Bool {
-        return config?.dnsOverrideEnabled ?? true
+        return serverSettings?.overrideDns ?? activeOrgConfig?.dnsOverrideEnabled
+            ?? config?.dnsOverrideEnabled ?? true
     }
 
     /// Whether at least one upstream DNS server is configured. Required on iOS before DNS
@@ -132,16 +220,23 @@ class ConfigManager: ObservableObject {
     }
 
     func getDNSTunnelEnabled() -> Bool {
-        return config?.dnsTunnelEnabled ?? false
+        return serverSettings?.tunnelDns ?? activeOrgConfig?.dnsTunnelEnabled
+            ?? config?.dnsTunnelEnabled ?? false
     }
 
     func getPrimaryDNSServer() -> String {
-        return config?.primaryDNSServer ?? ""
+        if let serverSettings, serverSettings.managesUpstreamDNS {
+            return serverSettings.primaryDns ?? ""
+        }
+        return activeOrgConfig?.primaryDNSServer ?? config?.primaryDNSServer ?? ""
     }
 
     func getSecondaryDNSServer() -> String {
+        if let serverSettings, serverSettings.managesUpstreamDNS {
+            return serverSettings.secondaryDns ?? ""
+        }
         // Return empty string if not set (no default for secondary)
-        return config?.secondaryDNSServer ?? ""
+        return activeOrgConfig?.secondaryDNSServer ?? config?.secondaryDNSServer ?? ""
     }
 
     /// Enables or disables DNS override. On iOS, requires at least one upstream DNS server to
@@ -149,54 +244,63 @@ class ConfigManager: ObservableObject {
     /// false and leaves the setting unchanged if enabling is requested without one. macOS has no
     /// such requirement: leaving both blank there falls back to SCDynamicStore-detected system
     /// DNS instead.
-    func setDNSOverrideEnabled(_ enabled: Bool) -> Bool {
+    func setDNSOverrideEnabled(_ enabled: Bool, scope: SettingsScope = .global) -> Bool {
         #if os(iOS)
             if enabled && !hasUpstreamDNSServer {
                 return false
             }
         #endif
-        var updatedConfig = config ?? Config()
-        updatedConfig.dnsOverrideEnabled = enabled
-        if !enabled {
-            updatedConfig.dnsTunnelEnabled = false
-        }
-        return save(updatedConfig)
+        return update(
+            scope: scope,
+            global: {
+                $0.dnsOverrideEnabled = enabled
+                if !enabled { $0.dnsTunnelEnabled = false }
+            },
+            org: {
+                $0.dnsOverrideEnabled = enabled
+                if !enabled { $0.dnsTunnelEnabled = false }
+            })
     }
 
-    func setDNSTunnelEnabled(_ enabled: Bool) -> Bool {
-        var updatedConfig = config ?? Config()
-        updatedConfig.dnsTunnelEnabled = enabled
-        return save(updatedConfig)
+    func setDNSTunnelEnabled(_ enabled: Bool, scope: SettingsScope = .global) -> Bool {
+        update(
+            scope: scope,
+            global: { $0.dnsTunnelEnabled = enabled },
+            org: { $0.dnsTunnelEnabled = enabled })
     }
 
     /// Sets the primary upstream DNS server. On iOS, returns false and leaves the setting
     /// unchanged if clearing it would leave DNS override enabled with no upstream DNS server
     /// configured at all (see `setDNSOverrideEnabled`).
-    func setPrimaryDNSServer(_ server: String) -> Bool {
+    func setPrimaryDNSServer(_ server: String, scope: SettingsScope = .global) -> Bool {
         let trimmed: String? = server.isEmpty ? nil : server
         #if os(iOS)
             if trimmed == nil, getDNSOverrideEnabled(), getSecondaryDNSServer().isEmpty {
                 return false
             }
         #endif
-        var updatedConfig = config ?? Config()
-        updatedConfig.primaryDNSServer = trimmed
-        return save(updatedConfig)
+        // An org keeps an empty string so it can clear a server the global settings define.
+        return update(
+            scope: scope,
+            global: { $0.primaryDNSServer = trimmed },
+            org: { $0.primaryDNSServer = server })
     }
 
     /// Sets the secondary upstream DNS server. On iOS, returns false and leaves the setting
     /// unchanged if clearing it would leave DNS override enabled with no upstream DNS server
     /// configured at all (see `setDNSOverrideEnabled`).
-    func setSecondaryDNSServer(_ server: String) -> Bool {
+    func setSecondaryDNSServer(_ server: String, scope: SettingsScope = .global) -> Bool {
         let trimmed: String? = server.isEmpty ? nil : server
         #if os(iOS)
             if trimmed == nil, getDNSOverrideEnabled(), getPrimaryDNSServer().isEmpty {
                 return false
             }
         #endif
-        var updatedConfig = config ?? Config()
-        updatedConfig.secondaryDNSServer = trimmed
-        return save(updatedConfig)
+        // An org keeps an empty string so it can clear a server the global settings define.
+        return update(
+            scope: scope,
+            global: { $0.secondaryDNSServer = trimmed },
+            org: { $0.secondaryDNSServer = server })
     }
 
     /// On iOS, returns false and leaves settings unchanged if overrideEnabled is true but both
@@ -221,7 +325,8 @@ class ConfigManager: ObservableObject {
     /// should check against local records/upstream DNS. Queries for domains that don't match
     /// any pattern are sent directly to the host's system DNS servers instead.
     func getMatchDomains() -> [String] {
-        return config?.matchDomains ?? []
+        return serverSettings?.matchDomains ?? activeOrgConfig?.matchDomains
+            ?? config?.matchDomains ?? []
     }
 
     func setMatchDomains(_ domains: [String]) -> Bool {
@@ -245,13 +350,15 @@ class ConfigManager: ObservableObject {
     /// their aliases are not resolved, so all traffic is sent through the exit node instead of
     /// directly to resources.
     func getExitNodeTakesPrecedence() -> Bool {
-        return config?.exitNodeTakesPrecedence ?? false
+        return serverSettings?.exitNodeTakesPrecedence ?? activeOrgConfig?.exitNodeTakesPrecedence
+            ?? config?.exitNodeTakesPrecedence ?? false
     }
 
-    func setExitNodeTakesPrecedence(_ enabled: Bool) -> Bool {
-        var updatedConfig = config ?? Config()
-        updatedConfig.exitNodeTakesPrecedence = enabled
-        return save(updatedConfig)
+    func setExitNodeTakesPrecedence(_ enabled: Bool, scope: SettingsScope = .global) -> Bool {
+        update(
+            scope: scope,
+            global: { $0.exitNodeTakesPrecedence = enabled },
+            org: { $0.exitNodeTakesPrecedence = enabled })
     }
 
     // MARK: - Update Settings
@@ -305,31 +412,31 @@ class ConfigManager: ObservableObject {
     // MARK: - Advanced / MTU
 
     func getTunnelMTU() -> Int {
-        if let mtu = config?.tunnelMTU, Self.tunnelMTURange.contains(mtu) {
+        let mtu = serverSettings?.mtu ?? activeOrgConfig?.tunnelMTU ?? config?.tunnelMTU
+        if let mtu, Self.tunnelMTURange.contains(mtu) {
             return mtu
         }
         return Self.defaultTunnelMTU
     }
 
-    func setTunnelMTU(_ mtu: Int?) -> Bool {
-        var updatedConfig = config ?? Config()
+    func setTunnelMTU(_ mtu: Int?, scope: SettingsScope = .global) -> Bool {
         if let mtu {
             guard Self.tunnelMTURange.contains(mtu) else { return false }
-            updatedConfig.tunnelMTU = mtu
-        } else {
-            updatedConfig.tunnelMTU = nil
         }
-        return save(updatedConfig)
+        return update(
+            scope: scope,
+            global: { $0.tunnelMTU = mtu },
+            org: { $0.tunnelMTU = mtu })
     }
 
-    func setTunnelMTUFromString(_ string: String) -> Bool {
+    func setTunnelMTUFromString(_ string: String, scope: SettingsScope = .global) -> Bool {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            return setTunnelMTU(nil)
+            return setTunnelMTU(nil, scope: scope)
         }
         guard let mtu = Int(trimmed), Self.tunnelMTURange.contains(mtu) else {
             return false
         }
-        return setTunnelMTU(mtu)
+        return setTunnelMTU(mtu, scope: scope)
     }
 }

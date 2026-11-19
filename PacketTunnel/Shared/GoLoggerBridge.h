@@ -17,5 +17,12 @@
 // message: the log message
 void goLogToOSLog(const char* subsystem, const char* category, int level, const char* message);
 
+// Receives every message passed to goLogToOSLog, with the same level, so Swift can also write
+// it to the log file.
+typedef void (*GoLogFileSink)(int level, const char* message);
+
+// Sets the function that receives Go log messages. Set it before starting Go.
+void goLoggerSetFileSink(GoLogFileSink sink);
+
 #endif /* GoLoggerBridge_h */
 

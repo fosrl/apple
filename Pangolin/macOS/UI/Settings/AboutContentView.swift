@@ -16,6 +16,16 @@ struct AboutContentView: View {
     }
     
     var body: some View {
+        // A stack so Logs opens in place, with a back button.
+        NavigationStack {
+            content
+                .navigationDestination(for: AboutDestination.self) { _ in
+                    LogsContentView()
+                }
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
@@ -96,6 +106,19 @@ struct AboutContentView: View {
                     } header: {
                         Text("Legal")
                     }
+
+                    Section {
+                        NavigationLink(value: AboutDestination.logs) {
+                            Text("Logs")
+                                .font(.system(size: 13))
+                        }
+                    } header: {
+                        Text("Troubleshooting")
+                    } footer: {
+                        Text("Messages from the app and the tunnel. Save them when reporting a problem.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
@@ -105,3 +128,7 @@ struct AboutContentView: View {
     }
 }
 
+
+private enum AboutDestination: Hashable {
+    case logs
+}
