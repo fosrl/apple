@@ -101,13 +101,7 @@ struct StatusView: View {
             }
         }
 
-        if splitLeadingInset {
-            form
-                .contentMargins(.leading, 20, for: .scrollContent)
-                .modifier(StatusLeadingSectionMargins(length: 20))
-        } else {
-            form
-        }
+        form.splitPaneLeadingInset(splitLeadingInset)
     }
 
     private var siteSheetPresented: Binding<Bool> {
@@ -251,13 +245,28 @@ struct StatusView: View {
     }
 }
 
-/// Insets Form/List sections from the leading edge (iOS 26+). No-op on older OS.
-private struct StatusLeadingSectionMargins: ViewModifier {
+extension View {
+    /// Horizontal margins for forms shown in the trailing half of the Duo split, so
+    /// content clears the divider. Applied to both edges so left and right padding match.
+    @ViewBuilder
+    func splitPaneLeadingInset(_ enabled: Bool) -> some View {
+        if enabled {
+            self
+                .contentMargins(.horizontal, 20, for: .scrollContent)
+                .modifier(StatusHorizontalSectionMargins(length: 20))
+        } else {
+            self
+        }
+    }
+}
+
+/// Insets Form/List sections horizontally (iOS 26+). No-op on older OS.
+private struct StatusHorizontalSectionMargins: ViewModifier {
     let length: CGFloat
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.listSectionMargins(.leading, length)
+            content.listSectionMargins(.horizontal, length)
         } else {
             content
         }

@@ -8,6 +8,12 @@
 #import "GoLoggerBridge.h"
 #import <os/log.h>
 
+static GoLogFileSink fileSink = NULL;
+
+void goLoggerSetFileSink(GoLogFileSink sink) {
+    fileSink = sink;
+}
+
 void goLogToOSLog(const char* subsystem, const char* category, int level, const char* message) {
     if (!subsystem || !category || !message) {
         return;
@@ -39,5 +45,10 @@ void goLogToOSLog(const char* subsystem, const char* category, int level, const 
     }
     
     os_log_with_type(logger, logType, "%{public}s", message);
+
+    GoLogFileSink sink = fileSink;
+    if (sink) {
+        sink(level, message);
+    }
 }
 

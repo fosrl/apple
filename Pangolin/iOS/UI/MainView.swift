@@ -3,7 +3,7 @@ import SwiftUI
 enum TabSelection: Int {
     case home = 0
     case status = 1
-    case preferences = 2
+    case settings = 2
     case about = 3
 }
 
@@ -25,42 +25,40 @@ struct MainView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeStatusArrangementView(
-                configManager: configManager,
-                authManager: authManager,
-                accountManager: accountManager,
-                tunnelManager: tunnelManager,
-                showAccountPicker: $showAccountPicker,
-                showOrganizationPicker: $showOrganizationPicker,
-                showExitNodePicker: $showExitNodePicker,
-                showLoginView: $showLoginView,
-                startDeviceAuthImmediately: $startDeviceAuthImmediately,
-                selectedTab: $selectedTab
-            )
+            homeArrangement(showsSecondaryWhenFolded: false) { sideBySide in
+                statusView(splitLeadingInset: sideBySide)
+            }
             .tabItem {
                 Label("Home", systemImage: "house.fill")
             }
             .tag(TabSelection.home)
-            
-            StatusView(
-                olmStatusManager: tunnelManager.olmStatusManager,
-                exitNodes: tunnelManager.availableExitNodes
-            )
-                .tabItem {
-                    Label("Status", systemImage: "app.connected.to.app.below.fill")
-                }
+
+            homeArrangement { sideBySide in
+                statusView(splitLeadingInset: sideBySide)
+            }
+            .tabItem {
+                Label("Status", systemImage: "app.connected.to.app.below.fill")
+            }
             .tag(TabSelection.status)
-            
-            PreferencesView(configManager: configManager, tunnelManager: tunnelManager)
-                .tabItem {
-                    Label("Preferences", systemImage: "gearshape.fill")
-                }
-            .tag(TabSelection.preferences)
-            
-            AboutView()
-                .tabItem {
-                    Label("About", systemImage: "info.circle")
-                }
+
+            homeArrangement { sideBySide in
+                SettingsView(
+                    configManager: configManager,
+                    tunnelManager: tunnelManager,
+                    splitLeadingInset: sideBySide
+                )
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape.fill")
+            }
+            .tag(TabSelection.settings)
+
+            homeArrangement { sideBySide in
+                AboutView(splitLeadingInset: sideBySide)
+            }
+            .tabItem {
+                Label("About", systemImage: "info.circle")
+            }
             .tag(TabSelection.about)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -116,6 +114,36 @@ struct MainView: View {
         }
     }
 
+    private func statusView(splitLeadingInset: Bool) -> StatusView {
+        StatusView(
+            olmStatusManager: tunnelManager.olmStatusManager,
+            exitNodes: tunnelManager.availableExitNodes,
+            splitLeadingInset: splitLeadingInset
+        )
+    }
+
+    /// Every tab keeps Home in the leading half when unfolded and shows its own
+    /// content in the trailing half. Folded, non-Home tabs show their content alone.
+    private func homeArrangement<Secondary: View>(
+        showsSecondaryWhenFolded: Bool = true,
+        @ViewBuilder secondary: @escaping (_ sideBySide: Bool) -> Secondary
+    ) -> some View {
+        HomeArrangementView(
+            configManager: configManager,
+            authManager: authManager,
+            accountManager: accountManager,
+            tunnelManager: tunnelManager,
+            showAccountPicker: $showAccountPicker,
+            showOrganizationPicker: $showOrganizationPicker,
+            showExitNodePicker: $showExitNodePicker,
+            showLoginView: $showLoginView,
+            startDeviceAuthImmediately: $startDeviceAuthImmediately,
+            selectedTab: $selectedTab,
+            showsSecondaryWhenFolded: showsSecondaryWhenFolded,
+            secondary: secondary
+        )
+    }
+
     private func presentConnectionErrorIfNeeded() {
         guard scenePhase == .active else { return }
         guard let message = tunnelManager.connectionErrorMessage, !message.isEmpty else { return }
@@ -134,10 +162,12 @@ private func isHomeStatusSideBySide(
     horizontalSizeClass == .regular && size.width > size.height
 }
 
-/// Home tab root: ArrangementView with horizontal-only split on iOS 27.1+, else Home alone.
-/// Panes omit their own NavigationStack so the primary half does not reserve an empty
+/// Tab root: ArrangementView with Home in the leading half and the tab's content in
+/// the trailing half (horizontal-only split, iOS 27.1+). When not side by side, shows
+/// Home (Home tab) or the tab's content alone.
+/// Home omits its own NavigationStack so the primary half does not reserve an empty
 /// trailing column that looks like a sidebar gutter.
-struct HomeStatusArrangementView: View {
+struct HomeArrangementView<Secondary: View>: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var authManager: AuthManager
     @ObservedObject var accountManager: AccountManager
@@ -148,34 +178,43 @@ struct HomeStatusArrangementView: View {
     @Binding var showLoginView: Bool
     @Binding var startDeviceAuthImmediately: Bool
     @Binding var selectedTab: TabSelection
+    /// True for non-Home tabs: when folded, show the tab's content instead of Home.
+    let showsSecondaryWhenFolded: Bool
+    /// Trailing-half content; the argument is true while shown beside Home.
+    let secondary: (_ sideBySide: Bool) -> Secondary
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         if #available(iOS 27.1, *) {
             // Measure the full arrangement (not a single pane): half-width Home
-            // can be taller than wide even while Status is beside it.
+            // can be taller than wide even while the secondary is beside it.
             GeometryReader { geo in
                 let sideBySide = isHomeStatusSideBySide(
                     horizontalSizeClass: horizontalSizeClass,
                     size: geo.size
                 )
-                // No NavigationStack around the panes: a stack in the primary half
-                // reserves an empty trailing column that reads as a sidebar gutter.
-                ArrangementView {
-                    homeTab(
-                        embedsNavigationStack: false,
-                        showsStatusDetailsLink: !sideBySide
-                    )
-                } secondary: {
-                    StatusView(
-                        olmStatusManager: tunnelManager.olmStatusManager,
-                        exitNodes: tunnelManager.availableExitNodes,
-                        splitLeadingInset: true
-                    )
+                if showsSecondaryWhenFolded && !sideBySide {
+                    secondary(false)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else {
+                    // No NavigationStack around Home: a stack in the primary half
+                    // reserves an empty trailing column that reads as a sidebar gutter.
+                    ArrangementView {
+                        homeTab(
+                            embedsNavigationStack: false,
+                            // Hide only when Status is already the trailing pane.
+                            showsStatusDetailsLink: !sideBySide
+                                || (selectedTab != .home && selectedTab != .status)
+                        )
+                    } secondary: {
+                        secondary(true)
+                    }
+                    .arrangementViewStyle(.split.axes(.horizontal))
+                    .frame(width: geo.size.width, height: geo.size.height)
                 }
-                .arrangementViewStyle(.split.axes(.horizontal))
-                .frame(width: geo.size.width, height: geo.size.height)
             }
+        } else if showsSecondaryWhenFolded {
+            secondary(false)
         } else {
             homeTab(embedsNavigationStack: true, showsStatusDetailsLink: true)
         }
@@ -218,7 +257,7 @@ struct HomeTabView: View {
     @Binding var selectedTab: TabSelection
     /// When false, content is hosted inside an outer NavigationStack (Duo arrangement).
     var embedsNavigationStack: Bool = true
-    /// When false, Status is already visible beside Home (Duo unfolded landscape).
+    /// When false, another tab's content is beside Home (Duo unfolded landscape).
     var showsStatusDetailsLink: Bool = true
 
     private var tunnelStatus: TunnelStatus {
@@ -896,6 +935,9 @@ struct ExitNodePickerView: View {
     @State private var isApplying = false
     
     private var shouldDisableButtons: Bool {
+        if tunnelManager.isExitNodeLocked {
+            return true
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true

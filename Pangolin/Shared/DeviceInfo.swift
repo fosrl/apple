@@ -11,9 +11,9 @@ import UIKit
 #endif
 
 enum DeviceInfo {
-    private static let logger: OSLog = {
+    private static let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "DeviceInfo")
+        return PangolinLog(subsystem: subsystem, category: "DeviceInfo")
     }()
     
     static func getDeviceModelName() -> String {

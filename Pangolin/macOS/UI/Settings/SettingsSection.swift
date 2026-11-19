@@ -1,8 +1,11 @@
 import Combine
 import SwiftUI
 
-enum PreferencesSection: String, CaseIterable, Identifiable {
-    case preferences = "Preferences"
+enum SettingsSection: String, CaseIterable, Identifiable {
+    /// App behavior on this Mac: starting at login and on-demand activation.
+    case general = "General"
+    /// How the tunnel connects: DNS and advanced settings, which can differ per org.
+    case connection = "Connection"
     case accounts = "Accounts"
     case olmStatus = "Status"
     case about = "About"
@@ -11,8 +14,10 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
     
     var icon: String {
         switch self {
-        case .preferences:
+        case .general:
             return "gearshape.fill"
+        case .connection:
+            return "network"
         case .accounts:
             return "person.crop.circle.fill"
         case .olmStatus:
@@ -23,13 +28,13 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// Lets other parts of the app open Preferences on a given section. The window
+/// Lets other parts of the app open Settings on a given section. The window
 /// picks up the request when it appears or, if already open, right away.
 @MainActor
-final class PreferencesNavigation: ObservableObject {
-    static let shared = PreferencesNavigation()
+final class SettingsNavigation: ObservableObject {
+    static let shared = SettingsNavigation()
 
-    @Published var requestedSection: PreferencesSection?
+    @Published var requestedSection: SettingsSection?
     /// Asks the Accounts section to show the login sheet.
     @Published var requestedLogin: AccountLoginRequest?
 }

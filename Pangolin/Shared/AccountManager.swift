@@ -22,9 +22,9 @@ class AccountManager: ObservableObject {
         store.activeUserId
     }
 
-    private let logger: OSLog = {
+    private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
-        return OSLog(subsystem: subsystem, category: "AccountManager")
+        return PangolinLog(subsystem: subsystem, category: "AccountManager")
     }()
 
     init() {
@@ -133,6 +133,16 @@ class AccountManager: ObservableObject {
         account.orgSettings = settings.isEmpty ? nil : settings
         store.accounts[userId] = account
         _ = save()
+    }
+
+    func getServerSettings(userId: String, orgId: String) -> ClientSettings? {
+        getOrgSettings(userId: userId, orgId: orgId).serverSettings
+    }
+
+    func setServerSettings(userId: String, orgId: String, settings: ClientSettings?) {
+        updateOrgSettings(userId: userId, orgId: orgId) { orgSettings in
+            orgSettings.serverSettings = settings
+        }
     }
 
     func getExitNode(userId: String, orgId: String) -> Int? {

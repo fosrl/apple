@@ -1,10 +1,11 @@
 import SwiftUI
 import AppKit
 
-struct PreferencesContentView: View {
+/// Settings for how the tunnel connects. They can be saved for all organizations or only the
+/// current one, unlike the app-wide ones in `GeneralSettingsView`.
+struct ConnectionSettingsView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var tunnelManager: TunnelManager
-    @StateObject private var launchAtLoginManager = LaunchAtLoginManager()
     @State private var showPrimaryDNSModal = false
     @State private var showSecondaryDNSModal = false
     @State private var showMTUModal = false
@@ -12,7 +13,20 @@ struct PreferencesContentView: View {
     @State private var editingSecondaryDNS = ""
     @State private var editingMTU = ""
     @State private var showEnableDNSOverrideAlert = false
-    @State private var showLaunchAtLoginErrorAlert = false
+
+    /// Where changes are saved: the current org's own settings if it has them, otherwise the
+    /// ones for all organizations.
+    private var scope: SettingsScope {
+        configManager.activeScope
+    }
+
+    private var serverSettings: ClientSettings? {
+        configManager.serverSettings
+    }
+
+    private var orgName: String {
+        configManager.managingOrgName
+    }
 
     private var dnsOverrideEnabled: Bool {
         configManager.getDNSOverrideEnabled()
@@ -52,40 +66,14 @@ struct PreferencesContentView: View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
-                    Section(header: Text("General")) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Start at Login")
-                                    .font(.system(size: 13))
-                                Text("Automatically open Pangolin when you log in to your Mac.")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: Binding(
-                                get: { launchAtLoginManager.isEnabled },
-                                set: { newValue in
-                                    launchAtLoginManager.setEnabled(newValue)
-                                    if launchAtLoginManager.errorMessage != nil {
-                                        showLaunchAtLoginErrorAlert = true
-                                    }
-                                }
-                            ))
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        }
-                    }
-
-                    OnDemandActivationSection(
-                        configManager: configManager,
-                        tunnelManager: tunnelManager
-                    )
+                    OrgSettingsModeSection(configManager: configManager)
 
                     Section(header: Text("DNS Settings")) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Enable Aliases (DNS Override)")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.overrideDns != nil)
                                 Text("When enabled, the client uses custom DNS servers to resolve internal resources and aliases. This overrides your system's default DNS settings. Queries that cannot be resolved as a Pangolin resource will be forwarded to your configured Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
@@ -94,19 +82,22 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { dnsOverrideEnabled },
                                 set: { newValue in
-                                    if !configManager.setDNSOverrideEnabled(newValue) {
+                                    if !configManager.setDNSOverrideEnabled(newValue, scope: scope) {
                                         showEnableDNSOverrideAlert = true
                                     }
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
+                            .disabled(serverSettings?.overrideDns != nil)
                         }
+                        .managedSettingHelp(serverSettings?.overrideDns != nil, orgName: orgName)
 
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("DNS Over Tunnel")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.tunnelDns != nil)
                                 Text("When enabled, DNS queries are routed through the tunnel for remote resolution. To ensure queries are tunneled correctly, you must define the DNS server as a Pangolin resource and enter its address as an Upstream DNS Server.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
@@ -115,18 +106,20 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { dnsTunnelEnabled },
                                 set: { newValue in
-                                    _ = configManager.setDNSTunnelEnabled(newValue)
+                                    _ = configManager.setDNSTunnelEnabled(newValue, scope: scope)
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
-                            .disabled(!dnsOverrideEnabled)
+                            .disabled(!dnsOverrideEnabled || serverSettings?.tunnelDns != nil)
                         }
+                        .managedSettingHelp(serverSettings?.tunnelDns != nil, orgName: orgName)
                         
                         if dnsOverrideEnabled {
                             HStack {
                                 Text("Primary Upstream DNS Server")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.managesUpstreamDNS == true)
                                 Spacer()
                                 Text(displayPrimaryDNS)
                                     .font(.system(size: 13))
@@ -137,11 +130,14 @@ struct PreferencesContentView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                .disabled(serverSettings?.managesUpstreamDNS == true)
                             }
+                            .managedSettingHelp(serverSettings?.managesUpstreamDNS == true, orgName: orgName)
                             
                             HStack {
                                 Text("Secondary Upstream DNS Server")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.managesUpstreamDNS == true)
                                 Spacer()
                                 Text(displaySecondaryDNS)
                                     .font(.system(size: 13))
@@ -152,7 +148,9 @@ struct PreferencesContentView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                .disabled(serverSettings?.managesUpstreamDNS == true)
                             }
+                            .managedSettingHelp(serverSettings?.managesUpstreamDNS == true, orgName: orgName)
                         }
                     }
 
@@ -161,6 +159,7 @@ struct PreferencesContentView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Exit Node Takes Precedence Over Resources")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.exitNodeTakesPrecedence != nil)
                                 Text("When enabled, routes for individual resources are not added to the system and their aliases are not resolved, so all traffic is sent through the exit node instead of directly to resources.")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
@@ -169,17 +168,20 @@ struct PreferencesContentView: View {
                             Toggle("", isOn: Binding(
                                 get: { exitNodeTakesPrecedence },
                                 set: { newValue in
-                                    _ = configManager.setExitNodeTakesPrecedence(newValue)
+                                    _ = configManager.setExitNodeTakesPrecedence(newValue, scope: scope)
                                 }
                             ))
                             .toggleStyle(.switch)
                             .labelsHidden()
+                            .disabled(serverSettings?.exitNodeTakesPrecedence != nil)
                         }
+                        .managedSettingHelp(serverSettings?.exitNodeTakesPrecedence != nil, orgName: orgName)
 
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
                                 Text("MTU")
                                     .font(.system(size: 13))
+                                    .managedLock(serverSettings?.mtu != nil)
                                 Spacer()
                                 Text(tunnelMTUDisplay)
                                     .font(.system(size: 13))
@@ -190,12 +192,14 @@ struct PreferencesContentView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                .disabled(serverSettings?.mtu != nil)
                             }
 
                             Text("Your sites must be configured to use the same MTU value.")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
+                        .managedSettingHelp(serverSettings?.mtu != nil, orgName: orgName)
                     }
 
                     Section(header: Text("Help")) {
@@ -216,13 +220,16 @@ struct PreferencesContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            await tunnelManager.refreshClientSettings()
+        }
         .sheet(isPresented: $showPrimaryDNSModal) {
             DNSServerModalView(
                 title: "Primary Upstream DNS Server:",
                 dnsServer: $editingPrimaryDNS,
                 isPresented: $showPrimaryDNSModal,
                 onSave: { newValue in
-                    _ = configManager.setPrimaryDNSServer(newValue)
+                    _ = configManager.setPrimaryDNSServer(newValue, scope: scope)
                 }
             )
         }
@@ -232,7 +239,7 @@ struct PreferencesContentView: View {
                 dnsServer: $editingSecondaryDNS,
                 isPresented: $showSecondaryDNSModal,
                 onSave: { newValue in
-                    _ = configManager.setSecondaryDNSServer(newValue)
+                    _ = configManager.setSecondaryDNSServer(newValue, scope: scope)
                 }
             )
         }
@@ -242,7 +249,7 @@ struct PreferencesContentView: View {
                 mtuValue: $editingMTU,
                 isPresented: $showMTUModal,
                 onSave: { newValue in
-                    _ = configManager.setTunnelMTUFromString(newValue)
+                    _ = configManager.setTunnelMTUFromString(newValue, scope: scope)
                 }
             )
         }
@@ -251,18 +258,8 @@ struct PreferencesContentView: View {
         } message: {
             Text("Set a Primary or Secondary Upstream DNS Server before enabling Aliases (DNS Override).")
         }
-        .alert("Start at Login", isPresented: $showLaunchAtLoginErrorAlert) {
-            Button("OK", role: .cancel) {
-                launchAtLoginManager.errorMessage = nil
-            }
-        } message: {
-            Text(launchAtLoginManager.errorMessage ?? "Unable to update the Start at Login setting.")
-        }
-        .onAppear {
-            launchAtLoginManager.refresh()
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            launchAtLoginManager.refresh()
+            Task { await tunnelManager.refreshClientSettings() }
         }
     }
 }

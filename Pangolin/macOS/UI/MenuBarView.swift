@@ -281,8 +281,8 @@ struct MenuBarView: View {
 
         MenuSeparator()
 
-        MenuItem(title: "Preferences…", shortcut: "⌘,") {
-            openPreferencesWindow()
+        MenuItem(title: "Settings…", shortcut: "⌘,") {
+            openSettingsWindow()
         }
         .keyboardShortcut(",", modifiers: .command)
 
@@ -395,7 +395,7 @@ struct MenuBarView: View {
                     olmStatusManager: tunnelManager.olmStatusManager,
                     tunnelManager: tunnelManager,
                     controller: submenus.child,
-                    openStatusPanel: { openPreferencesWindow(section: .olmStatus) })
+                    openStatusPanel: { openSettingsWindow(section: .olmStatus) })
             } label: {
                 tunnelStatusLabel
             }
@@ -536,7 +536,7 @@ struct MenuBarView: View {
                     tunnelManager: tunnelManager,
                     activity: activity,
                     addAccount: { openLoginWindow() },
-                    manageAccounts: { openPreferencesWindow(section: .accounts) },
+                    manageAccounts: { openSettingsWindow(section: .accounts) },
                     logOut: {
                         dismissMenu()
                         activity.logOut()
@@ -731,23 +731,23 @@ struct MenuBarView: View {
         NSWorkspace.shared.open(url)
     }
 
-    /// Opens Preferences on Accounts with the login sheet. `renewing` logs in to
+    /// Opens Settings on Accounts with the login sheet. `renewing` logs in to
     /// that server right away, for a locked account.
     private func openLoginWindow(renewing hostname: String? = nil) {
-        PreferencesNavigation.shared.requestedLogin = AccountLoginRequest(hostname: hostname)
-        openPreferencesWindow(section: .accounts)
+        SettingsNavigation.shared.requestedLogin = AccountLoginRequest(hostname: hostname)
+        openSettingsWindow(section: .accounts)
     }
 
-    private func openPreferencesWindow(section: PreferencesSection? = nil) {
+    private func openSettingsWindow(section: SettingsSection? = nil) {
         if let section {
-            PreferencesNavigation.shared.requestedSection = section
+            SettingsNavigation.shared.requestedSection = section
         }
-        // A new window only gets its identifier once PreferencesWindow configures
+        // A new window only gets its identifier once SettingsWindow configures
         // it, and its title follows the selected section, so match on either.
-        let titles = Set(["Preferences"] + PreferencesSection.allCases.map(\.rawValue))
+        let titles = Set(["Settings"] + SettingsSection.allCases.map(\.rawValue))
         presentWindow(
-            id: "preferences",
-            matches: { $0.identifier?.rawValue == "preferences" || titles.contains($0.title) })
+            id: "settings",
+            matches: { $0.identifier?.rawValue == "settings" || titles.contains($0.title) })
     }
 
     /// Opens or raises one of the app's windows and makes it key.
@@ -941,6 +941,9 @@ struct ExitNodeSubmenu: View {
     }
 
     private var isDisabled: Bool {
+        if tunnelManager.isExitNodeLocked {
+            return true
+        }
         switch tunnelManager.status {
         case .starting, .registering:
             return true
