@@ -293,7 +293,8 @@ struct MenuBarView: View {
                 checkForUpdates: {
                     dismissMenu()
                     updater.checkForUpdates()
-                })
+                },
+                installCLI: openCLIInstallWindow)
         }
     }
 
@@ -650,6 +651,8 @@ struct MenuBarView: View {
     }
 
     private func handleMenuOpen() async {
+        CLIInstaller.shared.refreshInstalled()
+
         // Accessory menu bar apps often never become active, so didBecomeActive
         // does not refresh the on-demand start blob. Opening the menu does.
         await tunnelManager.refreshProviderConfigurationIfOnDemandEnabled()
@@ -748,6 +751,16 @@ struct MenuBarView: View {
         presentWindow(
             id: "settings",
             matches: { $0.identifier?.rawValue == "settings" || titles.contains($0.title) })
+    }
+
+    private func openCLIInstallWindow() {
+        CLIInstaller.shared.resetForPresentation()
+        presentWindow(
+            id: CLIInstallWindow.windowID,
+            matches: {
+                $0.identifier?.rawValue == CLIInstallWindow.windowID
+                    || $0.title == CLIInstallWindow.windowTitle
+            })
     }
 
     /// Opens or raises one of the app's windows and makes it key.
@@ -1079,6 +1092,8 @@ struct MoreSubmenu: View {
     @ObservedObject var checkForUpdatesViewModel: CheckForUpdatesViewModel
     let openURL: (String) -> Void
     let checkForUpdates: () -> Void
+    let installCLI: () -> Void
+    @ObservedObject private var cliInstaller = CLIInstaller.shared
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -1110,5 +1125,11 @@ struct MoreSubmenu: View {
             checkForUpdates()
         }
         .disabled(!checkForUpdatesViewModel.canCheckForUpdates)
+        if !cliInstaller.isInstalled {
+            MenuItem(title: cliInstaller.isInstalling ? "Installing CLI…" : "Install Pangolin CLI…") {
+                installCLI()
+            }
+            .disabled(cliInstaller.isInstalling)
+        }
     }
 }
