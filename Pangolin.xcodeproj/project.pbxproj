@@ -958,7 +958,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4668XHFAHF;
@@ -998,7 +998,7 @@
 					"$(SRCROOT)/PangolinGo",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1028,7 +1028,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4668XHFAHF;
@@ -1068,7 +1068,7 @@
 					"$(SRCROOT)/PangolinGo",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1126,7 +1126,7 @@
 					"$(SRCROOT)/PangolinGo",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
@@ -1183,7 +1183,7 @@
 					"$(SRCROOT)/PangolinGo",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				OTHER_LDFLAGS = "-lpangolin";
 				PRODUCT_BUNDLE_IDENTIFIER = net.pangolin.Pangolin.PacketTunnel;
 				PRODUCT_NAME = "$(inherited)";
