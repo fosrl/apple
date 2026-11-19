@@ -96,8 +96,8 @@ struct MenuBarLabel: View {
 
     /// Login, settings, and onboarding windows that should keep the app in the Dock.
     private static func hasVisibleAppWindow() -> Bool {
-        let knownIds: Set<String> = ["settings", "onboarding"]
-        var knownTitles: Set<String> = ["Pangolin Setup"]
+        let knownIds: Set<String> = ["settings", "onboarding", CLIInstallWindow.windowID]
+        var knownTitles: Set<String> = ["Pangolin Setup", CLIInstallWindow.windowTitle]
         knownTitles.formUnion(SettingsSection.allCases.map(\.rawValue))
 
         return NSApp.windows.contains { window in
@@ -129,9 +129,21 @@ struct AnimatedLoadingIcon: View {
 }
 
 final class PangolinAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// Serves this app's session to the Pangolin CLI in companion mode.
+    private var cliSecretsServer: CLISecretsServer?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
         PangolinAppShortcuts.updateAppShortcutParameters()
+
+        let server = CLISecretsServer(
+            secretManager: SecretManager(), socketPath: CLISecretsServer.defaultSocketPath)
+        server.start()
+        cliSecretsServer = server
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        cliSecretsServer?.stop()
     }
 
     func userNotificationCenter(
@@ -290,6 +302,13 @@ struct PangolinApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 560, height: 520)
         .windowResizability(.contentSize)
+
+        // Install CLI Window
+        Window(CLIInstallWindow.windowTitle, id: CLIInstallWindow.windowID) {
+            CLIInstallWindow(installer: CLIInstaller.shared)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
 
         // Settings Window
         WindowGroup("Settings", id: "settings") {
