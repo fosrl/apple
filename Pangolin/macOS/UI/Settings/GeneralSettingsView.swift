@@ -13,14 +13,6 @@ struct GeneralSettingsView: View {
         VStack(spacing: 0) {
             ScrollView {
                 Form {
-                    Section {
-                        SettingsBannerText(
-                            title: "Shared by all organizations and accounts",
-                            detail: "These settings apply to every organization and account on this Mac.",
-                            systemImage: "laptopcomputer"
-                        )
-                    }
-
                     Section(header: Text("Startup")) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {

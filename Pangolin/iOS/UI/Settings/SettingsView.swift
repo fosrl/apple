@@ -265,14 +265,6 @@ struct GeneralSettingsView: View {
     var body: some View {
         Form {
             Section {
-                SettingsBannerText(
-                    title: "Shared by all organizations and accounts",
-                    detail: "These settings apply to every organization and account on this device.",
-                    systemImage: "iphone"
-                )
-            }
-
-            Section {
                 Toggle(isOn: $liveActivityEnabled) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Dynamic Island & Live Activity")
