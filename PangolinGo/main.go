@@ -92,6 +92,10 @@ func initOlm(configJSON *C.char) *C.char {
 		Version:    config.Version,
 		Agent:      config.Agent,
 		OlmVersion: olmVersionOverride,
+		// The system extension can't ask the user to approve adding the
+		// block page CA to the trust store; the app does that (see
+		// BlockPageTrustManager) and tells olm to check again.
+		BlockPageTrustByHost: true,
 	}
 
 	// Initialize OLM with context and GlobalConfig

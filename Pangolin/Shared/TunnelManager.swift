@@ -73,6 +73,11 @@ class TunnelManager: NSObject, ObservableObject {
     // Fingerprint/posture checking poller
     let fingerprintManager: FingerprintManager
 
+    #if os(macOS)
+        /// Asks the user to trust the DNS block page certificate when olm needs it.
+        let blockPageTrust: BlockPageTrustManager
+    #endif
+
     private let logger: PangolinLog = {
         let subsystem = Bundle.main.bundleIdentifier ?? "net.pangolin.Pangolin"
         return PangolinLog(subsystem: subsystem, category: "TunnelManager")
@@ -119,6 +124,7 @@ class TunnelManager: NSObject, ObservableObject {
         self.fingerprintManager = FingerprintManager()
         #if os(macOS)
             self.fingerprintManager.startCacheRefresh(interval: 3 * 3600)
+            self.blockPageTrust = BlockPageTrustManager(socketManager: self.socketManager)
         #endif
         self.savedExitNodeResourceId = Self.savedExitNode(
             configManager: configManager, accountManager: accountManager, orgId: accountManager.activeAccount?.orgId)
@@ -1441,6 +1447,13 @@ class TunnelManager: NSObject, ObservableObject {
                             }
                         }
 
+                        #if os(macOS)
+                            let blockPage = socketStatus.blockPage
+                            await MainActor.run {
+                                self.blockPageTrust.observe(blockPage)
+                            }
+                        #endif
+
                         // Determine the new tunnel status based on socket response
                         let newStatus: TunnelStatus
                         if socketStatus.connected && socketStatus.registered == true {
@@ -1534,6 +1547,12 @@ class TunnelManager: NSObject, ObservableObject {
         // Clear cached values
         lastTunnelStatus = nil
         lastIsNEConnected = false
+
+        #if os(macOS)
+            Task { @MainActor in
+                self.blockPageTrust.observe(nil)
+            }
+        #endif
     }
 
     #if os(iOS)

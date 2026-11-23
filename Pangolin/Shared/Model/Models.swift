@@ -434,6 +434,23 @@ struct SocketStatusResponse: Codable, Equatable {
     let gatewayActive: Bool?
     let gatewaySiteResourceId: Int?
     let gatewaySiteIds: [Int]?
+    /// DNS block page state; present only while the org blocks domains that get a block page.
+    let blockPage: BlockPageStatus?
+}
+
+/// Whether browsers opening a blocked domain see Pangolin's block page. Over HTTPS that needs
+/// the system to trust this device's block page certificate authority, which the macOS app
+/// installs with the user's approval (see BlockPageTrustManager).
+struct BlockPageStatus: Codable, Equatable {
+    /// Blocked domains go to the block page; when false their lookups fail instead.
+    let active: Bool
+    /// The system trusts the block page CA.
+    let trusted: Bool
+    let caPath: String?
+    /// Why the block page is off, if it is.
+    let error: String?
+    /// The CA exists but is not trusted yet, so installing it would turn the block page on.
+    let needsTrust: Bool?
 }
 
 struct SocketPeer: Codable, Equatable {

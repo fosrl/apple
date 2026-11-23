@@ -106,6 +106,18 @@ class SocketManager {
         return try await performRequest(method: "PUT", path: "/metadata", body: bodyData)
     }
 
+    /// This device's DNS block page certificate authority, in PEM form. Only present while
+    /// the org blocks domains that get a block page.
+    func getBlockPageCA() async throws -> Data {
+        return try await performRawRequest(method: "GET", path: "/blockpage/ca", body: nil)
+    }
+
+    /// Asks olm to check again whether the system trusts the block page CA, after the app
+    /// added it, and returns the new block page state.
+    func recheckBlockPage() async throws -> BlockPageStatus {
+        return try await performRequest(method: "POST", path: "/blockpage/recheck", body: nil)
+    }
+
     // MARK: - Private Methods
 
     private func performRequest<T: Decodable>(
@@ -113,6 +125,29 @@ class SocketManager {
         path: String,
         body: Data?
     ) async throws -> T {
+        let responseBody = try await performRawRequest(method: method, path: path, body: body)
+
+        // Decode JSON response
+        do {
+            let decoder = JSONDecoder()
+            return try decoder.decode(T.self, from: responseBody)
+        } catch {
+            os_log(
+                "JSON decode error: %{public}@", log: logger, type: .error,
+                error.localizedDescription)
+            if let bodyString = String(data: responseBody, encoding: .utf8) {
+                os_log("Failed to decode body: %{public}@", log: logger, type: .error, bodyString)
+            }
+            throw SocketError.decodingError(error)
+        }
+    }
+
+    /// Sends a request and returns the response body of a 2xx answer.
+    private func performRawRequest(
+        method: String,
+        path: String,
+        body: Data?
+    ) async throws -> Data {
         // Check if socket exists
         guard FileManager.default.fileExists(atPath: socketPath) else {
             throw SocketError.socketDoesNotExist
@@ -148,19 +183,7 @@ class SocketManager {
             throw SocketError.httpError(statusCode, errorMessage)
         }
 
-        // Decode JSON response
-        do {
-            let decoder = JSONDecoder()
-            return try decoder.decode(T.self, from: responseBody)
-        } catch {
-            os_log(
-                "JSON decode error: %{public}@", log: logger, type: .error,
-                error.localizedDescription)
-            if let bodyString = String(data: responseBody, encoding: .utf8) {
-                os_log("Failed to decode body: %{public}@", log: logger, type: .error, bodyString)
-            }
-            throw SocketError.decodingError(error)
-        }
+        return responseBody
     }
 
     private func connectAndSend(requestData: Data) async throws -> Data {

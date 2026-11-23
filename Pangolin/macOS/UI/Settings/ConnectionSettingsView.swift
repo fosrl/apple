@@ -154,6 +154,8 @@ struct ConnectionSettingsView: View {
                         }
                     }
 
+                    BlockPageTrustSection(manager: tunnelManager.blockPageTrust)
+
                     Section(header: Text("Advanced")) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
